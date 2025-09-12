@@ -293,6 +293,9 @@ class SPRestApi {
   const capexFlag = document.getElementById('capexFlag');
   const milestoneSection = document.getElementById('milestoneSection');
   const projectList = document.getElementById('projectList');
+  const projectDetails = document.getElementById('projectDetails');
+  const appContainer = document.getElementById('app');
+  const newProjectBtn = document.getElementById('newProjectBtn');
   const saveDraftBtn = document.getElementById('saveDraftBtn');
   const backBtn = document.getElementById('backBtn');
   google.charts.load('current', { packages: ['gantt'] });
@@ -357,16 +360,77 @@ class SPRestApi {
   }
 
   function showForm() {
-    if (projectList) projectList.style.display = 'none';
+    if (appContainer) appContainer.style.display = 'none';
     form.style.display = 'block';
     if (backBtn) backBtn.style.display = 'inline-flex';
+    if (newProjectBtn) newProjectBtn.style.display = 'none';
   }
 
   function showProjectList() {
     form.style.display = 'none';
-    if (projectList) projectList.style.display = 'flex';
+    if (appContainer) appContainer.style.display = 'flex';
     if (backBtn) backBtn.style.display = 'none';
+    if (newProjectBtn) newProjectBtn.style.display = 'inline-block';
     resetForm();
+  }
+
+  function getStatusColor(status) {
+    switch (status) {
+      case 'Rascunho': return '#414141';
+      case 'Em Aprovação': return '#970886';
+      case 'Recusado': return '#f83241';
+      case 'Aprovado': return '#fe8f46';
+      default: return '#414141';
+    }
+  }
+
+  function showProjectDetails(item) {
+    if (!projectDetails) return;
+    if (!item) {
+      projectDetails.innerHTML = '<div class="project-details"><div class="empty">Selecione um projeto</div></div>';
+      return;
+    }
+    projectDetails.innerHTML = `
+      <div class="project-details">
+        <div class="details-header">
+          <h1>${item.Title}</h1>
+          <span class="status-badge" style="background:${getStatusColor(item.Status)}">${item.Status}</span>
+        </div>
+        <div class="details-grid">
+          <div class="detail-card">
+            <h3>Orçamento</h3>
+            <p>${BRL.format(item.CapexBudgetBRL || 0)}</p>
+          </div>
+        </div>
+        <div class="detail-desc">
+          <h3>Descrição do Projeto</h3>
+          <p>${item.Descricao || ''}</p>
+        </div>
+        <div class="detail-actions">
+          <button type="button" class="action-btn edit" id="editProjectDetails">Editar Projeto</button>
+          <button type="button" class="action-btn report">Relatório</button>
+          ${item.Status === 'Rascunho' ? '<button type="button" class="action-btn approve">Enviar para Aprovação</button>' : ''}
+        </div>
+      </div>`;
+    const editBtn = document.getElementById('editProjectDetails');
+    if (editBtn) {
+      const editable = item.Status === 'Rascunho' || item.Status === 'Reprovado para Revisão';
+      if (editable) {
+        editBtn.addEventListener('click', () => editProject(item.Id));
+      } else {
+        editBtn.disabled = true;
+      }
+    }
+  }
+
+  if (newProjectBtn) {
+    newProjectBtn.addEventListener('click', () => {
+      resetFormWithoutAlert = true;
+      resetForm();
+      showForm();
+      updateStatus('', 'info');
+      resetFormWithoutAlert = false;
+    });
   }
 
   async function loadUserProjects() {
@@ -379,36 +443,27 @@ class SPRestApi {
     });
     const items = res.d?.results || [];
 
-    const newCard = document.createElement('div');
-    newCard.className = 'card new-project';
-    newCard.innerHTML = '<div class="icon"><span class="material-symbols-outlined">assignment_add</span></div><div>Criar novo projeto</div>';
-    newCard.addEventListener('click', () => {
-      resetFormWithoutAlert = true;
-      resetForm();
-      showForm();
-      updateStatus('', 'info');
-      resetFormWithoutAlert = false;
-    });
-    projectList.appendChild(newCard);
-
     items.forEach(item => {
       const card = document.createElement('div');
-      card.className = 'card';
+      card.className = 'project-card';
       card.innerHTML = `
+        <span class="status-badge" style="background:${getStatusColor(item.Status)}">${item.Status}</span>
         <h3>${item.Title}</h3>
-        <p>${BRL.format(item.CapexBudgetBRL || 0)}</p>
-        <span class="project-status">${item.Status}</span>
-        <button type="button"><span class="material-symbols-outlined">edit</span>Editar</button>`;
-      const btn = card.querySelector('button');
-      const editable = item.Status === 'Rascunho' || item.Status === 'Reprovado para Revisão';
-      if (editable) {
-        btn.addEventListener('click', () => editProject(item.Id));
-      } else {
-        btn.disabled = true;
-      }
+        <p>${BRL.format(item.CapexBudgetBRL || 0)}</p>`;
+      card.addEventListener('click', () => {
+        showProjectDetails(item);
+        [...projectList.children].forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+      });
       projectList.appendChild(card);
     });
     showProjectList();
+    if (items.length) {
+      showProjectDetails(items[0]);
+      projectList.firstChild.classList.add('selected');
+    } else {
+      showProjectDetails(null);
+    }
   }
 
   function fillForm(item) {

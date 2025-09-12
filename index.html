@@ -8,10 +8,18 @@
 </head>
 
 <body id="static-mirror">
-    <div class="wrap">
-        <h1>CIPM 2.0 Stages Waterfall</h1>
-        <section id="projectList"></section>
-        <form id="capexForm" novalidate style="display: none;">
+    <header class="main-header">
+        <div class="logo"></div>
+        <button type="button" id="newProjectBtn" class="new-project-btn">Novo Projeto</button>
+    </header>
+    <div id="app">
+        <aside id="projectSidebar">
+            <h2>Projetos</h2>
+            <div id="projectList"></div>
+        </aside>
+        <main id="projectDetails"></main>
+    </div>
+    <form id="capexForm" novalidate style="display: none;">
             <button type="button" id="backBtn" class="btn" style="display:none;"><span class="material-symbols-outlined">arrow_back</span> Voltar</button>
             <h2>Novo Projeto de CAPEX Normativo</h2>
             <p class="hint">Preencha os dados do projeto. Se o <strong>CAPEX BUDGET</strong> for superior a <strong>R$ 500.000,00</strong>, você deverá adicionar <em>marcos</em> (milestones) e ao menos 2 atividade em cada marco.</p>
@@ -198,7 +206,6 @@
 
         <h3 id="ganttCharTitle" style="display: none;">Programação do Projeto</h3>
         <div id="ganttChart"></div>
-    </div>
 
     <!-- Templates -->
     <template id="milestoneTemplate">
