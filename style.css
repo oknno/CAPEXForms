@@ -191,83 +191,6 @@
 }
 
 
-#static-mirror #projectList {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  justify-content: center;
-}
-
-#static-mirror #projectList .card {
-  background-color: #fff;
-  border-radius: 5px;
-  padding: 10px;
-  width: 320px;
-  position: relative;
-}
-
-#static-mirror #projectList .card h3 {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#static-mirror #projectList .card.new-project {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-purple);
-  color: #fff;
-  font-size: large;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  user-select: none;
-}
-
-#static-mirror #projectList .card.new-project .icon {
-  font-size: xx-large;
-}
-
-#static-mirror #projectList .card.new-project:hover {
-  background: var(--color-am-orange);
-}
-
-#static-mirror #projectList .card .project-status {
-  border-radius: 30px;
-  height: 20px;
-  min-width: 20px;
-  background-color: #444;
-  color: #fff;
-  font-size: x-small;
-  padding: 5px 15px;
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#static-mirror #projectList .card button {
-  width: 100%;
-  border: none;
-  background: var(--color-am-orange);
-  color: #ffffff;
-  padding: 10px 14px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: x-small;
-  transition: all 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#static-mirror #projectList .card button:hover {
-  background: var(--color-purple);
-}
 
 @media (max-width: 860px) {
   #static-mirror .row {
@@ -317,6 +240,195 @@
 
 #static-mirror .btn.secondary:hover {
   background: var(--color-am-orange);
+}
+
+/* New layout for project list and details */
+#static-mirror .main-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+
+#static-mirror .logo {
+  background: url('Images/logo.png') center/contain no-repeat;
+  width: 200px;
+  height: 60px;
+}
+
+#static-mirror .new-project-btn {
+  background: linear-gradient(90deg, #feb557, #f94141, #7d0980);
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#static-mirror #app {
+  display: flex;
+  height: calc(100vh - 80px);
+}
+
+#static-mirror #projectSidebar {
+  width: 300px;
+  background: #d9d9d9;
+  overflow-y: auto;
+  padding: 20px 10px;
+}
+
+#static-mirror #projectSidebar h2 {
+  margin: 0 0 10px;
+  color: #555;
+}
+
+#static-mirror #projectList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#static-mirror #projectList .project-card {
+  cursor: pointer;
+  padding: 12px;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+
+#static-mirror #projectList .project-card:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+#static-mirror #projectList .project-card.selected {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+#static-mirror #projectList .project-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+#static-mirror #projectList .project-card p {
+  margin: 0;
+  font-size: 13px;
+  color: #555;
+}
+
+#static-mirror .status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+#static-mirror #projectDetails {
+  flex: 1;
+  background: #f8f9fa;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+#static-mirror .project-details {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+#static-mirror .project-details .details-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+#static-mirror .project-details h1 {
+  margin: 0;
+  font-size: 24px;
+  color: #333;
+}
+
+#static-mirror .project-details .details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+#static-mirror .project-details .detail-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+#static-mirror .project-details .detail-card h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #555;
+}
+
+#static-mirror .project-details .detail-card p {
+  margin: 0;
+  font-size: 18px;
+}
+
+#static-mirror .project-details .detail-desc {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+#static-mirror .project-details .detail-desc h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #555;
+}
+
+#static-mirror .project-details .detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+#static-mirror .project-details .action-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+#static-mirror .project-details .action-btn.edit {
+  background: #1e40af;
+  color: #fff;
+}
+
+#static-mirror .project-details .action-btn.report {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+#static-mirror .project-details .action-btn.approve {
+  background: #16a34a;
+  color: #fff;
+}
+
+#static-mirror .project-details .action-btn:hover {
+  opacity: 0.9;
+}
+
+#static-mirror .project-details .empty {
+  color: #555;
+  text-align: center;
+  margin-top: 40px;
 }
 
 #static-mirror .btn.primary:hover {
