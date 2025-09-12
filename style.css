@@ -271,6 +271,8 @@
 #static-mirror #app {
   display: flex;
   height: calc(100vh - 80px);
+  padding: 0 20px;
+  box-sizing: border-box;
 }
 
 #static-mirror #projectSidebar {
@@ -309,6 +311,8 @@
 #static-mirror #projectList .project-card h3 {
   margin: 0;
   font-size: 16px;
+  font-weight: 700;
+  color: #000;
 }
 
 #static-mirror #projectList .project-card p {
@@ -324,6 +328,13 @@
   font-size: 11px;
   color: #fff;
   margin-bottom: 6px;
+}
+
+#static-mirror #projectList .status-badge {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  font-weight: 600;
 }
 
 #static-mirror #projectDetails {
@@ -409,11 +420,6 @@
 #static-mirror .project-details .action-btn.edit {
   background: #1e40af;
   color: #fff;
-}
-
-#static-mirror .project-details .action-btn.report {
-  background: #e5e7eb;
-  color: #374151;
 }
 
 #static-mirror .project-details .action-btn.approve {
