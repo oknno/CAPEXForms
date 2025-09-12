@@ -1,0 +1,483 @@
+@import url(https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0);
+:root {
+  /* Company brand color palette */
+  --color-purple: #460a78;
+  --color-violet: #be2846;
+  --color-red: #e63c41;
+  --color-orange: #f58746;
+  --color-yellow: #ffbe6e;
+  --color-am-orange: #ff3700;
+
+  --bg: #f5f5f5;
+  --card: #ffffff;
+  --muted: #ffffff;
+  --ink: #333333;
+  --ink-2: #555555;
+  --accent: var(--color-violet);
+  --bad: var(--color-red);
+  --ok: var(--color-orange);
+  --border: #dddddd;
+  --bg-2: #fafafa;
+  --btn-bg-start: var(--color-orange);
+  --btn-bg-end: var(--color-red);
+  --btn-hover-border: var(--color-purple);
+  --btn-primary-start: var(--color-orange);
+  --btn-primary-end: var(--color-red);
+  --btn-primary-border: var(--color-orange);
+  --btn-danger-bg: var(--color-red);
+  --btn-danger-border: var(--color-violet);
+  --danger-light: var(--color-yellow);
+  --milestone-border: var(--color-violet);
+  --milestone-bg: #ffffff;
+  --activity-bg: #ffffff;
+  --activity-border: var(--color-violet);
+  --badge-bg: var(--color-purple);
+  --badge-border: var(--color-violet);
+  --badge-color: var(--color-yellow);
+  --error-border: var(--color-red);
+  --error-bg: rgba(230, 60, 65, 0.1);
+  --ok-light: #3d9308;
+}
+
+.material-symbols-outlined {
+  font-size: inherit;
+}
+
+#CommentsWrapper {
+  display: none;
+}
+
+#static-mirror * {
+  box-sizing: border-box;
+}
+
+#static-mirror {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, "Helvetica Neue", Helvetica, "Noto Sans", "Liberation Sans", sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+#static-mirror .wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 16px;
+  background: var(--bg);
+}
+
+#static-mirror h1 {
+  margin: 0 0 16px;
+  font-size: 26px;
+  letter-spacing: .2px;
+}
+
+#static-mirror p.hint {
+  color: var(--ink-2);
+  margin: 8px 0 24px;
+}
+
+#static-mirror form {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+#static-mirror fieldset {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin: 0 0 16px;
+  padding: 16px;
+}
+
+#static-mirror legend {
+  padding: 0 8px;
+  color: var(--ink-2);
+}
+
+#static-mirror .grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(6, 1fr);
+}
+
+#static-mirror .col-6 {
+  grid-column: span 6;
+}
+
+#static-mirror .col-3 {
+  grid-column: span 3;
+}
+
+#static-mirror .col-2 {
+  grid-column: span 2;
+}
+
+#static-mirror .col-4 {
+  grid-column: span 4;
+}
+
+.vs {
+  margin-block: 10px;
+}
+
+@media (max-width: 860px) {
+  #static-mirror .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  #static-mirror .col-6,
+  #static-mirror .col-4,
+  #static-mirror .col-3,
+  #static-mirror .col-2 {
+    grid-column: span 2;
+  }
+}
+
+#static-mirror label {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-2);
+  margin: 0 0 6px;
+}
+
+#static-mirror input[type="text"],
+#static-mirror input[type="number"],
+#static-mirror input[type="date"],
+#static-mirror textarea,
+#static-mirror select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--muted);
+  color: var(--ink);
+  outline: none;
+  font-size: 14px;
+  &.is-invalid {
+    border-color: var(--badge-border);
+  }
+}
+
+#static-mirror textarea {
+  min-height: 300px;
+  resize: vertical;
+}
+
+#static-mirror .row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(12, 1fr);
+}
+
+#static-mirror .row>.c-3 {
+  grid-column: span 3;
+}
+
+#static-mirror .c-4 {
+  grid-column: span 4;
+}
+
+#static-mirror .c-6 {
+  grid-column: span 6;
+}
+
+#static-mirror .c-8 {
+  grid-column: span 8;
+}
+
+#static-mirror .c-12 {
+  grid-column: span 12;
+}
+
+
+#static-mirror #projectList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  justify-content: center;
+}
+
+#static-mirror #projectList .card {
+  background-color: #fff;
+  border-radius: 5px;
+  padding: 10px;
+  width: 320px;
+  position: relative;
+}
+
+#static-mirror #projectList .card h3 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#static-mirror #projectList .card.new-project {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-purple);
+  color: #fff;
+  font-size: large;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+#static-mirror #projectList .card.new-project .icon {
+  font-size: xx-large;
+}
+
+#static-mirror #projectList .card.new-project:hover {
+  background: var(--color-am-orange);
+}
+
+#static-mirror #projectList .card .project-status {
+  border-radius: 30px;
+  height: 20px;
+  min-width: 20px;
+  background-color: #444;
+  color: #fff;
+  font-size: x-small;
+  padding: 5px 15px;
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#static-mirror #projectList .card button {
+  width: 100%;
+  border: none;
+  background: var(--color-am-orange);
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: x-small;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#static-mirror #projectList .card button:hover {
+  background: var(--color-purple);
+}
+
+@media (max-width: 860px) {
+  #static-mirror .row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  #static-mirror .row>* {
+    grid-column: span 2;
+  }
+}
+
+#static-mirror .btn {
+  border: none;
+  background: var(--color-am-orange);
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#static-mirror .btn > .material-symbols-outlined, #static-mirror #projectList .card button > .material-symbols-outlined {
+  &:first-child {
+    margin-right: 5px;
+  }
+  &:last-child {
+    margin-left: 5px;
+  }
+}
+
+#static-mirror .btn.primary {
+  background: var(--color-am-orange);
+}
+
+#static-mirror .btn.secondary {
+  background: var(--color-purple);
+}
+
+#static-mirror .btn:hover {
+  background: var(--color-purple);
+}
+
+#static-mirror .btn.secondary:hover {
+  background: var(--color-am-orange);
+}
+
+#static-mirror .btn.primary:hover {
+  box-shadow: 0 0 10px var(--color-purple);
+}
+
+#static-mirror .btn.ghost {
+  background: transparent;
+  color: var(--ink);
+}
+
+#static-mirror .btn.danger {
+  background: var(--btn-danger-bg);
+  border-color: var(--btn-danger-border);
+  color: #ffffff;
+
+}
+#static-mirror .btn.danger:hover {
+  background: var(--color-violet);
+}
+
+#static-mirror .btn.danger.icon {
+  font-size: 15px;
+  padding: 10px;
+  width: 40px;
+  height: 40px;
+  vertical-align: middle;
+}
+
+#static-mirror .btn-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+#static-mirror .milestone {
+  border: 1px dashed var(--milestone-border);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 12px 0;
+  background: var(--milestone-bg);
+}
+
+#static-mirror .milestone-header {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+#static-mirror .milestone-title {
+  flex: 1;
+}
+
+#static-mirror .activities {
+  margin-top: 10px;
+  display: grid;
+  gap: 12px;
+}
+
+#static-mirror .activity {
+  background: var(--activity-bg);
+  border: 1px solid var(--activity-border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+#static-mirror .act-year {
+  margin-top: 12px;
+}
+
+#static-mirror .activity-title {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin: 0 0 6px;
+}
+
+#static-mirror .badge {
+  display: inline-block;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--badge-bg);
+  border: 1px solid var(--badge-border);
+  color: var(--badge-color);
+}
+
+#static-mirror .status {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 12px 0;
+}
+
+#static-mirror .status.success {
+  border-color: var(--ok-light);
+  background: rgba(61, 147, 8, 0.1);
+  color: var(--ok-light);
+}
+
+#static-mirror .status.error {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+  color: var(--error-border);
+}
+
+#static-mirror .error-box {
+  border: 1px solid var(--error-border);
+  background: var(--error-bg);
+  color: var(--error-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 12px 0;
+}
+
+#static-mirror .error-box ul {
+  margin: 6px 0 0 18px;
+}
+
+#static-mirror .ok {
+  color: var(--ok-light);
+}
+
+#static-mirror .muted {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+#static-mirror .divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0 12px;
+}
+
+#static-mirror .right {
+  text-align: right;
+}
+
+#static-mirror .sr {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+#static-mirror #ganttChart {
+  padding: 10px;
+  & > div {
+    border-radius: 14px;
+    overflow: hidden;
+    background-color: var(--activity-bg);
+    & > div {
+      padding: 10px;
+      overflow-x: auto;
+    }
+  }
+}
