@@ -1,6 +1,13 @@
 @import url(https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0);
+
+/*
+  Folha de estilos responsável pelo protótipo de formulários CAPEX.
+  Mantive todos os valores que construímos anteriormente e acrescentei
+  comentários para explicar a função de cada agrupamento de regras.
+*/
+
 :root {
-  /* Company brand color palette */
+  /* Paleta base e tokens de cor utilizados em todo o layout */
   --color-purple: #460a78;
   --color-violet: #be2846;
   --color-red: #e63c41;
@@ -8,7 +15,7 @@
   --color-yellow: #ffbe6e;
   --color-am-orange: #ff3700;
 
-  --bg: #f5f5f5;
+  --bg: #ffffff;
   --card: #ffffff;
   --muted: #ffffff;
   --ink: #333333;
@@ -37,6 +44,7 @@
   --error-border: var(--color-red);
   --error-bg: rgba(230, 60, 65, 0.1);
   --ok-light: #3d9308;
+  --layout-width: 1200px;
 }
 
 .material-symbols-outlined {
@@ -51,13 +59,18 @@
   box-sizing: border-box;
 }
 
+/* Container raiz que simula a página final entregue no SharePoint */
 #static-mirror {
   margin: 0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, "Helvetica Neue", Helvetica, "Noto Sans", "Liberation Sans", sans-serif;
   color: var(--ink);
   background: var(--bg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
+/* Wrapper auxiliar utilizado em alguns trechos impressos */
 #static-mirror .wrap {
   max-width: 1100px;
   margin: 0 auto;
@@ -76,11 +89,15 @@
   margin: 8px 0 24px;
 }
 
+/* Blocos do formulário principal, mesmo escondido no protótipo */
 #static-mirror form {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 20px;
+  width: min(100%, var(--layout-width));
+  margin: 0 auto 40px;
+  box-sizing: border-box;
 }
 
 #static-mirror fieldset {
@@ -95,6 +112,7 @@
   color: var(--ink-2);
 }
 
+/* Grids genéricos usados em várias seções do formulário */
 #static-mirror .grid {
   display: grid;
   gap: 12px;
@@ -134,6 +152,7 @@
   }
 }
 
+/* Estilo padrão de inputs e labels */
 #static-mirror label {
   display: block;
   font-size: 13px;
@@ -154,9 +173,14 @@
   color: var(--ink);
   outline: none;
   font-size: 14px;
-  &.is-invalid {
-    border-color: var(--badge-border);
-  }
+}
+
+#static-mirror input[type="text"].is-invalid,
+#static-mirror input[type="number"].is-invalid,
+#static-mirror input[type="date"].is-invalid,
+#static-mirror textarea.is-invalid,
+#static-mirror select.is-invalid {
+  border-color: var(--badge-border);
 }
 
 #static-mirror textarea {
@@ -164,6 +188,7 @@
   resize: vertical;
 }
 
+/* Grade de 12 colunas utilizada dentro de marcos/atividades */
 #static-mirror .row {
   display: grid;
   gap: 12px;
@@ -202,6 +227,7 @@
   }
 }
 
+/* Conjunto de botões reutilizáveis */
 #static-mirror .btn {
   border: none;
   background: var(--color-am-orange);
@@ -217,13 +243,14 @@
   justify-content: center;
 }
 
-#static-mirror .btn > .material-symbols-outlined, #static-mirror #projectList .card button > .material-symbols-outlined {
-  &:first-child {
-    margin-right: 5px;
-  }
-  &:last-child {
-    margin-left: 5px;
-  }
+#static-mirror .btn > .material-symbols-outlined:first-child,
+#static-mirror #projectList .card button > .material-symbols-outlined:first-child {
+  margin-right: 5px;
+}
+
+#static-mirror .btn > .material-symbols-outlined:last-child,
+#static-mirror #projectList .card button > .material-symbols-outlined:last-child {
+  margin-left: 5px;
 }
 
 #static-mirror .btn.primary {
@@ -242,14 +269,17 @@
   background: var(--color-am-orange);
 }
 
-/* New layout for project list and details */
+/* Layout geral do cabeçalho e da área de trabalho (sidebar + detalhes) */
 #static-mirror .main-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px;
+  padding: 16px 40px;
   background: #fff;
   border-bottom: 1px solid var(--border);
+  width: min(100%, var(--layout-width));
+  margin: 0 auto 24px;
+  box-sizing: border-box;
 }
 
 #static-mirror .logo {
@@ -268,47 +298,79 @@
   cursor: pointer;
 }
 
+/* Região flexível que mantém sidebar e painel de detalhes lado a lado */
 #static-mirror #app {
-  display: flex;
-  height: calc(100vh - 80px);
+  display: grid;
+  grid-template-columns: minmax(330px, 390px) minmax(0, 1fr);
+  gap: 32px;
+  padding: 0 40px;
+  box-sizing: border-box;
+  width: min(100%, var(--layout-width));
+  margin: 0 auto;
+  flex: 1;
+  min-height: 0;
 }
 
+@media (max-width: 960px) {
+  #static-mirror #app {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 16px;
+    width: 100%;
+    margin: 0;
+  }
+
+  #static-mirror #projectSidebar,
+  #static-mirror #projectDetails {
+    min-height: unset;
+    height: auto;
+  }
+}
+
+/* Sidebar rolável com a listagem de projetos */
 #static-mirror #projectSidebar {
-  width: 300px;
-  background: #d9d9d9;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
   overflow-y: auto;
-  padding: 20px 10px;
-}
-
-#static-mirror #projectSidebar h2 {
-  margin: 0 0 10px;
-  color: #555;
+  padding: 24px 20px;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
 }
 
 #static-mirror #projectList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 #static-mirror #projectList .project-card {
   cursor: pointer;
-  padding: 12px;
-  border-radius: 8px;
-  transition: background 0.2s ease;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 #static-mirror #projectList .project-card:hover {
-  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--color-purple);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 #static-mirror #projectList .project-card.selected {
-  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--color-purple);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 #static-mirror #projectList .project-card h3 {
   margin: 0;
   font-size: 16px;
+  font-weight: 700;
+  color: #000;
 }
 
 #static-mirror #projectList .project-card p {
@@ -326,16 +388,39 @@
   margin-bottom: 6px;
 }
 
+#static-mirror #projectList .status-badge {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  font-weight: 600;
+}
+
+/* Painel de detalhes com estado vazio e cartões do projeto */
 #static-mirror #projectDetails {
-  flex: 1;
-  background: #f8f9fa;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
   overflow-y: auto;
-  padding: 20px;
+  padding: 32px 24px;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  justify-self: stretch;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  box-sizing: border-box;
 }
 
 #static-mirror .project-details {
-  max-width: 1000px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 720px;
   margin: 0 auto;
+  gap: 24px;
 }
 
 #static-mirror .project-details .details-header {
@@ -343,7 +428,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  margin-bottom: 20px;
+  width: 100%;
 }
 
 #static-mirror .project-details h1 {
@@ -352,11 +437,12 @@
   color: #333;
 }
 
+/* Grade de duas colunas que organiza orçamento, responsável e datas */
 #static-mirror .project-details .details-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 15px;
-  margin-bottom: 20px;
+  width: 100%;
 }
 
 #static-mirror .project-details .detail-card {
@@ -377,58 +463,60 @@
   font-size: 18px;
 }
 
-#static-mirror .project-details .detail-desc {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 20px;
+/* Descrição ocupa a linha inteira da grade */
+#static-mirror .project-details .detail-card.detail-desc {
+  grid-column: 1 / -1;
 }
 
-#static-mirror .project-details .detail-desc h3 {
-  margin: 0 0 8px;
-  font-size: 14px;
+#static-mirror .project-details .detail-card.detail-desc p {
+  font-size: 15px;
+  line-height: 1.6;
   color: #555;
+  white-space: pre-line;
 }
 
 #static-mirror .project-details .detail-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
+  width: 100%;
 }
 
 #static-mirror .project-details .action-btn {
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
   font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
+  font-size: 14px;
 }
 
-#static-mirror .project-details .action-btn.edit {
-  background: #1e40af;
-  color: #fff;
-}
-
-#static-mirror .project-details .action-btn.report {
-  background: #e5e7eb;
-  color: #374151;
-}
-
-#static-mirror .project-details .action-btn.approve {
-  background: #16a34a;
-  color: #fff;
-}
-
-#static-mirror .project-details .action-btn:hover {
-  opacity: 0.9;
+#static-mirror .project-details .action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 #static-mirror .project-details .empty {
   color: #555;
   text-align: center;
-  margin-top: 40px;
+  margin: auto;
+  max-width: 360px;
+}
+
+#static-mirror .project-details .empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+/* Destaque especial do orçamento, conforme solicitado pelo usuário */
+#static-mirror .project-details .budget-value {
+  color: #16a34a;
+  font-size: 20px;
+  font-weight: 600;
 }
 
 #static-mirror .btn.primary:hover {
@@ -465,6 +553,7 @@
   align-items: center;
 }
 
+/* Estilos de marcos e atividades do fluxo condicional de CAPEX alto */
 #static-mirror .milestone {
   border: 1px dashed var(--milestone-border);
   border-radius: 12px;
@@ -583,13 +672,15 @@
 
 #static-mirror #ganttChart {
   padding: 10px;
-  & > div {
-    border-radius: 14px;
-    overflow: hidden;
-    background-color: var(--activity-bg);
-    & > div {
-      padding: 10px;
-      overflow-x: auto;
-    }
-  }
+}
+
+#static-mirror #ganttChart > div {
+  border-radius: 14px;
+  overflow: hidden;
+  background-color: var(--activity-bg);
+}
+
+#static-mirror #ganttChart > div > div {
+  padding: 10px;
+  overflow-x: auto;
 }
