@@ -488,7 +488,7 @@ class SPRestApi {
     editBtn.textContent = 'Editar Projeto';
     actions.appendChild(editBtn);
 
-    if (item.Status === 'Rascunho') {
+    if (item.Status === 'Rascunho' || item.Status === 'Reprovado para Revisão') {
       const approveBtn = document.createElement('button');
       approveBtn.type = 'button';
       approveBtn.className = 'btn primary action-btn approve';
@@ -499,7 +499,7 @@ class SPRestApi {
     wrapper.append(header, grid, actions);
     projectDetails.appendChild(wrapper);
 
-    const isEditable = item.Status === 'Rascunho' || item.Status === 'Reprovado para Revisão';
+    const isEditable = item.Status !== 'Aprovado';
     if (isEditable) {
       editBtn.addEventListener('click', () => editProject(item.Id));
     } else {
