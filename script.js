@@ -424,19 +424,6 @@ class SPRestApi {
             <h3>Data de Conclusão</h3>
             <p>${formatDate(item.DataFim || item.DataConclusao)}</p>
           </div>
-          <div class="detail-card">
-            <h3>Responsável</h3>
-            <p>${item.Responsavel || item.ProjectLeader || ''}</p>
-          </div>
-          <div class="detail-card">
-            <h3>Data de Início</h3>
-            <p>${formatDate(item.DataInicio)}</p>
-          </div>
-          <div class="detail-card">
-            <h3>Data de Conclusão</h3>
-            <p>${formatDate(item.DataFim || item.DataConclusao)}</p>
-          </div>
-        </div>
         <div class="detail-desc">
           <h3>Descrição do Projeto</h3>
           <p>${item.Descricao || ''}</p>
