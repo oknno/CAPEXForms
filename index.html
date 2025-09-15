@@ -1,6 +1,14 @@
+<!--
+    Documento principal da solução CAPEX Forms.
+    Nesta etapa fiz uma rodada de comentários para descrever como o layout
+    está organizado e quais decisões tomei anteriormente para atender os
+    pedidos do usuário. A intenção é facilitar uma próxima revisão, já que
+    o protótipo evoluiu bastante ao longo das últimas interações.
+-->
 <html lang="pt-BR">
 
 <head>
+    <!-- Metadados básicos e a folha de estilo que controla o visual da página -->
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Formulário de Projeto - CAPEX</title>
@@ -8,16 +16,21 @@
 </head>
 
 <body id="static-mirror">
+    <!-- Cabeçalho com logotipo e botão de criação de novos projetos -->
     <header class="main-header">
         <div class="logo"></div>
         <button type="button" id="newProjectBtn" class="new-project-btn">Novo Projeto</button>
     </header>
+    <!-- Wrapper que divide a tela entre a lista lateral e os detalhes do projeto -->
     <div id="app">
+        <!-- Barra lateral dedicada à listagem rolável de projetos -->
         <aside id="projectSidebar">
             <div id="projectList"></div>
         </aside>
+        <!-- Painel principal, usado para detalhes do projeto ou mensagem inicial -->
         <main id="projectDetails">
             <div class="project-details">
+                <!-- Estado vazio padrão orientando o usuário a selecionar algo -->
                 <div class="empty">
                     <p class="empty-title">Selecione um projeto</p>
                     <p>Clique em um projeto na lista ao lado para ver os detalhes</p>
@@ -25,6 +38,7 @@
             </div>
         </main>
     </div>
+    <!-- Formulário completo de cadastro/edição, mantido oculto no protótipo -->
     <form id="capexForm" novalidate style="display: none;">
             <button type="button" id="backBtn" class="btn" style="display:none;"><span class="material-symbols-outlined">arrow_back</span> Voltar</button>
             <h2>Novo Projeto de CAPEX Normativo</h2>
@@ -32,6 +46,7 @@
             <div id="status" class="status" role="status" aria-live="polite"></div>
             <div id="errors" class="error-box" style="display:none;" role="alert" aria-live="assertive"></div>
 
+            <!-- Bloco principal com informações estruturais exigidas pelo SAP -->
             <fieldset>
                 <legend>Informações SAP</legend>
                 <div class="grid">
@@ -142,11 +157,12 @@
                     
                     <legend><h1>KEY PROJECTS</h1></legend>
                 <div class="grid">
-                    <div class="col-6">
-                        <label>Projetos acima de R$ 500.000,00 são classificados como 
-                            estratégicos para o negócio e, por isso, serão acompanhados com 
+            <!-- Área condicionada que só aparece quando o orçamento ultrapassa o limite -->
+            <div class="col-6">
+                        <label>Projetos acima de R$ 500.000,00 são classificados como
+                            estratégicos para o negócio e, por isso, serão acompanhados com
                             aplicação aprofundada da metodologia de gestão de projetos CIPM.
-                            Para garantir a devida governança, solicitamos o preenchimento das 
+                            Para garantir a devida governança, solicitamos o preenchimento das
                             informações abaixo:
                         </label>
                     </div>
@@ -190,6 +206,7 @@
                     
                 </div>    
             
+                    <!-- Controles para criar marcos e informar o usuário sobre as regras -->
                     <div class="btn-row vs">
                         <button class="btn" type="button" id="addMilestoneBtn">+ Adicionar marco</button>
                         <!-- <span id="milestoneReq" class="badge" title="Obrigatório quando CAPEX &gt; R$ 1,5 mi">requisito -->
@@ -203,6 +220,7 @@
                 <div class="divider"></div>
             </div>
 
+            <!-- Botões finais que controlam o envio ou limpeza do formulário -->
             <div class="btn-row right">
                 <button type="reset" class="btn ghost"><span class="material-symbols-outlined">cleaning_services</span> Limpar</button>
                 <button type="button" id="saveDraftBtn" class="btn secondary"><span class="material-symbols-outlined">save_as</span> Salvar rascunho</button>
@@ -210,10 +228,12 @@
             </div>
         </form>
 
+        <!-- Espaço reservado para visualizar cronogramas quando implementado -->
         <h3 id="ganttCharTitle" style="display: none;">Programação do Projeto</h3>
         <div id="ganttChart"></div>
 
     <!-- Templates -->
+    <!-- Estruturas reutilizáveis para marcos e atividades, clonadas dinamicamente via JS -->
     <template id="milestoneTemplate">
         <details class="milestone" data-milestone>
             <summary>Marco X</summary>
@@ -275,6 +295,7 @@
             </div>
         </div>
     </template>
+      <!-- Bibliotecas necessárias para o gráfico de Gantt e para a lógica da página -->
       <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
       <script src="./script.js"></script>
   </body>
