@@ -268,9 +268,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px;
+  padding: 10px 40px;
   background: #fff;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 #static-mirror .logo {
@@ -464,6 +465,19 @@
 #static-mirror .project-details .empty {
   color: #555;
   text-align: center;
+}
+
+#static-mirror .project-details .empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+/* Destaque especial do orçamento, conforme solicitado pelo usuário */
+#static-mirror .project-details .budget-value {
+  color: #16a34a;
+  font-size: 20px;
+  font-weight: 600;
 }
 
 #static-mirror .project-details .empty-title {
