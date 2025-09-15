@@ -408,30 +408,24 @@
 #static-mirror .project-details .detail-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
 }
 
 #static-mirror .project-details .action-btn {
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
   font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
+  font-size: 14px;
 }
 
-#static-mirror .project-details .action-btn.edit {
-  background: #1e40af;
-  color: #fff;
-}
-
-#static-mirror .project-details .action-btn.approve {
-  background: #16a34a;
-  color: #fff;
-}
-
-#static-mirror .project-details .action-btn:hover {
-  opacity: 0.9;
+#static-mirror .project-details .action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 #static-mirror .project-details .empty {
