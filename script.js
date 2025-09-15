@@ -364,6 +364,7 @@ class SPRestApi {
     form.style.display = 'block';
     if (backBtn) backBtn.style.display = 'inline-flex';
     if (newProjectBtn) newProjectBtn.style.display = 'none';
+    document.body.style.overflow = 'auto';
   }
 
   function showProjectList() {
@@ -372,6 +373,7 @@ class SPRestApi {
     if (backBtn) backBtn.style.display = 'none';
     if (newProjectBtn) newProjectBtn.style.display = 'inline-block';
     resetForm();
+    document.body.style.overflow = 'hidden';
   }
 
   function getStatusColor(status) {
@@ -384,10 +386,20 @@ class SPRestApi {
     }
   }
 
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      return isNaN(d) ? '' : d.toLocaleDateString('pt-BR');
+    } catch (e) {
+      return '';
+    }
+  }
+
   function showProjectDetails(item) {
     if (!projectDetails) return;
     if (!item) {
-      projectDetails.innerHTML = '<div class="project-details"><div class="empty">Selecione um projeto</div></div>';
+      projectDetails.innerHTML = '<div class="project-details"><div class="empty"><p class="empty-title">Selecione um projeto</p><p>Clique em um projeto na lista ao lado para ver os detalhes</p></div></div>';
       return;
     }
     projectDetails.innerHTML = `
@@ -399,17 +411,28 @@ class SPRestApi {
         <div class="details-grid">
           <div class="detail-card">
             <h3>Orçamento</h3>
-            <p>${BRL.format(item.CapexBudgetBRL || 0)}</p>
+            <p class="budget-value">${BRL.format(item.CapexBudgetBRL || 0)}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Responsável</h3>
+            <p>${item.Responsavel || item.ProjectLeader || ''}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Data de Início</h3>
+            <p>${formatDate(item.DataInicio)}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Data de Conclusão</h3>
+            <p>${formatDate(item.DataFim || item.DataConclusao)}</p>
+          </div>
+          <div class="detail-card detail-desc">
+            <h3>Descrição do Projeto</h3>
+            <p>${item.Descricao || ''}</p>
           </div>
         </div>
-        <div class="detail-desc">
-          <h3>Descrição do Projeto</h3>
-          <p>${item.Descricao || ''}</p>
-        </div>
         <div class="detail-actions">
-          <button type="button" class="action-btn edit" id="editProjectDetails">Editar Projeto</button>
-          <button type="button" class="action-btn report">Relatório</button>
-          ${item.Status === 'Rascunho' ? '<button type="button" class="action-btn approve">Enviar para Aprovação</button>' : ''}
+          <button type="button" class="btn secondary action-btn" id="editProjectDetails">Editar Projeto</button>
+          ${item.Status === 'Rascunho' ? '<button type="button" class="btn primary action-btn approve">Enviar para Aprovação</button>' : ''}
         </div>
       </div>`;
     const editBtn = document.getElementById('editProjectDetails');
@@ -450,20 +473,16 @@ class SPRestApi {
         <span class="status-badge" style="background:${getStatusColor(item.Status)}">${item.Status}</span>
         <h3>${item.Title}</h3>
         <p>${BRL.format(item.CapexBudgetBRL || 0)}</p>`;
-      card.addEventListener('click', () => {
-        showProjectDetails(item);
+      card.addEventListener('click', async () => {
+        const fullItem = await projetos.getItemById(item.Id);
+        showProjectDetails(fullItem);
         [...projectList.children].forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
       });
       projectList.appendChild(card);
     });
     showProjectList();
-    if (items.length) {
-      showProjectDetails(items[0]);
-      projectList.firstChild.classList.add('selected');
-    } else {
-      showProjectDetails(null);
-    }
+    showProjectDetails(null);
   }
 
   function fillForm(item) {
