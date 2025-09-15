@@ -268,9 +268,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px;
+  padding: 10px 40px;
   background: #fff;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 #static-mirror .logo {
@@ -292,7 +293,11 @@
 /* Região flexível que mantém sidebar e painel de detalhes lado a lado */
 #static-mirror #app {
   display: flex;
-  height: calc(100vh - 80px);
+  flex: 1;
+  padding: 0 40px;
+  box-sizing: border-box;
+  gap: 24px;
+  min-height: 0;
 }
 
 /* Sidebar rolável com a listagem de projetos */
