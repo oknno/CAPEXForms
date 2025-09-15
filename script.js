@@ -364,6 +364,7 @@ class SPRestApi {
     form.style.display = 'block';
     if (backBtn) backBtn.style.display = 'inline-flex';
     if (newProjectBtn) newProjectBtn.style.display = 'none';
+    document.body.style.overflow = 'auto';
   }
 
   function showProjectList() {
@@ -372,6 +373,7 @@ class SPRestApi {
     if (backBtn) backBtn.style.display = 'none';
     if (newProjectBtn) newProjectBtn.style.display = 'inline-block';
     resetForm();
+    document.body.style.overflow = 'hidden';
   }
 
   function getStatusColor(status) {
@@ -397,8 +399,7 @@ class SPRestApi {
   function showProjectDetails(item) {
     if (!projectDetails) return;
     if (!item) {
-      projectDetails.innerHTML = '<div class="project-details"><div class="empty"><p>Selecione um projeto</p><p>Clique em um projeto na lista ao lado para ver e editar os detalhes. Para criar um novo, use o botão <strong>Novo Projeto</strong> acima.</p></div></div>';
-      return;
+      projectDetails.innerHTML = '<div class="project-details"><div class="empty"><p class="empty-title">Selecione um projeto</p><p>Clique em um projeto na lista ao lado</p><p>para ver os detalhes</p></div></div>';
     }
     projectDetails.innerHTML = `
       <div class="project-details">
@@ -409,7 +410,19 @@ class SPRestApi {
         <div class="details-grid">
           <div class="detail-card">
             <h3>Orçamento</h3>
-            <p>${BRL.format(item.CapexBudgetBRL || 0)}</p>
+            <p class="budget-value">${BRL.format(item.CapexBudgetBRL || 0)}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Responsável</h3>
+            <p>${item.Responsavel || item.ProjectLeader || ''}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Data de Início</h3>
+            <p>${formatDate(item.DataInicio)}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Data de Conclusão</h3>
+            <p>${formatDate(item.DataFim || item.DataConclusao)}</p>
           </div>
           <div class="detail-card">
             <h3>Responsável</h3>
