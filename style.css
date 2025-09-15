@@ -112,6 +112,16 @@
   color: var(--ink-2);
 }
 
+#static-mirror .form-section + .form-section {
+  margin-top: 24px;
+}
+
+#static-mirror .section-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
 /* Grids genéricos usados em várias seções do formulário */
 #static-mirror .grid {
   display: grid;

@@ -338,8 +338,13 @@ class SPRestApi {
   function parseNumberBRL(val) {
     if (typeof val === 'number') return val;
     if (!val) return 0;
+    const str = String(val).trim();
     // aceita ponto ou vírgula como separador decimal
-    const normalized = String(val).replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+    if (str.includes(',')) {
+      const normalized = str.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+      return Number(normalized || 0);
+    }
+    const normalized = str.replace(/[^\d.]/g, '');
     return Number(normalized || 0);
   }
 
