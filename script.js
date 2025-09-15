@@ -400,7 +400,6 @@ class SPRestApi {
     if (!projectDetails) return;
     if (!item) {
       projectDetails.innerHTML = '<div class="project-details"><div class="empty"><p class="empty-title">Selecione um projeto</p><p>Clique em um projeto na lista ao lado</p><p>para ver os detalhes</p></div></div>';
-      return;
     }
     projectDetails.innerHTML = `
       <div class="project-details">
@@ -412,6 +411,18 @@ class SPRestApi {
           <div class="detail-card">
             <h3>Orçamento</h3>
             <p class="budget-value">${BRL.format(item.CapexBudgetBRL || 0)}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Responsável</h3>
+            <p>${item.Responsavel || item.ProjectLeader || ''}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Data de Início</h3>
+            <p>${formatDate(item.DataInicio)}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Data de Conclusão</h3>
+            <p>${formatDate(item.DataFim || item.DataConclusao)}</p>
           </div>
           <div class="detail-card">
             <h3>Responsável</h3>
