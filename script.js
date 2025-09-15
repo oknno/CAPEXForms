@@ -420,7 +420,6 @@ class SPRestApi {
       return '';
     }
   }
-
   // Renderiza os detalhes resumidos do projeto no painel principal
   function showProjectDetails(item) {
     if (!projectDetails) return;
