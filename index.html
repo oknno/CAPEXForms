@@ -41,8 +41,8 @@
     <!-- Formulário completo de cadastro/edição, mantido oculto no protótipo -->
     <form id="capexForm" novalidate style="display: none;">
             <button type="button" id="backBtn" class="btn" style="display:none;"><span class="material-symbols-outlined">arrow_back</span> Voltar</button>
-            <h2>Novo Projeto de CAPEX Normativo</h2>
-            <p class="hint">Preencha os dados do projeto. Se o <strong>CAPEX BUDGET</strong> for superior a <strong>R$ 500.000,00</strong>, você deverá adicionar <em>marcos</em> (milestones) e ao menos 2 atividade em cada marco.</p>
+            <h2>Novo Projeto de CAPEX</h2>
+            <p class="hint">Preencha os dados do projeto. Se o <strong>CAPEX BUDGET</strong> for superior a <strong>R$ 1.000.000,00</strong>, você deverá adicionar <em>marcos</em> (milestones) e ao menos 2 atividade em cada marco.</p>
             <div id="status" class="status" role="status" aria-live="polite"></div>
             <div id="errors" class="error-box" style="display:none;" role="alert" aria-live="assertive"></div>
 
@@ -77,12 +77,10 @@
                             <label for="investmentLevel">Nível de Investimento</label>
                             <input id="investmentLevel" name="investmentLevel" type="text" maxlength="2" required />
                         </div>
-
                         <div class="col-4">
                             <label for="fundingSource">Origem da Verba</label>
                             <input id="fundingSource" name="fundingSource" type="text" maxlength="30" required />
                         </div>
-
                         <div class="col-4">
                             <label for="projectLeader">Coordenador do Projeto</label>
                             <input id="projectLeader" name="projectLeader" type="text" maxlength="30" required />
@@ -219,13 +217,9 @@
                         </div>
                     </div>
                 </div>
-            </fieldset>
-<!--------------------------------------------------------------------------->
-<!--Aparece depois do valor de R4500.000-->
 
             <div id="milestoneSection" style="display:none;">
                 <fieldset>
-
                     <legend>KEY PROJECTS</legend>
                     <p class="muted">
                         Projetos com orçamento acima de R$ 500.000,00 devem detalhar marcos e atividades

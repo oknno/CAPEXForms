@@ -390,6 +390,7 @@ class SPRestApi {
     form.style.display = 'block';
     if (backBtn) backBtn.style.display = 'inline-flex';
     if (newProjectBtn) newProjectBtn.style.display = 'none';
+    document.body.style.overflow = 'auto';
   }
 
   // Retorna para a visão em lista e oculta o formulário
@@ -399,6 +400,7 @@ class SPRestApi {
     if (backBtn) backBtn.style.display = 'none';
     if (newProjectBtn) newProjectBtn.style.display = 'inline-block';
     resetForm();
+    document.body.style.overflow = 'hidden';
   }
 
   // Mantém consistência das cores exibidas no selo de status
