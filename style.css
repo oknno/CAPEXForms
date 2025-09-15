@@ -301,7 +301,7 @@
 /* Região flexível que mantém sidebar e painel de detalhes lado a lado */
 #static-mirror #app {
   display: grid;
-  grid-template-columns: minmax(330px, 390px) minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 440px) minmax(0, 1fr);
   gap: 32px;
   padding: 0 40px;
   box-sizing: border-box;
@@ -399,7 +399,6 @@
 #static-mirror #projectDetails {
   display: flex;
   flex-direction: column;
-
   background: #ffffff;
   overflow-y: auto;
   padding: 32px 24px;
