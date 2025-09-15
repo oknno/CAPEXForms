@@ -399,7 +399,8 @@ class SPRestApi {
   function showProjectDetails(item) {
     if (!projectDetails) return;
     if (!item) {
-      projectDetails.innerHTML = '<div class="project-details"><div class="empty"><p class="empty-title">Selecione um projeto</p><p>Clique em um projeto na lista ao lado</p><p>para ver os detalhes</p></div></div>';
+      projectDetails.innerHTML = '<div class="project-details"><div class="empty"><p class="empty-title">Selecione um projeto</p><p>Clique em um projeto na lista ao lado para ver os detalhes</p></div></div>';
+      return;
     }
     projectDetails.innerHTML = `
       <div class="project-details">
@@ -424,9 +425,10 @@ class SPRestApi {
             <h3>Data de Conclusão</h3>
             <p>${formatDate(item.DataFim || item.DataConclusao)}</p>
           </div>
-        <div class="detail-desc">
-          <h3>Descrição do Projeto</h3>
-          <p>${item.Descricao || ''}</p>
+          <div class="detail-card detail-desc">
+            <h3>Descrição do Projeto</h3>
+            <p>${item.Descricao || ''}</p>
+          </div>
         </div>
       </div>
         <div class="detail-actions">
