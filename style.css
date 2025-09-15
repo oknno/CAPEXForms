@@ -293,13 +293,18 @@
 /* Região flexível que mantém sidebar e painel de detalhes lado a lado */
 #static-mirror #app {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+  gap: 32px;
+  padding: 0 48px;
+  box-sizing: border-box;
   height: calc(100vh - 80px);
 }
 
 @media (max-width: 960px) {
   #static-mirror #app {
     grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px;
     height: auto;
   }
 
@@ -379,6 +384,8 @@
   padding: 20px;
   height: 100%;
   min-height: 0;
+  width: min(100%, 780px);
+  justify-self: start;
 }
 
 #static-mirror .project-details {
@@ -454,6 +461,7 @@
   border-radius: 10px;
   font-weight: 600;
   font-size: 14px;
+
 }
 
 #static-mirror .project-details .action-btn:disabled {
@@ -465,19 +473,6 @@
 #static-mirror .project-details .empty {
   color: #555;
   text-align: center;
-}
-
-#static-mirror .project-details .empty-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-/* Destaque especial do orçamento, conforme solicitado pelo usuário */
-#static-mirror .project-details .budget-value {
-  color: #16a34a;
-  font-size: 20px;
-  font-weight: 600;
 }
 
 #static-mirror .project-details .empty-title {
