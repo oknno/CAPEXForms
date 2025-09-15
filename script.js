@@ -1,3 +1,8 @@
+//
+//  Script principal do protótipo CAPEX Forms.
+//  Aqui concentro tanto a camada de integração com SharePoint quanto os
+//  comportamentos da interface montada em HTML estático.
+//
 class SPRestApi {
     /**
      * Cria uma instância da API REST do SharePoint.
@@ -276,12 +281,20 @@ class SPRestApi {
     }
 }
 
+//
+//  A partir daqui começa a lógica de interface, encapsulada em uma IIFE
+//  para não poluir o escopo global quando o script é carregado no SharePoint.
+//
 (function () {
+  // Formatação monetária utilizada em toda a interface
   const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  // Limiar que define quando o fluxo de marcos precisa ser exibido
   const REQ_THRESHOLD = 500000; // 1.5 milhões
 
+  // Cliente já configurado apontando para o site utilizado nas demonstrações
   const SharePoint = new SPRestApi('https://arcelormittal.sharepoint.com/sites/controladorialongos/capex/');
 
+  // Cache de elementos chave presentes no formulário e na área de leitura
   const form = document.getElementById('capexForm');
   const statusBox = document.getElementById('status');
   const submitBtn = form.querySelector('button[type="submit"]');
@@ -300,6 +313,7 @@ class SPRestApi {
   const backBtn = document.getElementById('backBtn');
   google.charts.load('current', { packages: ['gantt'] });
 
+  // Templates HTML usados para gerar marcos e atividades dinamicamente
   const milestoneTpl = document.getElementById('milestoneTemplate');
   const activityTpl = document.getElementById('activityTemplate');
 
@@ -307,17 +321,20 @@ class SPRestApi {
   approvalYearInput.max = currentYear;
   approvalYearInput.placeholder = currentYear;
 
+  // Estados auxiliares controlando marcos, projeto atual e reset silencioso
   let milestoneCount = 0;
   let currentProjectId = null;
   let resetFormWithoutAlert = true;
 
   // Helpers
+  // Feedback visual ao usuário sobre o progresso das ações
   function updateStatus(message = '', type = 'info') {
     if (!statusBox) return;
     statusBox.textContent = message;
     statusBox.className = `status ${type}`;
   }
 
+  // Converte valores com formatação brasileira em números nativos
   function parseNumberBRL(val) {
     if (typeof val === 'number') return val;
     if (!val) return 0;
@@ -326,10 +343,12 @@ class SPRestApi {
     return Number(normalized || 0);
   }
 
+  // Aponta se o orçamento atual excede o limite para marcos obrigatórios
   function overThreshold() {
     return parseNumberBRL(projectValueInput.value) > REQ_THRESHOLD;
   }
 
+  // Atualiza a legenda que orienta quando marcos devem ser adicionados
   function updateCapexFlag() {
     const n = parseNumberBRL(projectValueInput.value);
     if (!n) { capexFlag.textContent = ''; return; }
@@ -338,6 +357,7 @@ class SPRestApi {
       : `CAPEX BUDGET ${BRL.format(n)} ≤ ${BRL.format(REQ_THRESHOLD)} — marcos não necessários.`;
   }
 
+  // Esconde ou revela a seção de marcos de acordo com o orçamento
   function updateMilestoneVisibility() {
     const show = overThreshold();
     milestoneSection.style.display = show ? 'block' : 'none';
@@ -348,6 +368,7 @@ class SPRestApi {
     }
   }
 
+  // Limpa o formulário e volta ao estado padrão
   function resetForm() {
     form.reset();
     currentProjectId = null;
@@ -359,21 +380,26 @@ class SPRestApi {
     refreshGantt();
   }
 
+  // Alterna a UI para o modo de edição/cadastro
   function showForm() {
     if (appContainer) appContainer.style.display = 'none';
     form.style.display = 'block';
     if (backBtn) backBtn.style.display = 'inline-flex';
     if (newProjectBtn) newProjectBtn.style.display = 'none';
+    document.body.style.overflow = 'auto';
   }
 
+  // Retorna para a visão em lista e oculta o formulário
   function showProjectList() {
     form.style.display = 'none';
     if (appContainer) appContainer.style.display = 'flex';
     if (backBtn) backBtn.style.display = 'none';
     if (newProjectBtn) newProjectBtn.style.display = 'inline-block';
     resetForm();
+    document.body.style.overflow = 'hidden';
   }
 
+  // Mantém consistência das cores exibidas no selo de status
   function getStatusColor(status) {
     switch (status) {
       case 'Rascunho': return '#414141';
@@ -384,10 +410,22 @@ class SPRestApi {
     }
   }
 
+  // Formata datas vindas do SharePoint para o padrão brasileiro
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      return isNaN(d) ? '' : d.toLocaleDateString('pt-BR');
+    } catch (e) {
+      return '';
+    }
+  }
+
+  // Renderiza os detalhes resumidos do projeto no painel principal
   function showProjectDetails(item) {
     if (!projectDetails) return;
     if (!item) {
-      projectDetails.innerHTML = '<div class="project-details"><div class="empty">Selecione um projeto</div></div>';
+      projectDetails.innerHTML = '<div class="project-details"><div class="empty"><p class="empty-title">Selecione um projeto</p><p>Clique em um projeto na lista ao lado para ver os detalhes</p></div></div>';
       return;
     }
     projectDetails.innerHTML = `
@@ -399,17 +437,28 @@ class SPRestApi {
         <div class="details-grid">
           <div class="detail-card">
             <h3>Orçamento</h3>
-            <p>${BRL.format(item.CapexBudgetBRL || 0)}</p>
+            <p class="budget-value">${BRL.format(item.CapexBudgetBRL || 0)}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Responsável</h3>
+            <p>${item.Responsavel || item.ProjectLeader || ''}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Data de Início</h3>
+            <p>${formatDate(item.DataInicio)}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Data de Conclusão</h3>
+            <p>${formatDate(item.DataFim || item.DataConclusao)}</p>
+          </div>
+          <div class="detail-card detail-desc">
+            <h3>Descrição do Projeto</h3>
+            <p>${item.Descricao || ''}</p>
           </div>
         </div>
-        <div class="detail-desc">
-          <h3>Descrição do Projeto</h3>
-          <p>${item.Descricao || ''}</p>
-        </div>
         <div class="detail-actions">
-          <button type="button" class="action-btn edit" id="editProjectDetails">Editar Projeto</button>
-          <button type="button" class="action-btn report">Relatório</button>
-          ${item.Status === 'Rascunho' ? '<button type="button" class="action-btn approve">Enviar para Aprovação</button>' : ''}
+          <button type="button" class="btn secondary action-btn" id="editProjectDetails">Editar Projeto</button>
+          ${item.Status === 'Rascunho' ? '<button type="button" class="btn primary action-btn approve">Enviar para Aprovação</button>' : ''}
         </div>
       </div>`;
     const editBtn = document.getElementById('editProjectDetails');
@@ -423,6 +472,7 @@ class SPRestApi {
     }
   }
 
+  // Botão superior que leva o usuário direto para o formulário de criação
   if (newProjectBtn) {
     newProjectBtn.addEventListener('click', () => {
       resetFormWithoutAlert = true;
@@ -433,6 +483,7 @@ class SPRestApi {
     });
   }
 
+  // Busca e renderiza cartões com os projetos do usuário atual
   async function loadUserProjects() {
     if (!projectList) return;
     projectList.innerHTML = '';
@@ -450,22 +501,19 @@ class SPRestApi {
         <span class="status-badge" style="background:${getStatusColor(item.Status)}">${item.Status}</span>
         <h3>${item.Title}</h3>
         <p>${BRL.format(item.CapexBudgetBRL || 0)}</p>`;
-      card.addEventListener('click', () => {
-        showProjectDetails(item);
+      card.addEventListener('click', async () => {
+        const fullItem = await projetos.getItemById(item.Id);
+        showProjectDetails(fullItem);
         [...projectList.children].forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
       });
       projectList.appendChild(card);
     });
     showProjectList();
-    if (items.length) {
-      showProjectDetails(items[0]);
-      projectList.firstChild.classList.add('selected');
-    } else {
-      showProjectDetails(null);
-    }
+    showProjectDetails(null);
   }
 
+  // Preenche o formulário com os dados recuperados do SharePoint
   function fillForm(item) {
     document.getElementById('projectName').value = item.Title || '';
     document.getElementById('approvalYear').value = item.AnoAprovacao || '';
@@ -488,6 +536,7 @@ class SPRestApi {
     updateMilestoneVisibility();
   }
 
+  // Abre um projeto específico em modo de edição quando permitido
   async function editProject(id) {
     const item = await SharePoint.getLista('Projetos').getItemById(id);
     currentProjectId = id;
@@ -502,6 +551,7 @@ class SPRestApi {
     updateStatus(`Status atual: ${item.Status}`, 'info');
   }
 
+  // Persiste o formulário como rascunho e salva a estrutura hierárquica
   async function saveDraft() {
     const data = getProjectData();
     const milestones = getMilestonesData();
@@ -544,6 +594,7 @@ class SPRestApi {
     }
   }
 
+  // Atualiza rapidamente o status do item e re-renderiza a lista
   async function updateProjectStatus(id, status) {
     try {
       await SharePoint.getLista('Projetos').updateItem(id, { Status: status });
@@ -556,6 +607,7 @@ class SPRestApi {
     }
   }
 
+  // Cria um novo marco e garante que ele venha com uma atividade inicial
   function addMilestone(nameDefault) {
     milestoneCount++;
     const node = milestoneTpl.content.cloneNode(true);
@@ -589,6 +641,7 @@ class SPRestApi {
     refreshGantt();
   }
 
+  // Atualiza a numeração padrão dos marcos conforme adições/remoções
   function renumberMilestones() {
     const all = [...milestonesWrap.querySelectorAll('.milestone-name')];
     let idx = 1;
@@ -600,6 +653,7 @@ class SPRestApi {
     }
   }
 
+  // Insere uma atividade dentro de um marco, controlando datas e alocações
   function addActivity(container) {
     const node = activityTpl.content.cloneNode(true);
     const act = node.querySelector('[data-activity]');
@@ -669,6 +723,7 @@ class SPRestApi {
     refreshGantt();
   }
 
+  // Coleta os campos principais do formulário para montar o payload do projeto
   function getProjectData(){
     return {
         nome: getValueFromSelector('projectName').trim(),
@@ -693,6 +748,7 @@ class SPRestApi {
       }
   }
 
+  // Extrai toda a hierarquia de marcos, atividades e alocações anuais
   function getMilestonesData() {
     const milestones = [];
     const msNodes = [...milestonesWrap.querySelectorAll('[data-milestone]')];
@@ -718,6 +774,7 @@ class SPRestApi {
     return milestones;
   }
 
+  // Remove registros relacionados antes de salvar uma nova versão da estrutura
   async function clearProjectStructure(projectId) {
     const Marcos = SharePoint.getLista('Marcos');
     const Atividades = SharePoint.getLista('Atividades1');
@@ -740,6 +797,7 @@ class SPRestApi {
     }
   }
 
+  // Persiste marcos, atividades e alocações nas listas secundárias do SharePoint
   async function saveProjectStructure(projectId, milestones) {
     const Marcos = SharePoint.getLista('Marcos');
     const Atividades = SharePoint.getLista('Atividades1');
@@ -769,6 +827,7 @@ class SPRestApi {
     }
   }
 
+  // Recarrega marcos, atividades e alocações para edição posterior
   async function fetchProjectStructure(projectId) {
     const Marcos = SharePoint.getLista('Marcos');
     const Atividades = SharePoint.getLista('Atividades1');
@@ -788,6 +847,7 @@ class SPRestApi {
     return result;
   }
 
+  // Recria dinamicamente a interface com base nos dados carregados
   function setMilestonesData(milestones) {
     milestonesWrap.innerHTML = '';
     milestoneCount = 0;
@@ -819,6 +879,7 @@ class SPRestApi {
     refreshGantt();
   }
 
+  // Monta o gráfico de Gantt respeitando o estilo e cores definidos
   function drawGantt(milestones) {
     const chartEl = document.getElementById('ganttChart');
     const titleEl = document.getElementById('ganttCharTitle');
@@ -908,6 +969,7 @@ class SPRestApi {
     });
   }
 
+  // Atualiza o gráfico sempre que algum dado de marcos/atividades muda
   function refreshGantt() {
     const milestones = getMilestonesData();
     const draw = () => drawGantt(milestones);
@@ -919,6 +981,7 @@ class SPRestApi {
   }
 
   // UI events
+  // Principais listeners responsáveis por manter a UI sincronizada com as ações
   addMilestoneBtn.addEventListener('click', () => addMilestone());
   milestoneSection.addEventListener('input', refreshGantt);
   milestoneSection.addEventListener('change', refreshGantt);
@@ -937,6 +1000,7 @@ class SPRestApi {
   });
 
   // Validation
+  // Bloco extenso de validações que cobre as regras discutidas com o usuário
   function validateForm() {
     const errs = [];
     const errsEl = [];
@@ -1049,6 +1113,7 @@ class SPRestApi {
     return true;
   }
 
+  // Função utilitária para recuperar valores sem duplicar lógica de busca
   function getValueFromSelector(queryOrId, defaultValue = "", parent = document){
     let e = null;
     try {
@@ -1060,7 +1125,8 @@ class SPRestApi {
     return e.value;
   }
 
-form.addEventListener('submit', async (ev) => {
+  // Fluxo completo de submissão que simula a integração final com SharePoint
+  form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     updateCapexFlag();
     updateMilestoneVisibility();
@@ -1109,6 +1175,7 @@ form.addEventListener('submit', async (ev) => {
     }
   });
 
+  // Reset personalizado que confirma com o usuário antes de apagar campos
   form.addEventListener('reset', ev => {
     if (resetFormWithoutAlert === false && !confirm('Tem certeza que deseja limpar o formulário?')) {
       ev.preventDefault();
@@ -1118,6 +1185,7 @@ form.addEventListener('submit', async (ev) => {
   });
 
   // Estado inicial
+  // Reaplica cálculos e carrega os projetos assim que o script é executado
   updateCapexFlag();
   updateMilestoneVisibility();
   refreshGantt();
