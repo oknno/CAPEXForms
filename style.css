@@ -271,6 +271,7 @@
   padding: 10px 48px;
   background: #fff;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 #static-mirror .logo {
