@@ -44,7 +44,7 @@
   --error-border: var(--color-red);
   --error-bg: rgba(230, 60, 65, 0.1);
   --ok-light: #3d9308;
-  --layout-width: 1200px;
+  --layout-width: 1360px;
 }
 
 .material-symbols-outlined {
@@ -301,7 +301,7 @@
 /* Região flexível que mantém sidebar e painel de detalhes lado a lado */
 #static-mirror #app {
   display: grid;
-  grid-template-columns: minmax(360px, 440px) minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 480px) minmax(0, 1fr);
   gap: 32px;
   padding: 0 40px;
   box-sizing: border-box;
@@ -418,7 +418,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 720px;
+  max-width: 880px;
   margin: 0 auto;
   gap: 24px;
 }
