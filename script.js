@@ -423,51 +423,87 @@ class SPRestApi {
   // Renderiza os detalhes resumidos do projeto no painel principal
   function showProjectDetails(item) {
     if (!projectDetails) return;
+
+    projectDetails.innerHTML = '';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'project-details';
+
     if (!item) {
-      projectDetails.innerHTML = '<div class="project-details"><div class="empty"><p class="empty-title">Selecione um projeto</p><p>Clique em um projeto na lista ao lado para ver os detalhes</p></div></div>';
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      const emptyTitle = document.createElement('p');
+      emptyTitle.className = 'empty-title';
+      emptyTitle.textContent = 'Selecione um projeto';
+      const emptyCopy = document.createElement('p');
+      emptyCopy.textContent = 'Clique em um projeto na lista ao lado para ver os detalhes';
+      empty.append(emptyTitle, emptyCopy);
+      wrapper.appendChild(empty);
+      projectDetails.appendChild(wrapper);
       return;
     }
-    projectDetails.innerHTML = `
-      <div class="project-details">
-        <div class="details-header">
-          <h1>${item.Title}</h1>
-          <span class="status-badge" style="background:${getStatusColor(item.Status)}">${item.Status}</span>
-        </div>
-        <div class="details-grid">
-          <div class="detail-card">
-            <h3>Orçamento</h3>
-            <p class="budget-value">${BRL.format(item.CapexBudgetBRL || 0)}</p>
-          </div>
-          <div class="detail-card">
-            <h3>Responsável</h3>
-            <p>${item.Responsavel || item.ProjectLeader || ''}</p>
-          </div>
-          <div class="detail-card">
-            <h3>Data de Início</h3>
-            <p>${formatDate(item.DataInicio)}</p>
-          </div>
-          <div class="detail-card">
-            <h3>Data de Conclusão</h3>
-            <p>${formatDate(item.DataFim || item.DataConclusao)}</p>
-          </div>
-          <div class="detail-card detail-desc">
-            <h3>Descrição do Projeto</h3>
-            <p>${item.Descricao || ''}</p>
-          </div>
-        </div>
-        <div class="detail-actions">
-          <button type="button" class="btn secondary action-btn" id="editProjectDetails">Editar Projeto</button>
-          ${item.Status === 'Rascunho' ? '<button type="button" class="btn primary action-btn approve">Enviar para Aprovação</button>' : ''}
-        </div>
-      </div>`;
-    const editBtn = document.getElementById('editProjectDetails');
-    if (editBtn) {
-      const editable = item.Status === 'Rascunho' || item.Status === 'Reprovado para Revisão';
-      if (editable) {
-        editBtn.addEventListener('click', () => editProject(item.Id));
-      } else {
-        editBtn.disabled = true;
-      }
+
+    const createDetailCard = (label, value, valueClass = '') => {
+      const card = document.createElement('div');
+      card.className = 'detail-card';
+      const heading = document.createElement('h3');
+      heading.textContent = label;
+      const text = document.createElement('p');
+      if (valueClass) text.className = valueClass;
+      text.textContent = value;
+      card.append(heading, text);
+      return card;
+    };
+
+    const header = document.createElement('div');
+    header.className = 'details-header';
+    const titleEl = document.createElement('h1');
+    titleEl.textContent = item.Title || '';
+    const statusBadge = document.createElement('span');
+    statusBadge.className = 'status-badge';
+    statusBadge.textContent = item.Status || '';
+    statusBadge.style.background = getStatusColor(item.Status);
+    header.append(titleEl, statusBadge);
+
+    const grid = document.createElement('div');
+    grid.className = 'details-grid';
+
+    const budgetCard = createDetailCard('Orçamento', BRL.format(item.CapexBudgetBRL || 0), 'budget-value');
+    const responsible = createDetailCard('Responsável', item.Responsavel || item.ProjectLeader || '');
+    const startDate = createDetailCard('Data de Início', formatDate(item.DataInicio));
+    const endDate = createDetailCard('Data de Conclusão', formatDate(item.DataFim || item.DataConclusao));
+
+    const descriptionCard = createDetailCard('Descrição do Projeto', item.Descricao || '');
+    descriptionCard.classList.add('detail-desc');
+
+    grid.append(budgetCard, responsible, startDate, endDate, descriptionCard);
+
+    const actions = document.createElement('div');
+    actions.className = 'detail-actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn secondary action-btn';
+    editBtn.id = 'editProjectDetails';
+    editBtn.textContent = 'Editar Projeto';
+    actions.appendChild(editBtn);
+
+    if (item.Status === 'Rascunho') {
+      const approveBtn = document.createElement('button');
+      approveBtn.type = 'button';
+      approveBtn.className = 'btn primary action-btn approve';
+      approveBtn.textContent = 'Enviar para Aprovação';
+      actions.appendChild(approveBtn);
+    }
+
+    wrapper.append(header, grid, actions);
+    projectDetails.appendChild(wrapper);
+
+    const isEditable = item.Status === 'Rascunho' || item.Status === 'Reprovado para Revisão';
+    if (isEditable) {
+      editBtn.addEventListener('click', () => editProject(item.Id));
+    } else {
+      editBtn.disabled = true;
     }
   }
 
@@ -496,10 +532,19 @@ class SPRestApi {
     items.forEach(item => {
       const card = document.createElement('div');
       card.className = 'project-card';
-      card.innerHTML = `
-        <span class="status-badge" style="background:${getStatusColor(item.Status)}">${item.Status}</span>
-        <h3>${item.Title}</h3>
-        <p>${BRL.format(item.CapexBudgetBRL || 0)}</p>`;
+
+      const statusBadge = document.createElement('span');
+      statusBadge.className = 'status-badge';
+      statusBadge.style.background = getStatusColor(item.Status);
+      statusBadge.textContent = item.Status || '';
+
+      const title = document.createElement('h3');
+      title.textContent = item.Title || '';
+
+      const budget = document.createElement('p');
+      budget.textContent = BRL.format(item.CapexBudgetBRL || 0);
+
+      card.append(statusBadge, title, budget);
       card.addEventListener('click', async () => {
         const fullItem = await projetos.getItemById(item.Id);
         showProjectDetails(fullItem);
@@ -726,9 +771,7 @@ class SPRestApi {
   function getProjectData(){
     return {
         nome: getValueFromSelector('projectName').trim(),
-        numero_solicitacao: getValueFromSelector('requestNumber').trim(),
         ano_aprovacao: parseInt(getValueFromSelector('approvalYear', 0), 10),
-        codigo: getValueFromSelector('projectCode').trim(),
         unidade: getValueFromSelector('unit').trim(),
         centro: getValueFromSelector('center').trim(),
         local_implantacao: getValueFromSelector('projectLocation').trim(),
@@ -1009,9 +1052,7 @@ class SPRestApi {
     // Valida campos básicos do projeto
     const reqFields = [
       { id: 'projectName', label: 'Nome do Projeto' },
-      // { id: 'requestNumber', label: 'Número da solicitação' },
       { id: 'approvalYear', label: 'Ano de aprovação do Projeto' },
-      // { id: 'projectCode', label: 'Código do projeto' },
       { id: 'unit', label: 'Unidade' },
       { id: 'center', label: 'Centro' },
       { id: 'projectLocation', label: 'Local da implantação do projeto' },
@@ -1082,7 +1123,6 @@ class SPRestApi {
             errs.push(`Atividade ${jdx} do marco ${idx}, ano ${ano}: informe o <strong>valor CAPEX</strong> (BRL) válido (≥ 0).`);
           }
 
-          console.log(getValueFromSelector('.act-desc', "", row), row, ano);
           if (getValueFromSelector('.act-desc', "", row).trim().length === 0) {
             errs.push(`Atividade ${jdx} do marco ${idx}, ano ${ano}: informe a <strong>descrição</strong>.`);
           }

@@ -64,11 +64,7 @@
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, "Helvetica Neue", Helvetica, "Noto Sans", "Liberation Sans", sans-serif;
   color: var(--ink);
   background: var(--bg);
-  height: 100vh;
   min-height: 100vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
 }
 
 /* Wrapper auxiliar utilizado em alguns trechos impressos */
@@ -171,9 +167,14 @@
   color: var(--ink);
   outline: none;
   font-size: 14px;
-  &.is-invalid {
-    border-color: var(--badge-border);
-  }
+}
+
+#static-mirror input[type="text"].is-invalid,
+#static-mirror input[type="number"].is-invalid,
+#static-mirror input[type="date"].is-invalid,
+#static-mirror textarea.is-invalid,
+#static-mirror select.is-invalid {
+  border-color: var(--badge-border);
 }
 
 #static-mirror textarea {
@@ -236,13 +237,14 @@
   justify-content: center;
 }
 
-#static-mirror .btn > .material-symbols-outlined, #static-mirror #projectList .card button > .material-symbols-outlined {
-  &:first-child {
-    margin-right: 5px;
-  }
-  &:last-child {
-    margin-left: 5px;
-  }
+#static-mirror .btn > .material-symbols-outlined:first-child,
+#static-mirror #projectList .card button > .material-symbols-outlined:first-child {
+  margin-right: 5px;
+}
+
+#static-mirror .btn > .material-symbols-outlined:last-child,
+#static-mirror #projectList .card button > .material-symbols-outlined:last-child {
+  margin-left: 5px;
 }
 
 #static-mirror .btn.primary {
@@ -300,12 +302,10 @@
 
 /* Sidebar rolável com a listagem de projetos */
 #static-mirror #projectSidebar {
-  width: 340px;
+  width: 260px;
   background: #d9d9d9;
   overflow-y: auto;
-  padding: 20px 15px;
-  flex-shrink: 0;
-  min-height: 0;
+  padding: 20px 10px;
 }
 
 #static-mirror #projectList {
@@ -364,7 +364,7 @@
   background: #f8f9fa;
   overflow-y: auto;
   padding: 20px;
-  min-height: 0;
+  height: 100%;
 }
 
 #static-mirror .project-details {
@@ -619,13 +619,15 @@
 
 #static-mirror #ganttChart {
   padding: 10px;
-  & > div {
-    border-radius: 14px;
-    overflow: hidden;
-    background-color: var(--activity-bg);
-    & > div {
-      padding: 10px;
-      overflow-x: auto;
-    }
-  }
+}
+
+#static-mirror #ganttChart > div {
+  border-radius: 14px;
+  overflow: hidden;
+  background-color: var(--activity-bg);
+}
+
+#static-mirror #ganttChart > div > div {
+  padding: 10px;
+  overflow-x: auto;
 }
