@@ -301,7 +301,7 @@ class SPRestApi {
   const errorsBox = document.getElementById('errors');
   const milestonesWrap = document.getElementById('milestones');
   const addMilestoneBtn = document.getElementById('addMilestoneBtn');
-  const projectValueInput = document.getElementById('projectValue');
+  const projectBudgetInput = document.getElementById('projectBudget');
   const approvalYearInput = document.getElementById('approvalYear');
   const capexFlag = document.getElementById('capexFlag');
   const milestoneSection = document.getElementById('milestoneSection');
@@ -345,16 +345,16 @@ class SPRestApi {
 
   // Aponta se o orçamento atual excede o limite para marcos obrigatórios
   function overThreshold() {
-    return parseNumberBRL(projectValueInput.value) > REQ_THRESHOLD;
+    return parseNumberBRL(projectBudgetInput.value) > REQ_THRESHOLD;
   }
 
   // Atualiza a legenda que orienta quando marcos devem ser adicionados
   function updateCapexFlag() {
-    const n = parseNumberBRL(projectValueInput.value);
+    const n = parseNumberBRL(projectBudgetInput.value);
     if (!n) { capexFlag.textContent = ''; return; }
     capexFlag.innerHTML = n > REQ_THRESHOLD
-      ? `<span class="ok">CAPEX BUDGET ${BRL.format(n)} &gt; ${BRL.format(REQ_THRESHOLD)} — marcos obrigatórios.</span>`
-      : `CAPEX BUDGET ${BRL.format(n)} ≤ ${BRL.format(REQ_THRESHOLD)} — marcos não necessários.`;
+      ? `<span class="ok">Orçamento do Projeto ${BRL.format(n)} &gt; ${BRL.format(REQ_THRESHOLD)} — marcos obrigatórios.</span>`
+      : `Orçamento do Projeto ${BRL.format(n)} ≤ ${BRL.format(REQ_THRESHOLD)} — marcos não necessários.`;
   }
 
   // Esconde ou revela a seção de marcos de acordo com o orçamento
@@ -474,7 +474,7 @@ class SPRestApi {
     const startDate = createDetailCard('Data de Início', formatDate(item.DataInicio));
     const endDate = createDetailCard('Data de Conclusão', formatDate(item.DataFim || item.DataConclusao));
 
-    const descriptionCard = createDetailCard('Descrição do Projeto', item.Descricao || '');
+    const descriptionCard = createDetailCard('Descrição do Projeto', item.SumarioProjeto || item.NecessidadeNegocio || item.ComentarioProjeto || item.Descricao || '');
     descriptionCard.classList.add('detail-desc');
 
     grid.append(budgetCard, responsible, startDate, endDate, descriptionCard);
@@ -562,21 +562,29 @@ class SPRestApi {
   function fillForm(item) {
     document.getElementById('projectName').value = item.Title || '';
     document.getElementById('approvalYear').value = item.AnoAprovacao || '';
+    document.getElementById('projectBudget').value = item.CapexBudgetBRL || '';
+    document.getElementById('investmentLevel').value = item.NivelInvestimento || '';
+    document.getElementById('fundingSource').value = item.OrigemVerba || '';
     document.getElementById('unit').value = item.Unidade || '';
     document.getElementById('center').value = item.Centro || '';
     document.getElementById('projectLocation').value = item.LocalImplantacao || '';
     document.getElementById('projectUser').value = item.ProjectUser || '';
     document.getElementById('projectLeader').value = item.ProjectLeader || '';
+    document.getElementById('company').value = item.Empresa || '';
+    document.getElementById('depreciationCostCenter').value = item.CCustoDepreciacao || '';
+    document.getElementById('category').value = item.Categoria || '';
     document.getElementById('investmentType').value = item.TipoInvestimento || '';
     document.getElementById('assetType').value = item.TipoAtivo || '';
-    document.getElementById('usefulLife').value = item.VidaUtilAnos || '';
-    document.getElementById('projectValue').value = item.CapexBudgetBRL || '';
-    document.getElementById('necessidade').value = item.NecessidadeNegocio || '';
-    document.getElementById('solucao').value = item.SolucaoProposta || '';
-    document.getElementById('kpi').value = item.KpiImpactado || '';
-    document.getElementById('kpiDesc').value = item.KpiDescricao || '';
-    document.getElementById('kpi_actual').value = item.KpiValorAtual || '';
-    document.getElementById('kpi_expected').value = item.KpiValorEsperado || '';
+    document.getElementById('projectFunction').value = item.FuncaoProjeto || '';
+    document.getElementById('startDate').value = item.DataInicio ? item.DataInicio.substring(0, 10) : (item.DataInicioProjeto ? item.DataInicioProjeto.substring(0,10) : '');
+    document.getElementById('endDate').value = item.DataFim ? item.DataFim.substring(0, 10) : (item.DataFimProjeto ? item.DataFimProjeto.substring(0,10) : '');
+    document.getElementById('projectSummary').value = item.SumarioProjeto || item.NecessidadeNegocio || '';
+    document.getElementById('projectComment').value = item.ComentarioProjeto || item.SolucaoProposta || '';
+    document.getElementById('kpiType').value = item.TipoKPI || item.KpiImpactado || '';
+    document.getElementById('kpiName').value = item.NomeKPI || '';
+    document.getElementById('kpiDescription').value = item.KpiDescricao || '';
+    document.getElementById('kpiCurrent').value = item.KpiValorAtual || '';
+    document.getElementById('kpiExpected').value = item.KpiValorEsperado || '';
     updateCapexFlag();
     updateMilestoneVisibility();
   }
@@ -604,20 +612,33 @@ class SPRestApi {
       Title: data.nome,
       AnoAprovacao: data.ano_aprovacao,
       CapexBudgetBRL: data.capex_budget_brl,
-      Centro: data.centro,
-      KpiDescricao: data.kpiDesc,
-      KpiImpactado: data.kpi,
-      KpiValorAtual: data.kpi_actual,
-      KpiValorEsperado: data.kpi_expected,
-      LocalImplantacao: data.local_implantacao,
-      NecessidadeNegocio: data.necessidade,
-      ProjectLeader: data.project_leader,
+      NivelInvestimento: data.nivel_investimento,
+      OrigemVerba: data.origem_verba,
       ProjectUser: data.project_user,
-      SolucaoProposta: data.solucao,
-      TipoAtivo: data.tipo_ativo,
-      TipoInvestimento: data.tipo_investimento,
+      ProjectLeader: data.project_leader,
+      Empresa: data.empresa,
+      Centro: data.centro,
       Unidade: data.unidade,
-      VidaUtilAnos: data.vida_util,
+      LocalImplantacao: data.local_implantacao,
+      CCustoDepreciacao: data.ccusto_depreciacao,
+      Categoria: data.categoria,
+      TipoInvestimento: data.tipo_investimento,
+      TipoAtivo: data.tipo_ativo,
+      FuncaoProjeto: data.funcao_projeto,
+      DataInicio: data.data_inicio || null,
+      DataFim: data.data_fim || null,
+      DataInicioProjeto: data.data_inicio || null,
+      DataFimProjeto: data.data_fim || null,
+      SumarioProjeto: data.sumario,
+      ComentarioProjeto: data.comentario,
+      NecessidadeNegocio: data.sumario,
+      SolucaoProposta: data.comentario,
+      TipoKPI: data.kpi_tipo,
+      KpiImpactado: data.kpi_tipo,
+      NomeKPI: data.kpi_nome,
+      KpiDescricao: data.kpi_descricao,
+      KpiValorAtual: data.kpi_atual,
+      KpiValorEsperado: data.kpi_esperado,
       Status: 'Rascunho'
     };
     updateStatus('Salvando rascunho...', 'info');
@@ -771,24 +792,32 @@ class SPRestApi {
   // Coleta os campos principais do formulário para montar o payload do projeto
   function getProjectData(){
     return {
-        nome: getValueFromSelector('projectName').trim(),
-        ano_aprovacao: parseInt(getValueFromSelector('approvalYear', 0), 10),
-        unidade: getValueFromSelector('unit').trim(),
-        centro: getValueFromSelector('center').trim(),
-        local_implantacao: getValueFromSelector('projectLocation').trim(),
-        project_user: getValueFromSelector('projectUser').trim(),
-        project_leader: getValueFromSelector('projectLeader').trim(),
-        tipo_investimento: getValueFromSelector('investmentType').trim(),
-        tipo_ativo: getValueFromSelector('assetType').trim(),
-        vida_util: parseInt(getValueFromSelector('usefulLife', 0), 10),
-        capex_budget_brl: parseNumberBRL(getValueFromSelector('projectValue')),
-        necessidade: getValueFromSelector('necessidade', "").trim(),
-        solucao: getValueFromSelector('solucao', "").trim(),
-        kpi: getValueFromSelector('kpi', "").trim(),
-        kpiDesc: getValueFromSelector('kpiDesc', "").trim(),
-        kpi_actual: parseNumberBRL(getValueFromSelector('kpi_actual', 0).trim()),
-        kpi_expected: parseNumberBRL(getValueFromSelector('kpi_expected', 0).trim())
-      }
+      nome: getValueFromSelector('projectName').trim(),
+      ano_aprovacao: parseInt(getValueFromSelector('approvalYear', 0), 10),
+      capex_budget_brl: parseNumberBRL(getValueFromSelector('projectBudget')), 
+      nivel_investimento: getValueFromSelector('investmentLevel').trim(),
+      origem_verba: getValueFromSelector('fundingSource').trim(),
+      project_user: getValueFromSelector('projectUser').trim(),
+      project_leader: getValueFromSelector('projectLeader').trim(),
+      empresa: getValueFromSelector('company').trim(),
+      centro: getValueFromSelector('center').trim(),
+      unidade: getValueFromSelector('unit').trim(),
+      local_implantacao: getValueFromSelector('projectLocation').trim(),
+      ccusto_depreciacao: getValueFromSelector('depreciationCostCenter').trim(),
+      categoria: getValueFromSelector('category').trim(),
+      tipo_investimento: getValueFromSelector('investmentType').trim(),
+      tipo_ativo: getValueFromSelector('assetType').trim(),
+      funcao_projeto: getValueFromSelector('projectFunction').trim(),
+      data_inicio: getValueFromSelector('startDate', '').trim(),
+      data_fim: getValueFromSelector('endDate', '').trim(),
+      sumario: getValueFromSelector('projectSummary', '').trim(),
+      comentario: getValueFromSelector('projectComment', '').trim(),
+      kpi_tipo: getValueFromSelector('kpiType', '').trim(),
+      kpi_nome: getValueFromSelector('kpiName', '').trim(),
+      kpi_descricao: getValueFromSelector('kpiDescription', '').trim(),
+      kpi_atual: parseNumberBRL(getValueFromSelector('kpiCurrent', 0).trim()),
+      kpi_esperado: parseNumberBRL(getValueFromSelector('kpiExpected', 0).trim())
+    }
   }
 
   // Extrai toda a hierarquia de marcos, atividades e alocações anuais
@@ -801,7 +830,7 @@ class SPRestApi {
       const acts = [...ms.querySelectorAll('[data-activity]')].map(a => {
         const anual = [...a.querySelectorAll('.row[data-year]')].map(row => ({
           ano: parseInt(row.dataset.year, 10),
-          capex_brl: parseNumberBRL(getValueFromSelector('.act-capex'), 0, row),
+          capex_brl: parseNumberBRL(getValueFromSelector('.act-capex', 0, row)),
           descricao: getValueFromSelector('.act-desc', "", row).trim(),
         }));
         return {
@@ -809,6 +838,8 @@ class SPRestApi {
           inicio: getValueFromSelector('.act-start', today, a),
           fim: getValueFromSelector('.act-end', today, a),
           elementoPep: getValueFromSelector('[name="kpi"]', "", a),
+          descricao: getValueFromSelector('.act-overview', "", a).trim(),
+          fornecedor: getValueFromSelector('.act-supplier', "", a).trim(),
           anual,
         };
       });
@@ -854,6 +885,8 @@ class SPRestApi {
           DataInicio: atividade.inicio,
           DataFim: atividade.fim,
           ElementoPEP: atividade.elementoPep,
+          DescricaoAtividade: atividade.descricao,
+          FornecedorAtividade: atividade.fornecedor,
           MarcoId: marcoId
         });
         const atvId = infoAtv.d?.Id || infoAtv.d?.ID;
@@ -878,12 +911,20 @@ class SPRestApi {
     const msRes = await Marcos.getItems({ select: 'Id,Title', filter: `ProjetoId eq ${projectId}` });
     const result = [];
     for (const ms of msRes.d?.results || []) {
-      const actRes = await Atividades.getItems({ select: 'Id,Title,DataInicio,DataFim,ElementoPEP', filter: `MarcoId eq ${ms.Id}` });
+      const actRes = await Atividades.getItems({ select: 'Id,Title,DataInicio,DataFim,ElementoPEP,DescricaoAtividade,FornecedorAtividade', filter: `MarcoId eq ${ms.Id}` });
       const acts = [];
       for (const act of actRes.d?.results || []) {
         const alRes = await Alocacoes.getItems({ select: 'Ano,CapexBRL,Descricao', filter: `AtividadeId eq ${act.Id}` });
         const anual = (alRes.d?.results || []).map(a => ({ ano: a.Ano, capex_brl: a.CapexBRL, descricao: a.Descricao }));
-        acts.push({ titulo: act.Title, inicio: act.DataInicio, fim: act.DataFim, elementoPep: act.ElementoPEP, anual });
+        acts.push({
+          titulo: act.Title,
+          inicio: act.DataInicio,
+          fim: act.DataFim,
+          elementoPep: act.ElementoPEP,
+          descricao: act.DescricaoAtividade,
+          fornecedor: act.FornecedorAtividade,
+          anual
+        });
       }
       result.push({ nome: ms.Title, atividades: acts });
     }
@@ -910,6 +951,10 @@ class SPRestApi {
         start.dispatchEvent(new Event('change'));
         end.dispatchEvent(new Event('change'));
         actNode.querySelector('[name="kpi"]').value = act.elementoPep || '';
+        const overview = actNode.querySelector('.act-overview');
+        const supplier = actNode.querySelector('.act-supplier');
+        if (overview) overview.value = act.descricao || '';
+        if (supplier) supplier.value = act.fornecedor || '';
         (act.anual || []).forEach(a => {
           const row = actNode.querySelector(`.row[data-year="${a.ano}"]`);
           if (row) {
@@ -1031,16 +1076,18 @@ class SPRestApi {
   if (saveDraftBtn) saveDraftBtn.addEventListener('click', saveDraft);
   if (backBtn) backBtn.addEventListener('click', showProjectList);
 
-  projectValueInput.addEventListener('input', () => {
-    updateCapexFlag();
-    updateMilestoneVisibility();
-    refreshGantt();
-  });
-  projectValueInput.addEventListener('change', () => {
-    updateCapexFlag();
-    updateMilestoneVisibility();
-    refreshGantt();
-  });
+  if (projectBudgetInput) {
+    projectBudgetInput.addEventListener('input', () => {
+      updateCapexFlag();
+      updateMilestoneVisibility();
+      refreshGantt();
+    });
+    projectBudgetInput.addEventListener('change', () => {
+      updateCapexFlag();
+      updateMilestoneVisibility();
+      refreshGantt();
+    });
+  }
 
   // Validation
   // Bloco extenso de validações que cobre as regras discutidas com o usuário
@@ -1053,16 +1100,30 @@ class SPRestApi {
     // Valida campos básicos do projeto
     const reqFields = [
       { id: 'projectName', label: 'Nome do Projeto' },
-      { id: 'approvalYear', label: 'Ano de aprovação do Projeto' },
-      { id: 'unit', label: 'Unidade' },
+      { id: 'approvalYear', label: 'Ano de Aprovação' },
+      { id: 'projectBudget', label: 'Orçamento do Projeto em R$' },
+      { id: 'investmentLevel', label: 'Nível de Investimento' },
+      { id: 'fundingSource', label: 'Origem da Verba' },
+      { id: 'projectUser', label: 'Project User' },
+      { id: 'projectLeader', label: 'Coordenador do Projeto' },
+      { id: 'company', label: 'Empresa' },
       { id: 'center', label: 'Centro' },
-      { id: 'projectLocation', label: 'Local da implantação do projeto' },
-      { id: 'projectUser', label: 'Project User do Projeto' },
-      { id: 'projectLeader', label: 'Project Leader' },
-      { id: 'investmentType', label: 'Tipo de investimento' },
-      { id: 'assetType', label: 'Tipo de ativo' },
-      { id: 'usefulLife', label: 'Vida útil do projeto' },
-      { id: 'projectValue', label: 'CAPEX BUDGET do Projeto' },
+      { id: 'unit', label: 'Unidade' },
+      { id: 'projectLocation', label: 'Local de Implantação' },
+      { id: 'depreciationCostCenter', label: 'C Custo Depreciação' },
+      { id: 'category', label: 'Categoria' },
+      { id: 'investmentType', label: 'Tipo de Investimento' },
+      { id: 'assetType', label: 'Tipo de Ativo' },
+      { id: 'projectFunction', label: 'Função do Projeto' },
+      { id: 'startDate', label: 'Data de Início' },
+      { id: 'endDate', label: 'Data de Término' },
+      { id: 'projectSummary', label: 'Sumário do Projeto' },
+      { id: 'projectComment', label: 'Comentário' },
+      { id: 'kpiType', label: 'Tipo de KPI' },
+      { id: 'kpiName', label: 'Nome do KPI' },
+      { id: 'kpiDescription', label: 'Descrição do KPI' },
+      { id: 'kpiCurrent', label: 'KPI Atual' },
+      { id: 'kpiExpected', label: 'KPI Esperado' },
     ];
     for (const f of reqFields) {
       const el = document.getElementById(f.id);
@@ -1106,6 +1167,8 @@ class SPRestApi {
         const title = a.querySelector('.act-title');
         const start = a.querySelector('.act-start');
         const end = a.querySelector('.act-end');
+        const overviewEl = a.querySelector('.act-overview');
+        const supplierEl = a.querySelector('.act-supplier');
         const yearRows = [...a.querySelectorAll('.row[data-year]')];
 
         if (!title.value.trim()) errs.push(`Atividade ${jdx} do marco ${idx}: informe o <strong>título</strong>.`);
@@ -1113,6 +1176,14 @@ class SPRestApi {
         if (!end.value) errs.push(`Atividade ${jdx} do marco ${idx}: informe a <strong>data de fim</strong>.`);
         if (start.value && end.value && start.value > end.value) {
           errs.push(`Atividade ${jdx} do marco ${idx}: a <strong>data de início</strong> não pode ser posterior à <strong>data de fim</strong>.`);
+        }
+        if (!overviewEl || !overviewEl.value.trim()) {
+          errs.push(`Atividade ${jdx} do marco ${idx}: informe a <strong>descrição da atividade</strong>.`);
+          if (overviewEl) errsEl.push(overviewEl);
+        }
+        if (!supplierEl || !supplierEl.value.trim()) {
+          errs.push(`Atividade ${jdx} do marco ${idx}: informe o <strong>fornecedor da atividade</strong>.`);
+          if (supplierEl) errsEl.push(supplierEl);
         }
         if (yearRows.length === 0) {
           errs.push(`Atividade ${jdx} do marco ${idx}: defina <strong>datas de início e fim</strong> válidas para gerar campos anuais.`);
@@ -1188,20 +1259,33 @@ class SPRestApi {
         Title: payload.projeto.nome,
         AnoAprovacao: payload.projeto.ano_aprovacao,
         CapexBudgetBRL: payload.projeto.capex_budget_brl,
-        Centro: payload.projeto.centro,
-        KpiDescricao: payload.projeto.kpiDesc,
-        KpiImpactado: payload.projeto.kpi,
-        KpiValorAtual: payload.projeto.kpi_actual,
-        KpiValorEsperado: payload.projeto.kpi_expected,
-        LocalImplantacao: payload.projeto.local_implantacao,
-        NecessidadeNegocio: payload.projeto.necessidade,
-        ProjectLeader: payload.projeto.project_leader,
+        NivelInvestimento: payload.projeto.nivel_investimento,
+        OrigemVerba: payload.projeto.origem_verba,
         ProjectUser: payload.projeto.project_user,
-        SolucaoProposta: payload.projeto.solucao,
-        TipoAtivo: payload.projeto.tipo_ativo,
-        TipoInvestimento: payload.projeto.tipo_investimento,
+        ProjectLeader: payload.projeto.project_leader,
+        Empresa: payload.projeto.empresa,
+        Centro: payload.projeto.centro,
         Unidade: payload.projeto.unidade,
-        VidaUtilAnos: payload.projeto.vida_util
+        LocalImplantacao: payload.projeto.local_implantacao,
+        CCustoDepreciacao: payload.projeto.ccusto_depreciacao,
+        Categoria: payload.projeto.categoria,
+        TipoInvestimento: payload.projeto.tipo_investimento,
+        TipoAtivo: payload.projeto.tipo_ativo,
+        FuncaoProjeto: payload.projeto.funcao_projeto,
+        DataInicio: payload.projeto.data_inicio || null,
+        DataFim: payload.projeto.data_fim || null,
+        DataInicioProjeto: payload.projeto.data_inicio || null,
+        DataFimProjeto: payload.projeto.data_fim || null,
+        SumarioProjeto: payload.projeto.sumario,
+        ComentarioProjeto: payload.projeto.comentario,
+        NecessidadeNegocio: payload.projeto.sumario,
+        SolucaoProposta: payload.projeto.comentario,
+        TipoKPI: payload.projeto.kpi_tipo,
+        KpiImpactado: payload.projeto.kpi_tipo,
+        NomeKPI: payload.projeto.kpi_nome,
+        KpiDescricao: payload.projeto.kpi_descricao,
+        KpiValorAtual: payload.projeto.kpi_atual,
+        KpiValorEsperado: payload.projeto.kpi_esperado
       });
 
       await saveProjectStructure(infoProjeto.d.ID, payload.milestones);
