@@ -397,7 +397,7 @@ class SPRestApi {
   function showProjectDetails(item) {
     if (!projectDetails) return;
     if (!item) {
-      projectDetails.innerHTML = '<div class="project-details"><div class="empty"><p>Selecione um projeto</p><p>Clique em um projeto na lista ao lado para ver os detalhes</p></div></div>';
+      projectDetails.innerHTML = '<div class="project-details"><div class="empty"><p>Selecione um projeto</p><p>Clique em um projeto na lista ao lado para ver e editar os detalhes. Para criar um novo, use o botão <strong>Novo Projeto</strong> acima.</p></div></div>';
       return;
     }
     projectDetails.innerHTML = `
