@@ -247,7 +247,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px;
+  padding: 10px 40px;
   background: #fff;
   border-bottom: 1px solid var(--border);
 }
@@ -271,18 +271,15 @@
 #static-mirror #app {
   display: flex;
   height: calc(100vh - 80px);
+  padding: 0 40px;
+  box-sizing: border-box;
 }
 
 #static-mirror #projectSidebar {
-  width: 300px;
+  width: 340px;
   background: #d9d9d9;
   overflow-y: auto;
-  padding: 20px 10px;
-}
-
-#static-mirror #projectSidebar h2 {
-  margin: 0 0 10px;
-  color: #555;
+  padding: 20px 15px;
 }
 
 #static-mirror #projectList {
@@ -309,6 +306,8 @@
 #static-mirror #projectList .project-card h3 {
   margin: 0;
   font-size: 16px;
+  font-weight: 700;
+  color: #000;
 }
 
 #static-mirror #projectList .project-card p {
@@ -324,6 +323,13 @@
   font-size: 11px;
   color: #fff;
   margin-bottom: 6px;
+}
+
+#static-mirror #projectList .status-badge {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  font-weight: 600;
 }
 
 #static-mirror #projectDetails {
@@ -354,7 +360,7 @@
 
 #static-mirror .project-details .details-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 15px;
   margin-bottom: 20px;
 }
@@ -409,11 +415,6 @@
 #static-mirror .project-details .action-btn.edit {
   background: #1e40af;
   color: #fff;
-}
-
-#static-mirror .project-details .action-btn.report {
-  background: #e5e7eb;
-  color: #374151;
 }
 
 #static-mirror .project-details .action-btn.approve {

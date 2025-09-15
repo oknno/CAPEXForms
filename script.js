@@ -384,10 +384,20 @@ class SPRestApi {
     }
   }
 
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      return isNaN(d) ? '' : d.toLocaleDateString('pt-BR');
+    } catch (e) {
+      return '';
+    }
+  }
+
   function showProjectDetails(item) {
     if (!projectDetails) return;
     if (!item) {
-      projectDetails.innerHTML = '<div class="project-details"><div class="empty">Selecione um projeto</div></div>';
+      projectDetails.innerHTML = '<div class="project-details"><div class="empty"><p>Selecione um projeto</p><p>Clique em um projeto na lista ao lado para ver e editar os detalhes. Para criar um novo, use o botão <strong>Novo Projeto</strong> acima.</p></div></div>';
       return;
     }
     projectDetails.innerHTML = `
@@ -401,6 +411,18 @@ class SPRestApi {
             <h3>Orçamento</h3>
             <p>${BRL.format(item.CapexBudgetBRL || 0)}</p>
           </div>
+          <div class="detail-card">
+            <h3>Responsável</h3>
+            <p>${item.Responsavel || item.ProjectLeader || ''}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Data de Início</h3>
+            <p>${formatDate(item.DataInicio)}</p>
+          </div>
+          <div class="detail-card">
+            <h3>Data de Conclusão</h3>
+            <p>${formatDate(item.DataFim || item.DataConclusao)}</p>
+          </div>
         </div>
         <div class="detail-desc">
           <h3>Descrição do Projeto</h3>
@@ -408,7 +430,6 @@ class SPRestApi {
         </div>
         <div class="detail-actions">
           <button type="button" class="action-btn edit" id="editProjectDetails">Editar Projeto</button>
-          <button type="button" class="action-btn report">Relatório</button>
           ${item.Status === 'Rascunho' ? '<button type="button" class="action-btn approve">Enviar para Aprovação</button>' : ''}
         </div>
       </div>`;
@@ -450,20 +471,16 @@ class SPRestApi {
         <span class="status-badge" style="background:${getStatusColor(item.Status)}">${item.Status}</span>
         <h3>${item.Title}</h3>
         <p>${BRL.format(item.CapexBudgetBRL || 0)}</p>`;
-      card.addEventListener('click', () => {
-        showProjectDetails(item);
+      card.addEventListener('click', async () => {
+        const fullItem = await projetos.getItemById(item.Id);
+        showProjectDetails(fullItem);
         [...projectList.children].forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
       });
       projectList.appendChild(card);
     });
     showProjectList();
-    if (items.length) {
-      showProjectDetails(items[0]);
-      projectList.firstChild.classList.add('selected');
-    } else {
-      showProjectDetails(null);
-    }
+    showProjectDetails(null);
   }
 
   function fillForm(item) {
