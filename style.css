@@ -122,7 +122,6 @@
   font-weight: 600;
   color: var(--ink);
 }
-
 /* Grids genéricos usados em várias seções do formulário */
 #static-mirror .grid {
   display: grid;
