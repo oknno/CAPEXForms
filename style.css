@@ -15,7 +15,7 @@
   --color-yellow: #ffbe6e;
   --color-am-orange: #ff3700;
 
-  --bg: #f5f5f5;
+  --bg: #ffffff;
   --card: #ffffff;
   --muted: #ffffff;
   --ink: #333333;
@@ -44,6 +44,7 @@
   --error-border: var(--color-red);
   --error-bg: rgba(230, 60, 65, 0.1);
   --ok-light: #3d9308;
+  --layout-width: 1200px;
 }
 
 .material-symbols-outlined {
@@ -65,6 +66,8 @@
   color: var(--ink);
   background: var(--bg);
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Wrapper auxiliar utilizado em alguns trechos impressos */
@@ -92,6 +95,9 @@
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 20px;
+  width: min(100%, var(--layout-width));
+  margin: 0 auto 40px;
+  box-sizing: border-box;
 }
 
 #static-mirror fieldset {
@@ -268,10 +274,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 48px;
+  padding: 16px 40px;
   background: #fff;
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  width: min(100%, var(--layout-width));
+  margin: 0 auto 24px;
+  box-sizing: border-box;
 }
 
 #static-mirror .logo {
@@ -293,19 +301,23 @@
 /* Região flexível que mantém sidebar e painel de detalhes lado a lado */
 #static-mirror #app {
   display: grid;
-  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+  grid-template-columns: minmax(330px, 390px) minmax(0, 1fr);
   gap: 32px;
-  padding: 0 48px 40px;
+  padding: 0 40px;
   box-sizing: border-box;
-  height: calc(100vh - 80px);
+  width: min(100%, var(--layout-width));
+  margin: 0 auto;
+  flex: 1;
+  min-height: 0;
 }
 
 @media (max-width: 960px) {
   #static-mirror #app {
     grid-template-columns: 1fr;
     gap: 20px;
-    padding: 20px;
-    height: auto;
+    padding: 16px;
+    width: 100%;
+    margin: 0;
   }
 
   #static-mirror #projectSidebar,
@@ -319,31 +331,39 @@
 #static-mirror #projectSidebar {
   display: flex;
   flex-direction: column;
-  background: #d9d9d9;
+  background: #ffffff;
   overflow-y: auto;
-  padding: 20px;
+  padding: 24px 20px;
   min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
 }
 
 #static-mirror #projectList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 #static-mirror #projectList .project-card {
   cursor: pointer;
-  padding: 12px;
-  border-radius: 8px;
-  transition: background 0.2s ease;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 #static-mirror #projectList .project-card:hover {
-  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--color-purple);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 #static-mirror #projectList .project-card.selected {
-  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--color-purple);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 #static-mirror #projectList .project-card h3 {
@@ -379,19 +399,29 @@
 #static-mirror #projectDetails {
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
+
+  background: #ffffff;
   overflow-y: auto;
-  padding: 20px;
+  padding: 32px 24px;
   height: 100%;
   min-height: 0;
   width: 100%;
   justify-self: stretch;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  box-sizing: border-box;
 }
 
 #static-mirror .project-details {
   flex: 1;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  gap: 24px;
 }
 
 #static-mirror .project-details .details-header {
@@ -399,7 +429,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  margin-bottom: 20px;
+  width: 100%;
 }
 
 #static-mirror .project-details h1 {
@@ -411,9 +441,9 @@
 /* Grade de duas colunas que organiza orçamento, responsável e datas */
 #static-mirror .project-details .details-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 15px;
-  margin-bottom: 20px;
+  width: 100%;
 }
 
 #static-mirror .project-details .detail-card {
@@ -450,6 +480,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  width: 100%;
 }
 
 #static-mirror .project-details .action-btn {
@@ -472,6 +503,8 @@
 #static-mirror .project-details .empty {
   color: #555;
   text-align: center;
+  margin: auto;
+  max-width: 360px;
 }
 
 #static-mirror .project-details .empty-title {
