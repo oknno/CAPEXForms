@@ -428,6 +428,7 @@ class SPRestApi {
           <h3>Descrição do Projeto</h3>
           <p>${item.Descricao || ''}</p>
         </div>
+      </div>
         <div class="detail-actions">
           <button type="button" class="action-btn edit" id="editProjectDetails">Editar Projeto</button>
           ${item.Status === 'Rascunho' ? '<button type="button" class="action-btn approve">Enviar para Aprovação</button>' : ''}
