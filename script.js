@@ -318,7 +318,6 @@ class SPRestApi {
   const activityTpl = document.getElementById('activityTemplate');
 
   const currentYear = new Date().getFullYear();
-  approvalYearInput.max = currentYear;
   approvalYearInput.placeholder = currentYear;
 
   // Estados auxiliares controlando marcos, projeto atual e reset silencioso
@@ -1105,12 +1104,12 @@ class SPRestApi {
     // Valida campos básicos do projeto
     const reqFields = [
       { id: 'projectName', label: 'Nome do Projeto' },
-      { id: 'approvalYear', label: 'Ano de Aprovação' },
-      { id: 'projectBudget', label: 'Orçamento do Projeto em R$' },
+      { id: 'approvalYear', label: 'Ano de Aprovação', validator: (val) => /^\d{4}$/.test(val) },
+      { id: 'projectBudget', label: 'Orçamento Projeto em R$', validator: (val) => val.replace(/[^\d]/g, '').length > 0 && !isNaN(parseNumberBRL(val)) && parseNumberBRL(val) >= 0 },
       { id: 'investmentLevel', label: 'Nível de Investimento' },
       { id: 'fundingSource', label: 'Origem da Verba' },
-      { id: 'projectUser', label: 'Project User' },
       { id: 'projectLeader', label: 'Coordenador do Projeto' },
+      { id: 'projectUser', label: 'Project User' },
       { id: 'company', label: 'Empresa' },
       { id: 'center', label: 'Centro' },
       { id: 'unit', label: 'Unidade' },
@@ -1127,25 +1126,42 @@ class SPRestApi {
       { id: 'kpiType', label: 'Tipo de KPI' },
       { id: 'kpiName', label: 'Nome do KPI' },
       { id: 'kpiDescription', label: 'Descrição do KPI' },
-      { id: 'kpiCurrent', label: 'KPI Atual' },
-      { id: 'kpiExpected', label: 'KPI Esperado' },
+      { id: 'kpiCurrent', label: 'KPI Atual', validator: (val) => val.replace(/[^\d]/g, '').length > 0 && !isNaN(parseNumberBRL(val)) && parseNumberBRL(val) >= 0 },
+      { id: 'kpiExpected', label: 'KPI Esperado', validator: (val) => val.replace(/[^\d]/g, '').length > 0 && !isNaN(parseNumberBRL(val)) && parseNumberBRL(val) >= 0 },
     ];
     for (const f of reqFields) {
       const el = document.getElementById(f.id);
-      if (!el.value || (el.type === 'number' && parseNumberBRL(el.value) < 0)) {
+      if (!el) continue;
+      const value = (el.value || '').trim();
+      const isValid = value && (!f.validator || f.validator(value, el));
+      if (!isValid) {
         errs.push(`Preencha o campo: <strong>${f.label}</strong>.`);
         errsEl.push(el);
+        el.classList.add('is-invalid');
       } else {
         el.classList.remove('is-invalid');
       }
     }
 
-    const yearVal = parseInt(approvalYearInput.value, 10);
-    if (isNaN(yearVal) || yearVal > currentYear) {
+    const yearStr = approvalYearInput.value.trim();
+    const yearVal = parseInt(yearStr, 10);
+    if (!/^\d{4}$/.test(yearStr) || isNaN(yearVal) || yearVal > currentYear) {
       errsEl.push(approvalYearInput);
       errs.push(`O <strong>ano de aprovação</strong> deve ser menor ou igual a ${currentYear}.`);
     } else {
       approvalYearInput.classList.remove('is-invalid');
+    }
+
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    if (startDateInput.value && endDateInput.value && startDateInput.value > endDateInput.value) {
+      errs.push('A <strong>data de início</strong> não pode ser posterior à <strong>data de término</strong>.');
+      errsEl.push(startDateInput, endDateInput);
+      startDateInput.classList.add('is-invalid');
+      endDateInput.classList.add('is-invalid');
+    } else {
+      startDateInput.classList.remove('is-invalid');
+      endDateInput.classList.remove('is-invalid');
     }
 
     // Requisito de marcos se CAPEX > 1,5 mi

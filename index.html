@@ -66,7 +66,7 @@
                         </div>
 
                         <div class="col-2">
-                            <label for="projectBudget">Orçamento do Projeto em R$</label>
+                            <label for="projectBudget">Orçamento Projeto em R$</label>
                             <input id="projectBudget" name="projectBudget" type="text" inputmode="decimal"
                                 pattern="^[0-9]{1,10}(?:[\.,][0-9]{0,2})?$" maxlength="10" required placeholder="500000,00"
                                 title="Informe até 10 dígitos, com separador decimal opcional" />
@@ -77,20 +77,18 @@
                             <label for="investmentLevel">Nível de Investimento</label>
                             <input id="investmentLevel" name="investmentLevel" type="text" maxlength="2" required />
                         </div>
-
-                        <div class="col-6">
+                        <div class="col-4">
                             <label for="fundingSource">Origem da Verba</label>
                             <input id="fundingSource" name="fundingSource" type="text" maxlength="30" required />
                         </div>
-
-                        <div class="col-3">
-                            <label for="projectUser">Project User</label>
-                            <input id="projectUser" name="projectUser" type="text" maxlength="30" required />
-                        </div>
-
-                        <div class="col-3">
+                        <div class="col-4">
                             <label for="projectLeader">Coordenador do Projeto</label>
                             <input id="projectLeader" name="projectLeader" type="text" maxlength="30" required />
+                        </div>
+
+                        <div class="col-4">
+                            <label for="projectUser">Project User</label>
+                            <input id="projectUser" name="projectUser" type="text" maxlength="30" required />
                         </div>
                     </div>
                 </div>
@@ -110,55 +108,12 @@
 
                         <div class="col-2">
                             <label for="unit">Unidade</label>
-                            <select id="unit" name="unit" required>
-                                <option value="">Selecione…</option>
-                                <option>Andrade</option>
-                                <option>Barra Mansa</option>
-                                <option>CEO</option>
-                                <option>CFTV</option>
-                                <option>Dir Logísitca e Planejamento</option>
-                                <option>ECA</option>
-                                <option>Suprimentos</option>
-                                <option>Guilman Amorim</option>
-                                <option>Juiz de Fora</option>
-                                <option>Metálicos</option>
-                                <option>Monlevade</option>
-                                <option>Piracicaba</option>
-                                <option>Resende</option>
-                                <option>Rio das Pedras</option>
-                                <option>Serra Azul</option>
-                                <option>Sitrel</option>
-                                <option>TI Corporativo</option>
-                                <option>TI Shared Services</option>
-                                <option>Trefilaria Juiz de Fora</option>
-                                <option>Trefilaria Resende</option>
-                                <option>Trefilaria Sabará</option>
-                                <option>Trefilaria São Paulo</option>
-                                <option>VP Comercial</option>
-                            </select>
+                            <input id="unit" name="unit" type="text" maxlength="30" required />
                         </div>
 
-                        <div class="col-3">
+                        <div class="col-6">
                             <label for="projectLocation">Local de Implantação</label>
-                            <select id="projectLocation" name="projectLocation" required>
-                                <option value="">Selecione…</option>
-                                <option>Aciaria</option>
-                                <option>Alto Forno</option>
-                                <option>Cilindro e Discos Laminação</option>
-                                <option>Engenharia e Utilidades</option>
-                                <option>Guilman Amorim</option>
-                                <option>Geral</option>
-                                <option>Gerência Técnica | Qualidade</option>
-                                <option>Suprimentos Monlevade</option>
-                                <option>Laminação</option>
-                                <option>Logística | Estocagem | Expedição</option>
-                                <option>Melhorias Ambientais</option>
-                                <option>Melhorias Seguranças</option>
-                                <option>Redução</option>
-                                <option>Recursos Humanos</option>
-                                <option>Sinterização</option>
-                                <option>Tecnologia da Informação</option>
-                            </select>
+                            <input id="projectLocation" name="projectLocation" type="text" maxlength="60" required />
                         </div>
 
                         <div class="col-3">
@@ -216,16 +171,16 @@
                 <div class="form-section">
                     <h3 class="section-title">Resumo do Projeto</h3>
                     <div class="grid">
-                        <div class="col-3">
+                        <div class="col-6">
                             <label for="projectSummary">Sumário do Projeto</label>
                             <textarea id="projectSummary" name="projectSummary" required
-                                placeholder="Descreva resumidamente o objetivo do projeto..."></textarea>
+                                placeholder="Descreva a necessidade do negócio que motivou o projeto..."></textarea>
                         </div>
 
-                        <div class="col-3">
+                        <div class="col-6">
                             <label for="projectComment">Comentário</label>
                             <textarea id="projectComment" name="projectComment" required
-                                placeholder="Detalhe as principais características e premissas..."></textarea>
+                                placeholder="Explique a solução proposta para atender a necessidade..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -260,6 +215,8 @@
                             <input id="kpiExpected" name="kpiExpected" type="number" min="0" step="0.01"
                                 inputmode="decimal" required />
                         </div>
+                    </div>
+                </div>
 
             <div id="milestoneSection" style="display:none;">
                 <fieldset>
