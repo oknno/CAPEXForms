@@ -399,6 +399,7 @@
 #static-mirror #projectDetails {
   display: flex;
   flex-direction: column;
+
   background: #ffffff;
   overflow-y: auto;
   padding: 32px 24px;
