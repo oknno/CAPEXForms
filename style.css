@@ -268,9 +268,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px;
+  padding: 10px 40px;
   background: #fff;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 #static-mirror .logo {
@@ -460,6 +461,7 @@
   border-radius: 10px;
   font-weight: 600;
   font-size: 14px;
+
 }
 
 #static-mirror .project-details .action-btn:disabled {
