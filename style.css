@@ -608,7 +608,7 @@
 #static-mirror .activity-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns: repeat(6, 1fr);
 }
 
 #static-mirror .activity-field {
@@ -617,29 +617,19 @@
   gap: 6px;
 }
 
-#static-mirror .activity-field-values p {
-  margin: 0;
-}
-
 #static-mirror .activity-field-title {
-  grid-column: span 3;
-}
-
-#static-mirror .activity-field-values {
-  grid-column: span 3;
+  grid-column: span 6;
 }
 
 #static-mirror .activity-field-start,
-#static-mirror .activity-field-end {
-  grid-column: span 3;
-}
-
-#static-mirror .activity-field-pep {
+#static-mirror .activity-field-end,
+#static-mirror .activity-field-pep,
+#static-mirror .activity-field-supplier {
   grid-column: span 3;
 }
 
 #static-mirror .activity-field-years {
-  grid-column: span 9;
+  grid-column: span 6;
 }
 
 #static-mirror .activity-year-list {
@@ -654,15 +644,9 @@
   color: var(--ink);
 }
 
-#static-mirror .activity-field-supplier,
-#static-mirror .activity-field-supplier-notes {
+#static-mirror .activity-field-overview {
   grid-column: span 6;
 }
-
-#static-mirror .activity-field-overview {
-  grid-column: span 12;
-}
-
 #static-mirror .activity-footer {
   display: flex;
   justify-content: flex-start;
@@ -674,20 +658,15 @@
   }
 
   #static-mirror .activity-field-title,
-  #static-mirror .activity-field-values,
-  #static-mirror .activity-field-start,
-  #static-mirror .activity-field-end {
-    grid-column: span 3;
-  }
-
-  #static-mirror .activity-field-pep,
   #static-mirror .activity-field-years,
   #static-mirror .activity-field-overview {
     grid-column: span 6;
   }
 
-  #static-mirror .activity-field-supplier,
-  #static-mirror .activity-field-supplier-notes {
+  #static-mirror .activity-field-start,
+  #static-mirror .activity-field-end,
+  #static-mirror .activity-field-pep,
+  #static-mirror .activity-field-supplier {
     grid-column: span 3;
   }
 }
@@ -698,22 +677,14 @@
   }
 
   #static-mirror .activity-field-title,
-  #static-mirror .activity-field-values,
   #static-mirror .activity-field-start,
   #static-mirror .activity-field-end,
   #static-mirror .activity-field-pep,
   #static-mirror .activity-field-years,
   #static-mirror .activity-field-supplier,
-  #static-mirror .activity-field-supplier-notes,
   #static-mirror .activity-field-overview {
     grid-column: 1 / -1;
   }
-}
-
-#static-mirror .activity-value-label {
-  font-weight: 600;
-  margin: 0;
-  color: var(--ink);
 }
 
 #static-mirror .activity-schedule .muted {
