@@ -404,8 +404,9 @@ class SPRestApi {
     switch (status) {
       case 'Rascunho': return '#414141';
       case 'Em Aprovação': return '#970886';
-      case 'Recusado': return '#f83241';
-      case 'Aprovado': return '#fe8f46';
+      case 'Reprovado': return '#f83241';
+      case 'Reprovado para Revisão': return '#fe8f46';
+      case 'Aprovado': return '#3d9308';
       default: return '#414141';
     }
   }
