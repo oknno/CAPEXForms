@@ -759,7 +759,7 @@ class SPRestApi {
           </div>
           <div class="c-8">
             <label>Descrição - ${y}</label>
-            <textarea class="act-desc" data-year="${y}" required placeholder="Detalhe a atividade, entregáveis e premissas."></textarea>
+            <textarea class="act-desc" data-year="${y}" required maxlength="600" placeholder="Detalhe a atividade, entregáveis e premissas."></textarea>
           </div>
         `;
         yearWrap.appendChild(row);

@@ -112,11 +112,40 @@
   color: var(--ink-2);
 }
 
+#static-mirror .form-section {
+  border-color: rgba(0, 0, 0, 0.08);
+  padding: 20px;
+}
+
+#static-mirror .form-section legend {
+  font-weight: 700;
+  color: var(--color-purple);
+}
+
+#static-mirror .section-intro {
+  margin: 0 0 16px;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+#static-mirror .capex-flag {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
 /* Grids genéricos usados em várias seções do formulário */
 #static-mirror .grid {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(6, 1fr);
+  margin-bottom: 16px;
+}
+
+#static-mirror .form-section .grid:last-of-type {
+  margin-bottom: 0;
 }
 
 #static-mirror .col-6 {
@@ -184,7 +213,7 @@
 }
 
 #static-mirror textarea {
-  min-height: 300px;
+  min-height: 220px;
   resize: vertical;
 }
 
