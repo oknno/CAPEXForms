@@ -44,7 +44,7 @@
   --error-border: var(--color-red);
   --error-bg: rgba(230, 60, 65, 0.1);
   --ok-light: #3d9308;
-  --layout-width: 1360px;
+  --layout-width: 1440px;
 }
 
 .material-symbols-outlined {
@@ -65,9 +65,15 @@
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, "Helvetica Neue", Helvetica, "Noto Sans", "Liberation Sans", sans-serif;
   color: var(--ink);
   background: var(--bg);
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
+  height: 70vh; /* 🔑 tela inteira */
+}
+
+/* Quando for o formulário, use uma classe extra */
+#static-mirror.form-mode {
+  height: auto; /* 🔑 deixa crescer naturalmente */
+  min-height: 100vh; /* ocupa pelo menos a tela cheia */
 }
 
 /* Wrapper auxiliar utilizado em alguns trechos impressos */
@@ -293,9 +299,11 @@
   padding: 16px 40px;
   background: #fff;
   border-bottom: 1px solid var(--border);
-  width: min(100%, var(--layout-width));
+  width: 100%;
   margin: 0 auto 24px;
   box-sizing: border-box;
+  height: 80px; /* ajuste conforme o header real */
+  flex-shrink: 0;
 }
 
 #static-mirror .logo {
@@ -316,15 +324,24 @@
 
 /* Região flexível que mantém sidebar e painel de detalhes lado a lado */
 #static-mirror #app {
+  flex: 1 1 auto;
+  height: 70vh; /* 🔑 altura limitada */
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(420px, 540px) minmax(0, 1fr);
+  grid-template-columns: 400px 1fr;
   gap: 32px;
   padding: 0 40px;
   box-sizing: border-box;
-  width: min(100%, var(--layout-width));
+  width: 100%;
   margin: 0 auto;
-  flex: 1;
+  align-items: stretch;
+  overflow: hidden; /* impede scroll global */
+}
+
+#static-mirror #projectSidebar,
+#static-mirror #projectDetails {
   min-height: 0;
+  overflow-y: auto;
 }
 
 @media (max-width: 960px) {
@@ -335,26 +352,38 @@
     width: 100%;
     margin: 0;
   }
-
-  #static-mirror #projectSidebar,
-  #static-mirror #projectDetails {
-    min-height: unset;
-    height: auto;
-  }
 }
 
 /* Sidebar rolável com a listagem de projetos */
 #static-mirror #projectSidebar {
   display: flex;
   flex-direction: column;
-  background: #ffffff;
   overflow-y: auto;
   padding: 24px 20px;
   min-height: 0;
   border: 1px solid var(--border);
   border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 24px rgba(0,0,0,.06);
   box-sizing: border-box;
+  width: 400px;    /* <- 680px */
+  max-width: 400px;
+  flex-shrink: 0;
+  overflow-y: auto;     /* 🔑 ativa a rolagem vertical */
+  max-height: 100%;     /* 🔑 usa a altura total da grid */
+}
+
+/* 🎨 Customização da barra de rolagem */
+#static-mirror #projectSidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+#static-mirror #projectSidebar::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+#static-mirror #projectSidebar::-webkit-scrollbar-thumb:hover {
+  background: #999;
 }
 
 #static-mirror #projectList {
@@ -387,9 +416,10 @@
   font-size: 16px;
   font-weight: 700;
   color: #000;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal; /* permite quebra de linha */
+  overflow: visible;   /* mostra todo o texto */
+  text-overflow: unset; /* remove os "..." */
+  word-break: break-word; /* quebra palavras longas se necessário */
 }
 
 #static-mirror #projectList .project-card p {
@@ -421,7 +451,6 @@
   background: #ffffff;
   overflow-y: auto;
   padding: 32px 24px;
-  height: 100%;
   min-height: 0;
   width: 100%;
   justify-self: stretch;
