@@ -46,58 +46,109 @@
             <div id="status" class="status" role="status" aria-live="polite"></div>
             <div id="errors" class="error-box" style="display:none;" role="alert" aria-live="assertive"></div>
 
-            <!-- Bloco principal com informações estruturais exigidas pelo SAP -->
-            <fieldset>
-                <legend>Informações SAP</legend>
+            <!-- Agrupamentos simplificados seguindo as três seções solicitadas -->
+            <fieldset class="form-section">
+                <legend>Informações do Projeto</legend>
+                <p class="section-intro">Reúna os dados estruturais do investimento antes de detalhar narrativas e indicadores.</p>
                 <div class="grid">
                     <div class="col-6">
                         <label for="projectName">Nome do Projeto</label>
-                        <input id="projectName" name="projectName" type="text" required
+                        <input id="projectName" name="projectName" type="text" required maxlength="160"
                             placeholder="Ex.: Modernização da Linha de Laminação" />
                     </div>
+                </div>
 
+                <div class="grid">
                     <div class="col-2">
                         <label for="approvalYear">Ano de Aprovação</label>
                         <input id="approvalYear" name="approvalYear" type="number" min="1900" required />
                     </div>
 
                     <div class="col-2">
-                        <label for="projectBudget">Orçamento do Projeto em R$</label>
-                        <input id="projectBudget" name="projectBudget" type="number" min="0" step="0.01"
-                            inputmode="decimal" required placeholder="500.000,00" />
-                        <div id="capexFlag" class="muted"></div>
+                        <label for="startDate">Data de Início</label>
+                        <input id="startDate" name="startDate" type="date" required />
                     </div>
 
                     <div class="col-2">
+                        <label for="endDate">Data de Término</label>
+                        <input id="endDate" name="endDate" type="date" required />
+                    </div>
+                </div>
+
+                <div class="grid">
+                    <div class="col-3">
+                        <label for="projectBudget">Orçamento do Projeto em R$</label>
+                        <input id="projectBudget" name="projectBudget" type="number" min="0" step="0.01"
+                            inputmode="decimal" required placeholder="500.000,00" />
+                        <div id="capexFlag" class="muted capex-flag"></div>
+                    </div>
+
+                    <div class="col-3">
                         <label for="investmentLevel">Nível de Investimento</label>
-                        <input id="investmentLevel" name="investmentLevel" type="text" required />
+                        <input id="investmentLevel" name="investmentLevel" type="text" required maxlength="120" />
                     </div>
 
                     <div class="col-3">
                         <label for="fundingSource">Origem da Verba</label>
-                        <input id="fundingSource" name="fundingSource" type="text" required />
+                        <input id="fundingSource" name="fundingSource" type="text" required maxlength="120" />
                     </div>
 
                     <div class="col-3">
+                        <label for="depreciationCostCenter">C Custo Depreciação</label>
+                        <input id="depreciationCostCenter" name="depreciationCostCenter" type="text" required maxlength="60" />
+                    </div>
+                </div>
+
+                <div class="grid">
+                    <div class="col-3">
+                        <label for="category">Categoria</label>
+                        <input id="category" name="category" type="text" required maxlength="120" />
+                    </div>
+
+                    <div class="col-3">
+                        <label for="investmentType">Tipo de Investimento</label>
+                        <select id="investmentType" name="investmentType" required>
+                            <option value="">Selecione…</option>
+                            <option>Estratégico</option>
+                            <option>Normativo</option>
+                            <option>Reline</option>
+                        </select>
+                    </div>
+
+                    <div class="col-3">
+                        <label for="assetType">Tipo de Ativo</label>
+                        <input id="assetType" name="assetType" type="text" required maxlength="120" />
+                    </div>
+
+                    <div class="col-3">
+                        <label for="projectFunction">Função do Projeto</label>
+                        <input id="projectFunction" name="projectFunction" type="text" required maxlength="160" />
+                    </div>
+                </div>
+
+                <div class="grid">
+                    <div class="col-3">
                         <label for="projectUser">Project User</label>
-                        <input id="projectUser" name="projectUser" type="text" required />
+                        <input id="projectUser" name="projectUser" type="text" required maxlength="120" />
                     </div>
 
                     <div class="col-3">
                         <label for="projectLeader">Coordenador do Projeto</label>
-                        <input id="projectLeader" name="projectLeader" type="text" required />
+                        <input id="projectLeader" name="projectLeader" type="text" required maxlength="120" />
                     </div>
 
                     <div class="col-3">
                         <label for="company">Empresa</label>
-                        <input id="company" name="company" type="text" required />
+                        <input id="company" name="company" type="text" required maxlength="120" />
                     </div>
 
                     <div class="col-3">
                         <label for="center">Centro</label>
-                        <input id="center" name="center" type="text" required />
+                        <input id="center" name="center" type="text" required maxlength="80" />
                     </div>
+                </div>
 
+                <div class="grid">
                     <div class="col-3">
                         <label for="unit">Unidade</label>
                         <select id="unit" name="unit" required>
@@ -150,72 +201,44 @@
                             <option>Tecnologia da Informação</option>
                         </select>
                     </div>
+                </div>
+            </fieldset>
 
-                    <div class="col-3">
-                        <label for="depreciationCostCenter">C Custo Depreciação</label>
-                        <input id="depreciationCostCenter" name="depreciationCostCenter" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="category">Categoria</label>
-                        <input id="category" name="category" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="investmentType">Tipo de Investimento</label>
-                        <select id="investmentType" name="investmentType" required>
-                            <option value="">Selecione…</option>
-                            <option>Estratégico</option>
-                            <option>Normativo</option>
-                            <option>Reline</option>
-                        </select>
-                    </div>
-
-                    <div class="col-3">
-                        <label for="assetType">Tipo de Ativo</label>
-                        <input id="assetType" name="assetType" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="projectFunction">Função do Projeto</label>
-                        <input id="projectFunction" name="projectFunction" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="startDate">Data de Início</label>
-                        <input id="startDate" name="startDate" type="date" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="endDate">Data de Término</label>
-                        <input id="endDate" name="endDate" type="date" required />
-                    </div>
-
+            <fieldset class="form-section">
+                <legend>Sumário e Comentário</legend>
+                <p class="section-intro">Documente a justificativa do investimento para que os aprovadores consultem os detalhes.</p>
+                <div class="grid">
                     <div class="col-6">
                         <label for="projectSummary">Sumário do Projeto</label>
-                        <textarea id="projectSummary" name="projectSummary" required
+                        <textarea id="projectSummary" name="projectSummary" required maxlength="1500"
                             placeholder="Descreva resumidamente o objetivo do projeto..."></textarea>
                     </div>
 
                     <div class="col-6">
                         <label for="projectComment">Comentário</label>
-                        <textarea id="projectComment" name="projectComment" required
+                        <textarea id="projectComment" name="projectComment" required maxlength="2000"
                             placeholder="Detalhe as principais características e premissas..."></textarea>
                     </div>
+                </div>
+            </fieldset>
 
+            <fieldset class="form-section">
+                <legend>Indicadores de Desempenho</legend>
+                <p class="section-intro">Finalize informando o KPI monitorado e os valores esperados após a implementação do projeto.</p>
+                <div class="grid">
                     <div class="col-3">
                         <label for="kpiType">Tipo de KPI</label>
-                        <input id="kpiType" name="kpiType" type="text" required />
+                        <input id="kpiType" name="kpiType" type="text" required maxlength="120" />
                     </div>
 
                     <div class="col-3">
                         <label for="kpiName">Nome do KPI</label>
-                        <input id="kpiName" name="kpiName" type="text" required />
+                        <input id="kpiName" name="kpiName" type="text" required maxlength="160" />
                     </div>
 
                     <div class="col-6">
                         <label for="kpiDescription">Descrição do KPI</label>
-                        <textarea id="kpiDescription" name="kpiDescription" required
+                        <textarea id="kpiDescription" name="kpiDescription" required maxlength="1500"
                             placeholder="Explique como o KPI será impactado pelo projeto..."></textarea>
                     </div>
 
@@ -276,7 +299,7 @@
             <div class="milestone-header">
                 <div class="milestone-title" style="min-width:260px;">
                     <label>Nome do Marco</label>
-                    <input type="text" class="milestone-name" required />
+                    <input type="text" class="milestone-name" required maxlength="160" />
                 </div>
                 <div class="btn-row">
                     <button type="button" class="btn" data-add-activity>+ Adicionar atividade</button>
@@ -292,7 +315,7 @@
             <div class="row">
                 <div class="c-6">
                     <label>Título da Atividade</label>
-                    <input type="text" class="act-title" required placeholder="Ex.: Compra do laminador" />
+                    <input type="text" class="act-title" required maxlength="160" placeholder="Ex.: Compra do laminador" />
                 </div>
                 <div class="c-3">
                     <label>Início da Atividade</label>
@@ -328,12 +351,12 @@
                 </div>
                 <div class="c-6">
                     <label>Fornecedor da Atividade</label>
-                    <input type="text" class="act-supplier" required placeholder="Informe o fornecedor responsável" />
+                    <input type="text" class="act-supplier" required maxlength="160" placeholder="Informe o fornecedor responsável" />
                 </div>
             </div>
             <div>
                 <label>Descrição da Atividade</label>
-                <textarea class="act-overview" required placeholder="Descreva os objetivos e entregáveis desta atividade."></textarea>
+                <textarea class="act-overview" required maxlength="800" placeholder="Descreva os objetivos e entregáveis desta atividade."></textarea>
             </div>
             <div data-year-fields></div>
             <div class="c-12 btn-row vs">
