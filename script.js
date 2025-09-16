@@ -755,11 +755,11 @@ class SPRestApi {
         row.className = 'row act-year';
         row.dataset.year = y;
         row.innerHTML = `
-          <div class="c-6">
+          <div class="act-year-field act-year-value">
             <label>Valor CAPEX da atividade (BRL) - ${y}</label>
             <input type="number" class="act-capex" data-year="${y}" min="0" step="0.01" inputmode="decimal" required placeholder="Ex.: 250000,00" />
           </div>
-          <div class="c-6">
+          <div class="act-year-field act-year-desc">
             <label>Descrição - ${y}</label>
             <textarea class="act-desc" data-year="${y}" required maxlength="600" placeholder="Detalhe a atividade, entregáveis e premissas."></textarea>
           </div>
