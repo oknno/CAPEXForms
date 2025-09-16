@@ -483,30 +483,45 @@ class SPRestApi {
     const actions = document.createElement('div');
     actions.className = 'detail-actions';
 
-    const editBtn = document.createElement('button');
-    editBtn.type = 'button';
-    editBtn.className = 'btn secondary action-btn';
-    editBtn.id = 'editProjectDetails';
-    editBtn.textContent = 'Editar Projeto';
-    actions.appendChild(editBtn);
+    const addActionButton = (label, className, handler) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = className;
+      button.textContent = label;
+      if (typeof handler === 'function') {
+        button.addEventListener('click', handler);
+      }
+      actions.appendChild(button);
+      return button;
+    };
 
-    if (item.Status === 'Rascunho' || item.Status === 'Reprovado para Revisão') {
-      const approveBtn = document.createElement('button');
-      approveBtn.type = 'button';
-      approveBtn.className = 'btn primary action-btn approve';
-      approveBtn.textContent = 'Enviar para Aprovação';
-      actions.appendChild(approveBtn);
+    const status = item.Status || '';
+
+    switch (status) {
+      case 'Rascunho':
+        addActionButton('Editar Projeto', 'btn secondary action-btn', () => editProject(item.Id));
+        addActionButton('Enviar para Aprovação', 'btn primary action-btn approve');
+        break;
+      case 'Reprovado para Revisão':
+        addActionButton('Editar Projeto', 'btn secondary action-btn', () => editProject(item.Id));
+        break;
+      case 'Aprovado':
+      case 'Em Aprovação':
+        addActionButton('Visualizar Projeto', 'btn secondary action-btn', () => editProject(item.Id));
+        break;
+      case 'Reprovado':
+        break;
+      default:
+        addActionButton('Editar Projeto', 'btn secondary action-btn', () => editProject(item.Id));
+        break;
     }
 
-    wrapper.append(header, grid, actions);
+    wrapper.append(header, grid);
+    if (actions.childElementCount > 0) {
+      wrapper.appendChild(actions);
+    }
+
     projectDetails.appendChild(wrapper);
-
-    const isEditable = item.Status !== 'Aprovado';
-    if (isEditable) {
-      editBtn.addEventListener('click', () => editProject(item.Id));
-    } else {
-      editBtn.disabled = true;
-    }
   }
 
   // Botão superior que leva o usuário direto para o formulário de criação
