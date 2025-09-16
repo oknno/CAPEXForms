@@ -684,10 +684,11 @@ class SPRestApi {
     const btnAddAct = node.querySelector('[data-add-activity]');
     const btnRemove = node.querySelector('[data-remove-milestone]');
     
-    nameInput.addEventListener('input', e=>(nameSummaryHeader.textContent = e.target.value));
-
     nameInput.value = nameDefault || `Milestone ${milestoneCount}`;
-    nameSummaryHeader.textContent = nameInput.value;
+    if (nameSummaryHeader) {
+      nameSummaryHeader.textContent = nameInput.value;
+      nameInput.addEventListener('input', e => (nameSummaryHeader.textContent = e.target.value));
+    }
 
     btnAddAct.addEventListener('click', () => {
       addActivity(actsWrap);
