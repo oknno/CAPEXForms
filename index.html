@@ -323,22 +323,27 @@
 
     <template id="activityTemplate">
         <div class="activity" data-activity>
-            <div class="activity-grid">
-                <div class="activity-field activity-field-title">
+            <div class="activity-grid grid">
+                <div class="activity-field activity-field-title col-6">
                     <label>Título da Atividade</label>
                     <input type="text" class="act-title" required maxlength="160" placeholder="Ex.: Compra do laminador" />
                 </div>
-                <div class="activity-field activity-field-start">
+                <div class="activity-field activity-field-years col-6">
+                    <label class="activity-year-title">Valor CAPEX da Atividade</label>
+                    <p class="activity-year-hint muted">Informe início e término para gerar os valores anuais da atividade.</p>
+                    <div class="activity-year-list" data-year-fields></div>
+                </div>
+                <div class="activity-field activity-field-start col-2">
                     <label>Início da Atividade</label>
                     <input type="date" class="act-start" required />
                 </div>
-                <div class="activity-field activity-field-end">
+                <div class="activity-field activity-field-end col-2">
                     <label>Término da Atividade</label>
                     <input type="date" class="act-end" required />
                 </div>
-                <div class="activity-field activity-field-pep">
-                    <label for="Elemento_PEP">Elemento PEP da Atividade</label>
-                    <select id="Elemento_PEP" name="kpi" required>
+                <div class="activity-field activity-field-pep col-2">
+                    <label>Elemento PEP da Atividade</label>
+                    <select name="kpi" required>
                         <option value="">Selecione…</option>
                         <option>DESP.ENGENHARIA / DETALHAMENTO PROJETO</option>
                         <option>AQUISIÇÃO DE EQUIPAMENTOS NACIONAIS</option>
@@ -358,15 +363,17 @@
                         <option>CONTINGÊNCIAS</option>
                     </select>
                 </div>
-                <div class="activity-field activity-field-years">
-                    <label class="activity-year-title">Valor CAPEX da Atividade</label>
-                    <div class="activity-year-list" data-year-fields></div>
-                </div>
-                <div class="activity-field activity-field-supplier">
+
+                <div class="activity-field activity-field-supplier col-3">
                     <label>Fornecedor da Atividade</label>
                     <input type="text" class="act-supplier" required maxlength="160" placeholder="Informe o fornecedor responsável" />
                 </div>
-                <div class="activity-field activity-field-overview">
+                <div class="activity-field activity-field-supplier-notes col-3">
+                    <label>Descrição do Fornecedor</label>
+                    <textarea class="act-supplier-notes" maxlength="600" placeholder="Detalhe condições comerciais, escopo contratado ou observações relevantes."></textarea>
+                </div>
+                <div class="activity-field activity-field-overview col-6">
+
                     <label>Descrição Geral da Atividade</label>
                     <textarea class="act-overview" required maxlength="600" placeholder="Descreva objetivos, entregáveis e premissas da atividade."></textarea>
                 </div>
