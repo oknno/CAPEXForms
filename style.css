@@ -128,6 +128,11 @@
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(6, 1fr);
+  margin-bottom: 16px;
+}
+
+#static-mirror .form-section .grid:last-of-type {
+  margin-bottom: 0;
 }
 
 #static-mirror .col-6 {
@@ -195,7 +200,7 @@
 }
 
 #static-mirror textarea {
-  min-height: 300px;
+  min-height: 220px;
   resize: vertical;
 }
 
@@ -663,7 +668,6 @@
 #static-mirror .activity-field-years .act-year .c-6:last-child {
   grid-column: 1 / span 6;
 }
-
 #static-mirror .activity-footer {
   display: flex;
   justify-content: flex-start;
@@ -672,6 +676,7 @@
 @media (max-width: 1080px) {
   #static-mirror .activity-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
+
   }
 
   #static-mirror .activity-field-title,
@@ -710,10 +715,58 @@
   margin-top: 12px;
 }
 
-#static-mirror .activity-title {
+#static-mirror .activity-card label {
+  font-weight: 600;
+  color: var(--color-purple);
+}
+
+#static-mirror .activity-value .activity-capex {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#static-mirror .activity-value [data-year-fields] {
+  display: grid;
+  gap: 12px;
+}
+
+#static-mirror .activity-value [data-year-fields]:empty::before {
+  content: 'Informe início e término para gerar os valores anuais da atividade.';
   font-size: 13px;
   color: var(--ink-2);
-  margin: 0 0 6px;
+  line-height: 1.45;
+}
+
+#static-mirror .activity-capex .act-year {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+#static-mirror .activity-capex .act-year .c-4,
+#static-mirror .activity-capex .act-year .c-8 {
+  grid-column: 1 / -1;
+}
+
+#static-mirror .activity-supplier .supplier-description {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+#static-mirror .activity-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 860px) {
+  #static-mirror .activity-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 #static-mirror .badge {
