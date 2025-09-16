@@ -67,7 +67,7 @@
   background: var(--bg);
   display: flex;
   flex-direction: column;
-  height: 70vh; /* 🔑 tela inteira */
+  min-height: 70vh; /* 🔑 garante altura mínima, mas permite crescer */
 }
 
 /* Quando for o formulário, use uma classe extra */
@@ -352,6 +352,12 @@
     width: 100%;
     margin: 0;
   }
+
+  #static-mirror #projectSidebar {
+    width: 100%;
+    max-width: 100%;
+    flex-shrink: 1;
+  }
 }
 
 /* Sidebar rolável com a listagem de projetos */
@@ -578,7 +584,7 @@
 
 #static-mirror .btn.danger {
   background: var(--btn-danger-bg);
-  border-color: var(--btn-danger-border);
+  border: 1px solid var(--btn-danger-border);
   color: #ffffff;
 
 }
