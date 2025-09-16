@@ -520,6 +520,9 @@
 /* Descrição ocupa a linha inteira da grade */
 #static-mirror .project-details .detail-card.detail-desc {
   grid-column: 1 / -1;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
 }
 
 #static-mirror .project-details .detail-card.detail-desc p {
@@ -527,6 +530,7 @@
   line-height: 1.6;
   color: #555;
   white-space: pre-line;
+  flex: 1;
 }
 
 #static-mirror .project-details .detail-actions {
