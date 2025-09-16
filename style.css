@@ -34,10 +34,10 @@
   --btn-danger-bg: var(--color-red);
   --btn-danger-border: var(--color-violet);
   --danger-light: var(--color-yellow);
-  --milestone-border: var(--color-violet);
+  --milestone-border: var(--border);
   --milestone-bg: #ffffff;
   --activity-bg: #ffffff;
-  --activity-border: var(--color-violet);
+  --activity-border: var(--border);
   --badge-bg: var(--color-purple);
   --badge-border: var(--color-violet);
   --badge-color: var(--color-yellow);
@@ -110,6 +110,17 @@
 #static-mirror legend {
   padding: 0 8px;
   color: var(--ink-2);
+}
+
+#static-mirror .form-section + .form-section {
+  margin-top: 24px;
+}
+
+#static-mirror .section-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 /* Grids genéricos usados em várias seções do formulário */
@@ -301,7 +312,7 @@
 /* Região flexível que mantém sidebar e painel de detalhes lado a lado */
 #static-mirror #app {
   display: grid;
-  grid-template-columns: minmax(480px, 480px) minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 480px) minmax(0, 1fr);
   gap: 32px;
   padding: 0 40px;
   box-sizing: border-box;
@@ -584,6 +595,144 @@
   border: 1px solid var(--activity-border);
   border-radius: 10px;
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#static-mirror .activity-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: start;
+}
+
+#static-mirror .activity-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+#static-mirror .activity-field-title {
+  grid-column: 1 / -1;
+}
+
+#static-mirror .activity-field-years,
+#static-mirror .activity-field-title,
+#static-mirror .activity-field-overview {
+  grid-column: 1 / -1;
+}
+
+#static-mirror .activity-field-start {
+  grid-column: 1 / span 4;
+}
+
+#static-mirror .activity-field-end {
+  grid-column: 5 / span 4;
+}
+
+#static-mirror .activity-field-pep {
+  grid-column: 9 / span 4;
+}
+
+#static-mirror .activity-field-supplier {
+  grid-column: 1 / span 12;
+}
+
+#static-mirror .activity-year-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#static-mirror .activity-year-title {
+  font-weight: 600;
+  margin: 0;
+  color: var(--ink);
+}
+
+#static-mirror .activity-field-years .act-year {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+#static-mirror .activity-field-years .act-year-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#static-mirror .activity-field-years .act-year-value {
+  grid-column: 1 / span 6;
+  grid-row: 1;
+}
+
+#static-mirror .activity-field-years .act-year-desc {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+#static-mirror .activity-footer {
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (max-width: 1080px) {
+  #static-mirror .activity-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  #static-mirror .activity-field-title,
+  #static-mirror .activity-field-years,
+  #static-mirror .activity-field-overview {
+    grid-column: 1 / -1;
+  }
+
+  #static-mirror .activity-field-start,
+  #static-mirror .activity-field-end,
+  #static-mirror .activity-field-pep,
+  #static-mirror .activity-field-supplier {
+    grid-column: span 6;
+  }
+
+  #static-mirror .activity-field-years .act-year {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  #static-mirror .activity-field-years .act-year-value {
+    grid-column: 1 / span 6;
+  }
+
+  #static-mirror .activity-field-years .act-year-desc {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  #static-mirror .activity-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #static-mirror .activity-field-title,
+  #static-mirror .activity-field-start,
+  #static-mirror .activity-field-end,
+  #static-mirror .activity-field-pep,
+  #static-mirror .activity-field-supplier,
+  #static-mirror .activity-field-overview,
+  #static-mirror .activity-field-years {
+    grid-column: 1 / -1;
+  }
+
+  #static-mirror .activity-field-years .act-year {
+    grid-template-columns: 1fr;
+  }
+}
+
+#static-mirror .activity-schedule .muted {
+  margin: 6px 0 0;
 }
 
 #static-mirror .act-year {
