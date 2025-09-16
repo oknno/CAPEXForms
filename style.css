@@ -34,10 +34,10 @@
   --btn-danger-bg: var(--color-red);
   --btn-danger-border: var(--color-violet);
   --danger-light: var(--color-yellow);
-  --milestone-border: var(--color-violet);
+  --milestone-border: var(--border);
   --milestone-bg: #ffffff;
   --activity-bg: #ffffff;
-  --activity-border: var(--color-violet);
+  --activity-border: var(--border);
   --badge-bg: var(--color-purple);
   --badge-border: var(--color-violet);
   --badge-color: var(--color-yellow);
@@ -110,6 +110,17 @@
 #static-mirror legend {
   padding: 0 8px;
   color: var(--ink-2);
+}
+
+#static-mirror .form-section + .form-section {
+  margin-top: 24px;
+}
+
+#static-mirror .section-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 /* Grids genéricos usados em várias seções do formulário */
@@ -301,7 +312,7 @@
 /* Região flexível que mantém sidebar e painel de detalhes lado a lado */
 #static-mirror #app {
   display: grid;
-  grid-template-columns: minmax(480px, 480px) minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 480px) minmax(0, 1fr);
   gap: 32px;
   padding: 0 40px;
   box-sizing: border-box;
@@ -584,6 +595,16 @@
   border: 1px solid var(--activity-border);
   border-radius: 10px;
   padding: 12px;
+}
+
+#static-mirror .activity-value-label {
+  font-weight: 600;
+  margin: 0;
+  color: var(--ink);
+}
+
+#static-mirror .activity-schedule .muted {
+  margin: 6px 0 0;
 }
 
 #static-mirror .act-year {
