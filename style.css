@@ -302,7 +302,7 @@
   width: 100%;
   margin: 0 auto 24px;
   box-sizing: border-box;
-  height: 80px; /* ajuste conforme o header real */
+  height: 65px; /* ajuste conforme o header real */
   flex-shrink: 0;
 }
 
@@ -325,7 +325,7 @@
 /* Região flexível que mantém sidebar e painel de detalhes lado a lado */
 #static-mirror #app {
   flex: 1 1 auto;
-  height: 70vh; /* 🔑 altura limitada */
+  height: 65vh; /* 🔑 altura limitada */
   min-height: 0;
   display: grid;
   grid-template-columns: 400px 1fr;
@@ -520,7 +520,7 @@
 /* Descrição ocupa a linha inteira da grade */
 #static-mirror .project-details .detail-card.detail-desc {
   grid-column: 1 / -1;
-  min-height: 200px;
+  min-height: 130px;
   display: flex;
   flex-direction: column;
 }
