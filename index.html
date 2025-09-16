@@ -323,29 +323,24 @@
 
     <template id="activityTemplate">
         <div class="activity" data-activity>
-            <div class="row">
-                <div class="c-12">
+            <div class="activity-grid">
+                <div class="activity-field activity-field-title">
                     <label>Título da Atividade</label>
                     <input type="text" class="act-title" required maxlength="160" placeholder="Ex.: Compra do laminador" />
                 </div>
-            </div>
-            <div class="row activity-schedule">
-                <div class="c-4">
+                <div class="activity-field activity-field-values">
                     <p class="activity-value-label">Valores CAPEX da atividade</p>
                     <p class="muted">Informe início e término para gerar os valores anuais da atividade.</p>
                 </div>
-                <div class="c-4">
+                <div class="activity-field activity-field-start">
                     <label>Início da Atividade</label>
                     <input type="date" class="act-start" required />
                 </div>
-                <div class="c-4">
+                <div class="activity-field activity-field-end">
                     <label>Término da Atividade</label>
                     <input type="date" class="act-end" required />
                 </div>
-            </div>
-            <div data-year-fields></div>
-            <div class="row">
-                <div class="c-12">
+                <div class="activity-field activity-field-pep">
                     <label for="Elemento_PEP">Elemento PEP da Atividade</label>
                     <select id="Elemento_PEP" name="kpi" required>
                         <option value="">Selecione…</option>
@@ -367,27 +362,24 @@
                         <option>CONTINGÊNCIAS</option>
                     </select>
                 </div>
-            </div>
-            <div class="row">
-                <div class="c-12">
+                <div class="activity-field activity-field-years">
+                    <p class="activity-year-title">Descrição PEP da Atividade</p>
+                    <div class="activity-year-list" data-year-fields></div>
+                </div>
+                <div class="activity-field activity-field-supplier">
+                    <label>Fornecedor da Atividade</label>
+                    <input type="text" class="act-supplier" required maxlength="160" placeholder="Informe o fornecedor responsável" />
+                </div>
+                <div class="activity-field activity-field-supplier-notes">
+                    <label>Descrição do Fornecedor</label>
+                    <textarea class="act-supplier-notes" maxlength="800" placeholder="Descreva as informações acordadas com o fornecedor."></textarea>
+                </div>
+                <div class="activity-field activity-field-overview">
                     <label>Descrição da Atividade</label>
                     <textarea class="act-overview" required maxlength="800" placeholder="Descreva os objetivos e entregáveis desta atividade."></textarea>
                 </div>
             </div>
-            <div class="row">
-                <div class="c-12">
-                    <label>Fornecedor da Atividade</label>
-                    <input type="text" class="act-supplier" required maxlength="160" placeholder="Informe o fornecedor responsável" />
-                </div>
-            </div>
-            <div class="row">
-                <div class="c-12">
-                    <label>Descrição do Fornecedor</label>
-                    <textarea class="act-supplier-notes" maxlength="800" placeholder="Descreva as informações acordadas com o fornecedor."></textarea>
-                </div>
-
-            </div>
-            <div class="c-12 btn-row vs">
+            <div class="activity-footer btn-row vs">
                 <button type="button" class="btn danger icon" data-remove-activity><span class="material-symbols-outlined">delete</span></button>
             </div>
         </div>

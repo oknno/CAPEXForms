@@ -597,11 +597,117 @@
 
 #static-mirror .activity {
   background: var(--activity-bg);
-  border: 1px solid rgba(70, 10, 120, 0.25);
-  border-radius: 16px;
-  padding: 16px;
+  border: 1px solid var(--activity-border);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#static-mirror .activity-grid {
   display: grid;
-  gap: 14px;
+  gap: 12px;
+  grid-template-columns: repeat(12, 1fr);
+}
+
+#static-mirror .activity-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#static-mirror .activity-field-values p {
+  margin: 0;
+}
+
+#static-mirror .activity-field-title {
+  grid-column: span 3;
+}
+
+#static-mirror .activity-field-values {
+  grid-column: span 3;
+}
+
+#static-mirror .activity-field-start,
+#static-mirror .activity-field-end {
+  grid-column: span 3;
+}
+
+#static-mirror .activity-field-pep {
+  grid-column: span 3;
+}
+
+#static-mirror .activity-field-years {
+  grid-column: span 9;
+}
+
+#static-mirror .activity-year-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#static-mirror .activity-year-title {
+  font-weight: 600;
+  margin: 0;
+  color: var(--ink);
+}
+
+#static-mirror .activity-field-supplier,
+#static-mirror .activity-field-supplier-notes {
+  grid-column: span 6;
+}
+
+#static-mirror .activity-field-overview {
+  grid-column: span 12;
+}
+
+#static-mirror .activity-footer {
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (max-width: 1080px) {
+  #static-mirror .activity-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  #static-mirror .activity-field-title,
+  #static-mirror .activity-field-values,
+  #static-mirror .activity-field-start,
+  #static-mirror .activity-field-end {
+    grid-column: span 3;
+  }
+
+  #static-mirror .activity-field-pep,
+  #static-mirror .activity-field-years,
+  #static-mirror .activity-field-overview {
+    grid-column: span 6;
+  }
+
+  #static-mirror .activity-field-supplier,
+  #static-mirror .activity-field-supplier-notes {
+    grid-column: span 3;
+  }
+}
+
+@media (max-width: 640px) {
+  #static-mirror .activity-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #static-mirror .activity-field-title,
+  #static-mirror .activity-field-values,
+  #static-mirror .activity-field-start,
+  #static-mirror .activity-field-end,
+  #static-mirror .activity-field-pep,
+  #static-mirror .activity-field-years,
+  #static-mirror .activity-field-supplier,
+  #static-mirror .activity-field-supplier-notes,
+  #static-mirror .activity-field-overview {
+    grid-column: 1 / -1;
+  }
 }
 
 #static-mirror .activity-value-label {
