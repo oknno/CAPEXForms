@@ -46,27 +46,17 @@
             <div id="status" class="status" role="status" aria-live="polite"></div>
             <div id="errors" class="error-box" style="display:none;" role="alert" aria-live="assertive"></div>
 
-            <!-- Bloco principal com informações estruturais exigidas pelo SAP -->
-            <ol class="form-journey">
-                <li><span class="step-index">1</span>Resumo do Projeto</li>
-                <li><span class="step-index">2</span>Cronograma e Aprovação</li>
-                <li><span class="step-index">3</span>Orçamento e Enquadramento</li>
-                <li><span class="step-index">4</span>Classificação SAP</li>
-                <li><span class="step-index">5</span>Equipe e Localização</li>
-                <li><span class="step-index">6</span>Indicadores de Desempenho</li>
-            </ol>
-
-            <fieldset class="step-block">
-                <legend>1. Resumo do Projeto</legend>
-                <p class="step-intro">Comece descrevendo o que será entregue. Essas informações ajudam o comitê a entender o
-                    contexto antes de analisar números e prazos.</p>
+            <!-- Agrupamentos simplificados seguindo as três seções solicitadas -->
+            <fieldset class="form-section">
+                <legend>Informações do Projeto</legend>
+                <p class="section-intro">Reúna os dados estruturais do investimento antes de detalhar narrativas e indicadores.</p>
                 <div class="grid">
                     <div class="col-6">
                         <label for="projectName">Nome do Projeto</label>
                         <input id="projectName" name="projectName" type="text" required maxlength="160"
                             placeholder="Ex.: Modernização da Linha de Laminação" />
                     </div>
-
+                </div>
                     <div class="col-6">
                         <label for="projectSummary">Sumário do Projeto</label>
                         <textarea id="projectSummary" name="projectSummary" required maxlength="1500"
@@ -85,28 +75,6 @@
                 <legend>2. Cronograma e Aprovação</legend>
                 <p class="step-intro">Informe o ano de aprovação e o período planejado de execução para alinhar o cronograma com as
                     áreas de negócio e financeira.</p>
-                <div class="grid">
-                    <div class="col-2">
-                        <label for="approvalYear">Ano de Aprovação</label>
-                        <input id="approvalYear" name="approvalYear" type="number" min="1900" required />
-                    </div>
-
-                    <div class="col-2">
-                        <label for="startDate">Data de Início</label>
-                        <input id="startDate" name="startDate" type="date" required />
-                    </div>
-
-                    <div class="col-2">
-                        <label for="endDate">Data de Término</label>
-                        <input id="endDate" name="endDate" type="date" required />
-                    </div>
-                </div>
-            </fieldset>
-
-            <fieldset class="step-block">
-                <legend>3. Orçamento e Enquadramento</legend>
-                <p class="step-intro">Apresente os valores aprovados e como o investimento será financiado. Essas informações
-                    definem se marcos obrigatórios serão necessários.</p>
                 <div class="grid">
                     <div class="col-3">
                         <label for="projectBudget">Orçamento do Projeto em R$</label>
@@ -130,12 +98,6 @@
                         <input id="depreciationCostCenter" name="depreciationCostCenter" type="text" required maxlength="60" />
                     </div>
                 </div>
-            </fieldset>
-
-            <fieldset class="step-block">
-                <legend>4. Classificação SAP</legend>
-                <p class="step-intro">Defina como o projeto será classificado nos sistemas SAP para facilitar o enquadramento contábil e
-                    fiscal.</p>
                 <div class="grid">
                     <div class="col-3">
                         <label for="category">Categoria</label>
@@ -162,12 +124,6 @@
                         <input id="projectFunction" name="projectFunction" type="text" required maxlength="160" />
                     </div>
                 </div>
-            </fieldset>
-
-            <fieldset class="step-block">
-                <legend>5. Equipe e Localização</legend>
-                <p class="step-intro">Identifique os responsáveis e onde o investimento será executado para garantir alinhamento entre as
-                    áreas envolvidas.</p>
                 <div class="grid">
                     <div class="col-3">
                         <label for="projectUser">Project User</label>
@@ -188,7 +144,9 @@
                         <label for="center">Centro</label>
                         <input id="center" name="center" type="text" required maxlength="80" />
                     </div>
+                </div>
 
+                <div class="grid">
                     <div class="col-3">
                         <label for="unit">Unidade</label>
                         <select id="unit" name="unit" required>
@@ -244,9 +202,27 @@
                 </div>
             </fieldset>
 
-            <fieldset class="step-block">
-                <legend>6. Indicadores de Desempenho</legend>
-                <p class="step-intro">Finalize informando o KPI monitorado e os valores esperados após a implementação do projeto.</p>
+            <fieldset class="form-section">
+                <legend>Sumário e Comentário</legend>
+                <p class="section-intro">Documente a justificativa do investimento para que os aprovadores consultem os detalhes.</p>
+                <div class="grid">
+                    <div class="col-6">
+                        <label for="projectSummary">Sumário do Projeto</label>
+                        <textarea id="projectSummary" name="projectSummary" required maxlength="1500"
+                            placeholder="Descreva resumidamente o objetivo do projeto..."></textarea>
+                    </div>
+
+                    <div class="col-6">
+                        <label for="projectComment">Comentário</label>
+                        <textarea id="projectComment" name="projectComment" required maxlength="2000"
+                            placeholder="Detalhe as principais características e premissas..."></textarea>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-section">
+                <legend>Indicadores de Desempenho</legend>
+                <p class="section-intro">Finalize informando o KPI monitorado e os valores esperados após a implementação do projeto.</p>
                 <div class="grid">
                     <div class="col-3">
                         <label for="kpiType">Tipo de KPI</label>
