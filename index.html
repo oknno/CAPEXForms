@@ -323,10 +323,16 @@
 
     <template id="activityTemplate">
         <div class="activity" data-activity>
-            <div class="row">
-                <div class="c-6">
-                    <label>Título da Atividade</label>
-                    <input type="text" class="act-title" required maxlength="160" placeholder="Ex.: Compra do laminador" />
+            <div class="activity-card activity-title">
+                <label>Título da Atividade</label>
+                <input type="text" class="act-title" required maxlength="160" placeholder="Ex.: Compra do laminador" />
+            </div>
+            <div class="activity-grid">
+                <div class="activity-card activity-value">
+                    <label>Valor CAPEX da atividade (BRL)</label>
+                    <div class="activity-capex">
+                        <div data-year-fields></div>
+                    </div>
                 </div>
                 <div class="activity-card activity-start">
                     <label>Início da Atividade</label>
@@ -337,47 +343,39 @@
                     <input type="date" class="act-end" required />
                 </div>
             </div>
-            <p class="muted">Informe início e término para gerar os valores anuais da atividade.</p>
-            <div data-year-fields></div>
-            <div class="row">
-                <div class="c-6">
-                    <label for="Elemento_PEP">Elemento PEP da Atividade</label>
-                    <select id="Elemento_PEP" name="kpi" required>
-                        <option value="">Selecione…</option>
-                        <option>DESP.ENGENHARIA / DETALHAMENTO PROJETO</option>
-                        <option>AQUISIÇÃO DE EQUIPAMENTOS NACIONAIS</option>
-                        <option>AQUISIÇÃO DE EQUIPAMENTOS IMPORTADOS</option>
-                        <option>AQUISIÇÃO DE VEÍCULOS</option>
-                        <option>DESPESAS COM OBRAS CIVIS</option>
-                        <option>DESP.MONTAGEM EQUIPTOS/ESTRUTURAS/OUTRAS</option>
-                        <option>AQ.DE COMPONENTES/MAT.INSTAL./FERRAMENTA</option>
-                        <option>DESPESAS COM MEIO AMBIENTE</option>
-                        <option>DESPESAS COM SEGURANÇA</option>
-                        <option>DESPESAS COM SEGUROS</option>
-                        <option>DESP.CONSULTORIA INTERNA (AMS)-TEC.INFOR</option>
-                        <option>DESP.CONSULTORIA EXTERNA - TEC.INFOR</option>
-                        <option>AQUISIÇÃO DE HARDWARE (NOTEBOOKS, ETC)</option>
-                        <option>DESP.GERENCIAMENTO E COORDENAÇÃO</option>
-                        <option>AQUISIÇÃO DE SOFTWARE</option>
-                        <option>CONTINGÊNCIAS</option>
-                    </select>
-                </div>
-                <div class="c-6">
-                    <label>Fornecedor da Atividade</label>
-                    <input type="text" class="act-supplier" required maxlength="160" placeholder="Informe o fornecedor responsável" />
-                </div>
-            </div>
-            <div class="row">
-                <div class="c-12">
-                    <label>Descrição do Fornecedor</label>
-                    <textarea class="act-supplier-notes" maxlength="800" placeholder="Descreva as informações acordadas com o fornecedor."></textarea>
-                </div>
+            <div class="activity-card activity-pep">
+                <label for="Elemento_PEP">Elemento PEP da Atividade</label>
+                <select id="Elemento_PEP" name="kpi" required>
+                    <option value="">Selecione…</option>
+                    <option>DESP.ENGENHARIA / DETALHAMENTO PROJETO</option>
+                    <option>AQUISIÇÃO DE EQUIPAMENTOS NACIONAIS</option>
+                    <option>AQUISIÇÃO DE EQUIPAMENTOS IMPORTADOS</option>
+                    <option>AQUISIÇÃO DE VEÍCULOS</option>
+                    <option>DESPESAS COM OBRAS CIVIS</option>
+                    <option>DESP.MONTAGEM EQUIPTOS/ESTRUTURAS/OUTRAS</option>
+                    <option>AQ.DE COMPONENTES/MAT.INSTAL./FERRAMENTA</option>
+                    <option>DESPESAS COM MEIO AMBIENTE</option>
+                    <option>DESPESAS COM SEGURANÇA</option>
+                    <option>DESPESAS COM SEGUROS</option>
+                    <option>DESP.CONSULTORIA INTERNA (AMS)-TEC.INFOR</option>
+                    <option>DESP.CONSULTORIA EXTERNA - TEC.INFOR</option>
+                    <option>AQUISIÇÃO DE HARDWARE (NOTEBOOKS, ETC)</option>
+                    <option>DESP.GERENCIAMENTO E COORDENAÇÃO</option>
+                    <option>AQUISIÇÃO DE SOFTWARE</option>
+                    <option>CONTINGÊNCIAS</option>
+                </select>
             </div>
             <div class="activity-card activity-description">
                 <label>Descrição da Atividade</label>
                 <textarea class="act-overview" required maxlength="800" placeholder="Descreva os objetivos e entregáveis desta atividade."></textarea>
             </div>
-            <div class="c-12 btn-row vs">
+            <div class="activity-card activity-supplier">
+                <label>Fornecedor da Atividade</label>
+                <input type="text" class="act-supplier" required maxlength="160" placeholder="Informe o fornecedor responsável" />
+                <p class="muted supplier-description">Descreva as informações acordadas com o fornecedor nos campos de descrição por ano.</p>
+            </div>
+
+            <div class="activity-actions btn-row vs">
                 <button type="button" class="btn danger icon" data-remove-activity><span class="material-symbols-outlined">delete</span></button>
             </div>
         </div>

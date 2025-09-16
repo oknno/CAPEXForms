@@ -112,15 +112,55 @@
   color: var(--ink-2);
 }
 
-#static-mirror .form-section + .form-section {
-  margin-top: 24px;
+#static-mirror .form-section {
+  border-color: rgba(0, 0, 0, 0.08);
+  padding: 20px;
 }
 
-#static-mirror .section-title {
-  margin: 0 0 8px;
-  font-size: 15px;
+#static-mirror .form-section legend {
+  font-weight: 700;
+  color: var(--color-purple);
+}
+
+#static-mirror .sap-subsection {
+  margin: 28px 0;
+}
+
+#static-mirror .sap-subsection:first-of-type {
+  margin-top: 0;
+}
+
+#static-mirror .sap-subsection:last-of-type {
+  margin-bottom: 0;
+}
+
+#static-mirror .sap-subsection h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--color-purple);
+}
+
+#static-mirror .sap-subsection .grid {
+  margin-bottom: 12px;
+}
+
+#static-mirror .sap-subsection .grid:last-of-type {
+  margin-bottom: 0;
+}
+
+#static-mirror .section-intro {
+  margin: 0 0 16px;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+#static-mirror .capex-flag {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-2);
 }
 
 /* Grids genéricos usados em várias seções do formulário */
@@ -317,7 +357,7 @@
 /* Região flexível que mantém sidebar e painel de detalhes lado a lado */
 #static-mirror #app {
   display: grid;
-  grid-template-columns: minmax(360px, 480px) minmax(0, 1fr);
+  grid-template-columns: minmax(480px, 480px) minmax(0, 1fr);
   gap: 32px;
   padding: 0 40px;
   box-sizing: border-box;
