@@ -755,11 +755,11 @@ class SPRestApi {
         row.className = 'row act-year';
         row.dataset.year = y;
         row.innerHTML = `
-          <div class="c-4">
+          <div class="c-6">
             <label>Valor CAPEX da atividade (BRL) - ${y}</label>
             <input type="number" class="act-capex" data-year="${y}" min="0" step="0.01" inputmode="decimal" required placeholder="Ex.: 250000,00" />
           </div>
-          <div class="c-8">
+          <div class="c-6">
             <label>Descrição - ${y}</label>
             <textarea class="act-desc" data-year="${y}" required maxlength="600" placeholder="Detalhe a atividade, entregáveis e premissas."></textarea>
           </div>
@@ -835,6 +835,7 @@ class SPRestApi {
           capex_brl: parseNumberBRL(getValueFromSelector('.act-capex', 0, row)),
           descricao: getValueFromSelector('.act-desc', "", row).trim(),
         }));
+        const supplierNotes = getValueFromSelector('.act-supplier-notes', "", a).trim();
         return {
           titulo: getValueFromSelector('.act-title', "", a).trim(),
           inicio: getValueFromSelector('.act-start', today, a),
@@ -842,6 +843,7 @@ class SPRestApi {
           elementoPep: getValueFromSelector('[name="kpi"]', "", a),
           descricao: getValueFromSelector('.act-overview', "", a).trim(),
           fornecedor: getValueFromSelector('.act-supplier', "", a).trim(),
+          descricaoFornecedor: supplierNotes,
           anual,
         };
       });
@@ -889,6 +891,7 @@ class SPRestApi {
           ElementoPEP: atividade.elementoPep,
           DescricaoAtividade: atividade.descricao,
           FornecedorAtividade: atividade.fornecedor,
+          DescricaoFornecedorAtividade: atividade.descricaoFornecedor,
           MarcoId: marcoId
         });
         const atvId = infoAtv.d?.Id || infoAtv.d?.ID;
@@ -913,7 +916,7 @@ class SPRestApi {
     const msRes = await Marcos.getItems({ select: 'Id,Title', filter: `ProjetoId eq ${projectId}` });
     const result = [];
     for (const ms of msRes.d?.results || []) {
-      const actRes = await Atividades.getItems({ select: 'Id,Title,DataInicio,DataFim,ElementoPEP,DescricaoAtividade,FornecedorAtividade', filter: `MarcoId eq ${ms.Id}` });
+      const actRes = await Atividades.getItems({ select: 'Id,Title,DataInicio,DataFim,ElementoPEP,DescricaoAtividade,FornecedorAtividade,DescricaoFornecedorAtividade', filter: `MarcoId eq ${ms.Id}` });
       const acts = [];
       for (const act of actRes.d?.results || []) {
         const alRes = await Alocacoes.getItems({ select: 'Ano,CapexBRL,Descricao', filter: `AtividadeId eq ${act.Id}` });
@@ -925,6 +928,7 @@ class SPRestApi {
           elementoPep: act.ElementoPEP,
           descricao: act.DescricaoAtividade,
           fornecedor: act.FornecedorAtividade,
+          descricaoFornecedor: act.DescricaoFornecedorAtividade || '',
           anual
         });
       }
@@ -955,8 +959,10 @@ class SPRestApi {
         actNode.querySelector('[name="kpi"]').value = act.elementoPep || '';
         const overview = actNode.querySelector('.act-overview');
         const supplier = actNode.querySelector('.act-supplier');
+        const supplierNotes = actNode.querySelector('.act-supplier-notes');
         if (overview) overview.value = act.descricao || '';
         if (supplier) supplier.value = act.fornecedor || '';
+        if (supplierNotes) supplierNotes.value = act.descricaoFornecedor || '';
         (act.anual || []).forEach(a => {
           const row = actNode.querySelector(`.row[data-year="${a.ano}"]`);
           if (row) {
