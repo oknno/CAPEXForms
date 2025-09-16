@@ -623,6 +623,11 @@
   grid-column: 1 / -1;
 }
 
+#static-mirror .activity-field-years,
+#static-mirror .activity-field-title,
+#static-mirror .activity-field-overview {
+  grid-column: 1 / -1;
+}
 #static-mirror .activity-field-start {
   grid-column: 1 / span 4;
 }
@@ -636,16 +641,7 @@
 }
 
 #static-mirror .activity-field-supplier {
-  grid-column: 1 / span 6;
-}
-
-#static-mirror .activity-field-supplier-notes {
-  grid-column: 7 / span 6;
-}
-
-#static-mirror .activity-field-overview,
-#static-mirror .activity-field-years {
-  grid-column: 1 / -1;
+  grid-column: 1 / span 12;
 }
 
 #static-mirror .activity-year-list {
@@ -673,7 +669,7 @@
 }
 
 #static-mirror .activity-field-years .act-year-value {
-  grid-column: 1 / span 8;
+  grid-column: 1 / span 6;
   grid-row: 1;
 }
 
@@ -693,16 +689,15 @@
   }
 
   #static-mirror .activity-field-title,
-  #static-mirror .activity-field-overview,
-  #static-mirror .activity-field-years {
+  #static-mirror .activity-field-years,
+  #static-mirror .activity-field-overview {
     grid-column: 1 / -1;
   }
 
   #static-mirror .activity-field-start,
   #static-mirror .activity-field-end,
   #static-mirror .activity-field-pep,
-  #static-mirror .activity-field-supplier,
-  #static-mirror .activity-field-supplier-notes {
+  #static-mirror .activity-field-supplier {
     grid-column: span 6;
   }
 
@@ -730,7 +725,6 @@
   #static-mirror .activity-field-end,
   #static-mirror .activity-field-pep,
   #static-mirror .activity-field-supplier,
-  #static-mirror .activity-field-supplier-notes,
   #static-mirror .activity-field-overview,
   #static-mirror .activity-field-years {
     grid-column: 1 / -1;
