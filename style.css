@@ -67,7 +67,7 @@
   background: var(--bg);
   display: flex;
   flex-direction: column;
-  min-height: 70vh; /* 🔑 garante altura mínima, mas permite crescer */
+  min-height: 65vh; /* 🔑 garante altura mínima, mas permite crescer */
 }
 
 /* Quando for o formulário, use uma classe extra */
