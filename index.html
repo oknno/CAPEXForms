@@ -57,24 +57,24 @@
                             placeholder="Ex.: Modernização da Linha de Laminação" />
                     </div>
                 </div>
-
-                <div class="grid">
-                    <div class="col-2">
-                        <label for="approvalYear">Ano de Aprovação</label>
-                        <input id="approvalYear" name="approvalYear" type="number" min="1900" required />
+                    <div class="col-6">
+                        <label for="projectSummary">Sumário do Projeto</label>
+                        <textarea id="projectSummary" name="projectSummary" required maxlength="1500"
+                            placeholder="Descreva resumidamente o objetivo do projeto..."></textarea>
                     </div>
 
-                    <div class="col-2">
-                        <label for="startDate">Data de Início</label>
-                        <input id="startDate" name="startDate" type="date" required />
-                    </div>
-
-                    <div class="col-2">
-                        <label for="endDate">Data de Término</label>
-                        <input id="endDate" name="endDate" type="date" required />
+                    <div class="col-6">
+                        <label for="projectComment">Comentário</label>
+                        <textarea id="projectComment" name="projectComment" required maxlength="2000"
+                            placeholder="Detalhe as principais características e premissas..."></textarea>
                     </div>
                 </div>
+            </fieldset>
 
+            <fieldset class="step-block">
+                <legend>2. Cronograma e Aprovação</legend>
+                <p class="step-intro">Informe o ano de aprovação e o período planejado de execução para alinhar o cronograma com as
+                    áreas de negócio e financeira.</p>
                 <div class="grid">
                     <div class="col-3">
                         <label for="projectBudget">Orçamento do Projeto em R$</label>
@@ -98,7 +98,6 @@
                         <input id="depreciationCostCenter" name="depreciationCostCenter" type="text" required maxlength="60" />
                     </div>
                 </div>
-
                 <div class="grid">
                     <div class="col-3">
                         <label for="category">Categoria</label>
@@ -125,7 +124,6 @@
                         <input id="projectFunction" name="projectFunction" type="text" required maxlength="160" />
                     </div>
                 </div>
-
                 <div class="grid">
                     <div class="col-3">
                         <label for="projectUser">Project User</label>
