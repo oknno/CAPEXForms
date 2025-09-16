@@ -608,28 +608,39 @@
 #static-mirror .activity-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: start;
 }
 
 #static-mirror .activity-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 #static-mirror .activity-field-title {
-  grid-column: span 6;
-}
-
-#static-mirror .activity-field-start,
-#static-mirror .activity-field-end,
-#static-mirror .activity-field-pep,
-#static-mirror .activity-field-supplier {
-  grid-column: span 3;
+  grid-column: 1 / span 12;
 }
 
 #static-mirror .activity-field-years {
-  grid-column: span 6;
+  grid-column: 1 / span 6;
+}
+
+#static-mirror .activity-field-start {
+  grid-column: 7 / span 3;
+}
+
+#static-mirror .activity-field-end {
+  grid-column: 10 / span 3;
+}
+
+#static-mirror .activity-field-pep {
+  grid-column: 1 / span 6;
+}
+
+#static-mirror .activity-field-supplier {
+  grid-column: 7 / span 6;
 }
 
 #static-mirror .activity-year-list {
@@ -644,8 +655,18 @@
   color: var(--ink);
 }
 
-#static-mirror .activity-field-overview {
-  grid-column: span 6;
+#static-mirror .activity-field-years .act-year {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+#static-mirror .activity-field-years .act-year .c-6:first-child {
+  grid-column: 1 / span 6;
+}
+
+#static-mirror .activity-field-years .act-year .c-6:last-child {
+  grid-column: 1 / span 6;
 }
 #static-mirror .activity-footer {
   display: flex;
@@ -654,19 +675,19 @@
 
 @media (max-width: 1080px) {
   #static-mirror .activity-grid {
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+
   }
 
   #static-mirror .activity-field-title,
   #static-mirror .activity-field-years,
-  #static-mirror .activity-field-overview {
+  #static-mirror .activity-field-pep,
+  #static-mirror .activity-field-supplier {
     grid-column: span 6;
   }
 
   #static-mirror .activity-field-start,
-  #static-mirror .activity-field-end,
-  #static-mirror .activity-field-pep,
-  #static-mirror .activity-field-supplier {
+  #static-mirror .activity-field-end {
     grid-column: span 3;
   }
 }
@@ -677,12 +698,11 @@
   }
 
   #static-mirror .activity-field-title,
+  #static-mirror .activity-field-years,
   #static-mirror .activity-field-start,
   #static-mirror .activity-field-end,
   #static-mirror .activity-field-pep,
-  #static-mirror .activity-field-years,
-  #static-mirror .activity-field-supplier,
-  #static-mirror .activity-field-overview {
+  #static-mirror .activity-field-supplier {
     grid-column: 1 / -1;
   }
 }

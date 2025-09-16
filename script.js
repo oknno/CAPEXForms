@@ -1185,9 +1185,11 @@ class SPRestApi {
         if (start.value && end.value && start.value > end.value) {
           errs.push(`Atividade ${jdx} do marco ${idx}: a <strong>data de início</strong> não pode ser posterior à <strong>data de fim</strong>.`);
         }
-        if (!overviewEl || !overviewEl.value.trim()) {
-          errs.push(`Atividade ${jdx} do marco ${idx}: informe a <strong>descrição da atividade</strong>.`);
-          if (overviewEl) errsEl.push(overviewEl);
+        if (overviewEl) {
+          if (!overviewEl.value.trim()) {
+            errs.push(`Atividade ${jdx} do marco ${idx}: informe a <strong>descrição da atividade</strong>.`);
+            errsEl.push(overviewEl);
+          }
         }
         if (!supplierEl || !supplierEl.value.trim()) {
           errs.push(`Atividade ${jdx} do marco ${idx}: informe o <strong>fornecedor da atividade</strong>.`);
