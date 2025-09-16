@@ -46,176 +46,211 @@
             <div id="status" class="status" role="status" aria-live="polite"></div>
             <div id="errors" class="error-box" style="display:none;" role="alert" aria-live="assertive"></div>
 
-            <!-- Bloco principal com informações estruturais exigidas pelo SAP -->
-            <fieldset>
+            <!-- Agrupamentos principais reorganizados em duas seções -->
+            <fieldset class="form-section">
                 <legend>Informações SAP</legend>
+                <p class="section-intro">Preencha primeiro os dados cadastrais e descritivos exigidos pelo SAP.</p>
+
+                <div class="sap-subsection">
+                    <h3>Identificação do Projeto</h3>
+                    <div class="grid">
+                        <div class="col-6">
+                            <label for="projectName">Nome do Projeto</label>
+                            <input id="projectName" name="projectName" type="text" required maxlength="160"
+                                placeholder="Ex.: Modernização da Linha de Laminação" />
+                        </div>
+
+                        <div class="col-3">
+                            <label for="category">Categoria</label>
+                            <input id="category" name="category" type="text" required maxlength="120" />
+                        </div>
+
+                        <div class="col-3">
+                            <label for="investmentType">Tipo de Investimento</label>
+                            <select id="investmentType" name="investmentType" required>
+                                <option value="">Selecione…</option>
+                                <option>Estratégico</option>
+                                <option>Normativo</option>
+                                <option>Reline</option>
+                            </select>
+                        </div>
+
+                        <div class="col-3">
+                            <label for="assetType">Tipo de Ativo</label>
+                            <input id="assetType" name="assetType" type="text" required maxlength="120" />
+                        </div>
+
+                        <div class="col-3">
+                            <label for="projectFunction">Função do Projeto</label>
+                            <input id="projectFunction" name="projectFunction" type="text" required maxlength="160" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sap-subsection">
+                    <h3>Planejamento Temporal</h3>
+                    <div class="grid">
+                        <div class="col-2">
+                            <label for="approvalYear">Ano de Aprovação</label>
+                            <input id="approvalYear" name="approvalYear" type="number" min="1900" required />
+                        </div>
+
+                        <div class="col-2">
+                            <label for="startDate">Data de Início</label>
+                            <input id="startDate" name="startDate" type="date" required />
+                        </div>
+
+                        <div class="col-2">
+                            <label for="endDate">Data de Término</label>
+                            <input id="endDate" name="endDate" type="date" required />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sap-subsection">
+                    <h3>Orçamento e Recursos</h3>
+                    <div class="grid">
+                        <div class="col-3">
+                            <label for="projectBudget">Orçamento do Projeto em R$</label>
+                            <input id="projectBudget" name="projectBudget" type="number" min="0" step="0.01"
+                                inputmode="decimal" required placeholder="500.000,00" />
+                            <div id="capexFlag" class="muted capex-flag"></div>
+                        </div>
+
+                        <div class="col-3">
+                            <label for="investmentLevel">Nível de Investimento</label>
+                            <input id="investmentLevel" name="investmentLevel" type="text" required maxlength="120" />
+                        </div>
+
+                        <div class="col-3">
+                            <label for="fundingSource">Origem da Verba</label>
+                            <input id="fundingSource" name="fundingSource" type="text" required maxlength="120" />
+                        </div>
+
+                        <div class="col-3">
+                            <label for="depreciationCostCenter">C Custo Depreciação</label>
+                            <input id="depreciationCostCenter" name="depreciationCostCenter" type="text" required maxlength="60" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sap-subsection">
+                    <h3>Localização Operacional</h3>
+                    <div class="grid">
+                        <div class="col-3">
+                            <label for="company">Empresa</label>
+                            <input id="company" name="company" type="text" required maxlength="120" />
+                        </div>
+
+                        <div class="col-3">
+                            <label for="center">Centro</label>
+                            <input id="center" name="center" type="text" required maxlength="80" />
+                        </div>
+
+                        <div class="col-3">
+                            <label for="unit">Unidade</label>
+                            <select id="unit" name="unit" required>
+                                <option value="">Selecione…</option>
+                                <option>Andrade</option>
+                                <option>Barra Mansa</option>
+                                <option>CEO</option>
+                                <option>CFTV</option>
+                                <option>Dir Logísitca e Planejamento</option>
+                                <option>ECA</option>
+                                <option>Suprimentos</option>
+                                <option>Guilman Amorim</option>
+                                <option>Juiz de Fora</option>
+                                <option>Metálicos</option>
+                                <option>Monlevade</option>
+                                <option>Piracicaba</option>
+                                <option>Resende</option>
+                                <option>Rio das Pedras</option>
+                                <option>Serra Azul</option>
+                                <option>Sitrel</option>
+                                <option>TI Corporativo</option>
+                                <option>TI Shared Services</option>
+                                <option>Trefilaria Juiz de Fora</option>
+                                <option>Trefilaria Resende</option>
+                                <option>Trefilaria Sabará</option>
+                                <option>Trefilaria São Paulo</option>
+                                <option>VP Comercial</option>
+                            </select>
+                        </div>
+
+                        <div class="col-3">
+                            <label for="projectLocation">Local de Implantação</label>
+                            <select id="projectLocation" name="projectLocation" required>
+                                <option value="">Selecione…</option>
+                                <option>Aciaria</option>
+                                <option>Alto Forno</option>
+                                <option>Cilindro e Discos Laminação</option>
+                                <option>Engenharia e Utilidades</option>
+                                <option>Guilman Amorim</option>
+                                <option>Geral</option>
+                                <option>Gerência Técnica | Qualidade</option>
+                                <option>Suprimentos Monlevade</option>
+                                <option>Laminação</option>
+                                <option>Logística | Estocagem | Expedição</option>
+                                <option>Melhorias Ambientais</option>
+                                <option>Melhorias Seguranças</option>
+                                <option>Redução</option>
+                                <option>Recursos Humanos</option>
+                                <option>Sinterização</option>
+                                <option>Tecnologia da Informação</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sap-subsection">
+                    <h3>Responsáveis</h3>
+                    <div class="grid">
+                        <div class="col-3">
+                            <label for="projectUser">Project User</label>
+                            <input id="projectUser" name="projectUser" type="text" required maxlength="120" />
+                        </div>
+
+                        <div class="col-3">
+                            <label for="projectLeader">Coordenador do Projeto</label>
+                            <input id="projectLeader" name="projectLeader" type="text" required maxlength="120" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sap-subsection sap-subsection--description">
+                    <h3>Detalhamento Complementar</h3>
+                    <div class="grid">
+                        <div class="col-6">
+                            <label for="projectSummary">Sumário do Projeto</label>
+                            <textarea id="projectSummary" name="projectSummary" required maxlength="1500"
+                                placeholder="Descreva resumidamente o objetivo do projeto..."></textarea>
+                        </div>
+
+                        <div class="col-6">
+                            <label for="projectComment">Comentário</label>
+                            <textarea id="projectComment" name="projectComment" required maxlength="2000"
+                                placeholder="Detalhe as principais características e premissas..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+            <fieldset class="form-section">
+                <legend>Indicadores de Desempenho</legend>
+                <p class="section-intro">Informe os indicadores que serão acompanhados e os valores esperados após o projeto.</p>
                 <div class="grid">
-                    <div class="col-6">
-                        <label for="projectName">Nome do Projeto</label>
-                        <input id="projectName" name="projectName" type="text" required
-                            placeholder="Ex.: Modernização da Linha de Laminação" />
-                    </div>
-
-                    <div class="col-2">
-                        <label for="approvalYear">Ano de Aprovação</label>
-                        <input id="approvalYear" name="approvalYear" type="number" min="1900" required />
-                    </div>
-
-                    <div class="col-2">
-                        <label for="projectBudget">Orçamento do Projeto em R$</label>
-                        <input id="projectBudget" name="projectBudget" type="number" min="0" step="0.01"
-                            inputmode="decimal" required placeholder="500.000,00" />
-                        <div id="capexFlag" class="muted"></div>
-                    </div>
-
-                    <div class="col-2">
-                        <label for="investmentLevel">Nível de Investimento</label>
-                        <input id="investmentLevel" name="investmentLevel" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="fundingSource">Origem da Verba</label>
-                        <input id="fundingSource" name="fundingSource" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="projectUser">Project User</label>
-                        <input id="projectUser" name="projectUser" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="projectLeader">Coordenador do Projeto</label>
-                        <input id="projectLeader" name="projectLeader" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="company">Empresa</label>
-                        <input id="company" name="company" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="center">Centro</label>
-                        <input id="center" name="center" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="unit">Unidade</label>
-                        <select id="unit" name="unit" required>
-                            <option value="">Selecione…</option>
-                            <option>Andrade</option>
-                            <option>Barra Mansa</option>
-                            <option>CEO</option>
-                            <option>CFTV</option>
-                            <option>Dir Logísitca e Planejamento</option>
-                            <option>ECA</option>
-                            <option>Suprimentos</option>
-                            <option>Guilman Amorim</option>
-                            <option>Juiz de Fora</option>
-                            <option>Metálicos</option>
-                            <option>Monlevade</option>
-                            <option>Piracicaba</option>
-                            <option>Resende</option>
-                            <option>Rio das Pedras</option>
-                            <option>Serra Azul</option>
-                            <option>Sitrel</option>
-                            <option>TI Corporativo</option>
-                            <option>TI Shared Services</option>
-                            <option>Trefilaria Juiz de Fora</option>
-                            <option>Trefilaria Resende</option>
-                            <option>Trefilaria Sabará</option>
-                            <option>Trefilaria São Paulo</option>
-                            <option>VP Comercial</option>
-                        </select>
-                    </div>
-
-                    <div class="col-3">
-                        <label for="projectLocation">Local de Implantação</label>
-                        <select id="projectLocation" name="projectLocation" required>
-                            <option value="">Selecione…</option>
-                            <option>Aciaria</option>
-                            <option>Alto Forno</option>
-                            <option>Cilindro e Discos Laminação</option>
-                            <option>Engenharia e Utilidades</option>
-                            <option>Guilman Amorim</option>
-                            <option>Geral</option>
-                            <option>Gerência Técnica | Qualidade</option>
-                            <option>Suprimentos Monlevade</option>
-                            <option>Laminação</option>
-                            <option>Logística | Estocagem | Expedição</option>
-                            <option>Melhorias Ambientais</option>
-                            <option>Melhorias Seguranças</option>
-                            <option>Redução</option>
-                            <option>Recursos Humanos</option>
-                            <option>Sinterização</option>
-                            <option>Tecnologia da Informação</option>
-                        </select>
-                    </div>
-
-                    <div class="col-3">
-                        <label for="depreciationCostCenter">C Custo Depreciação</label>
-                        <input id="depreciationCostCenter" name="depreciationCostCenter" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="category">Categoria</label>
-                        <input id="category" name="category" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="investmentType">Tipo de Investimento</label>
-                        <select id="investmentType" name="investmentType" required>
-                            <option value="">Selecione…</option>
-                            <option>Estratégico</option>
-                            <option>Normativo</option>
-                            <option>Reline</option>
-                        </select>
-                    </div>
-
-                    <div class="col-3">
-                        <label for="assetType">Tipo de Ativo</label>
-                        <input id="assetType" name="assetType" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="projectFunction">Função do Projeto</label>
-                        <input id="projectFunction" name="projectFunction" type="text" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="startDate">Data de Início</label>
-                        <input id="startDate" name="startDate" type="date" required />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="endDate">Data de Término</label>
-                        <input id="endDate" name="endDate" type="date" required />
-                    </div>
-
-                    <div class="col-6">
-                        <label for="projectSummary">Sumário do Projeto</label>
-                        <textarea id="projectSummary" name="projectSummary" required
-                            placeholder="Descreva resumidamente o objetivo do projeto..."></textarea>
-                    </div>
-
-                    <div class="col-6">
-                        <label for="projectComment">Comentário</label>
-                        <textarea id="projectComment" name="projectComment" required
-                            placeholder="Detalhe as principais características e premissas..."></textarea>
-                    </div>
-
                     <div class="col-3">
                         <label for="kpiType">Tipo de KPI</label>
-                        <input id="kpiType" name="kpiType" type="text" required />
+                        <input id="kpiType" name="kpiType" type="text" required maxlength="120" />
                     </div>
 
                     <div class="col-3">
                         <label for="kpiName">Nome do KPI</label>
-                        <input id="kpiName" name="kpiName" type="text" required />
+                        <input id="kpiName" name="kpiName" type="text" required maxlength="160" />
                     </div>
 
                     <div class="col-6">
                         <label for="kpiDescription">Descrição do KPI</label>
-                        <textarea id="kpiDescription" name="kpiDescription" required
+                        <textarea id="kpiDescription" name="kpiDescription" required maxlength="1500"
                             placeholder="Explique como o KPI será impactado pelo projeto..."></textarea>
                     </div>
 
@@ -234,7 +269,7 @@
 <!--Aparece depois do valor de R4500.000-->
 
             <div id="milestoneSection" style="display:none;">
-                <fieldset>
+                <fieldset class="form-section milestones-section">
 
                     <legend>KEY PROJECTS</legend>
                     <p class="muted">
@@ -271,12 +306,11 @@
     <!-- Templates -->
     <!-- Estruturas reutilizáveis para marcos e atividades, clonadas dinamicamente via JS -->
     <template id="milestoneTemplate">
-        <details class="milestone" data-milestone>
-            <summary>Marco X</summary>
+        <div class="milestone" data-milestone>
             <div class="milestone-header">
                 <div class="milestone-title" style="min-width:260px;">
                     <label>Nome do Marco</label>
-                    <input type="text" class="milestone-name" required />
+                    <input type="text" class="milestone-name" required maxlength="160" />
                 </div>
                 <div class="btn-row">
                     <button type="button" class="btn" data-add-activity>+ Adicionar atividade</button>
@@ -284,7 +318,7 @@
                 </div>
             </div>
             <div class="activities" data-activities></div>
-        </details>
+        </div>
     </template>
 
     <template id="activityTemplate">
@@ -292,7 +326,7 @@
             <div class="row">
                 <div class="c-6">
                     <label>Título da Atividade</label>
-                    <input type="text" class="act-title" required placeholder="Ex.: Compra do laminador" />
+                    <input type="text" class="act-title" required maxlength="160" placeholder="Ex.: Compra do laminador" />
                 </div>
                 <div class="c-3">
                     <label>Início da Atividade</label>
@@ -303,39 +337,46 @@
                     <input type="date" class="act-end" required />
                 </div>
             </div>
+            <p class="muted">Informe início e término para gerar os valores anuais da atividade.</p>
+            <div data-year-fields></div>
             <div class="row">
                 <div class="c-6">
                     <label for="Elemento_PEP">Elemento PEP da Atividade</label>
                     <select id="Elemento_PEP" name="kpi" required>
-                    <option value="">Selecione…</option>
-                    <option>DESP.ENGENHARIA / DETALHAMENTO PROJETO</option>
-                    <option>AQUISIÇÃO DE EQUIPAMENTOS NACIONAIS</option>
-                    <option>AQUISIÇÃO DE EQUIPAMENTOS IMPORTADOS</option>
-                    <option>AQUISIÇÃO DE VEÍCULOS</option>
-                    <option>DESPESAS COM OBRAS CIVIS</option>
-                    <option>DESP.MONTAGEM EQUIPTOS/ESTRUTURAS/OUTRAS</option>
-                    <option>AQ.DE COMPONENTES/MAT.INSTAL./FERRAMENTA</option>
-                    <option>DESPESAS COM MEIO AMBIENTE</option>
-                    <option>DESPESAS COM SEGURANÇA</option>
-                    <option>DESPESAS COM SEGUROS</option>
-                    <option>DESP.CONSULTORIA INTERNA (AMS)-TEC.INFOR</option>
-                    <option>DESP.CONSULTORIA EXTERNA - TEC.INFOR</option>
-                    <option>AQUISIÇÃO DE HARDWARE (NOTEBOOKS, ETC)</option>
-                    <option>DESP.GERENCIAMENTO E COORDENAÇÃO</option>
-                    <option>AQUISIÇÃO DE SOFTWARE</option>
-                    <option>CONTINGÊNCIAS</option>
-                </select>
+                        <option value="">Selecione…</option>
+                        <option>DESP.ENGENHARIA / DETALHAMENTO PROJETO</option>
+                        <option>AQUISIÇÃO DE EQUIPAMENTOS NACIONAIS</option>
+                        <option>AQUISIÇÃO DE EQUIPAMENTOS IMPORTADOS</option>
+                        <option>AQUISIÇÃO DE VEÍCULOS</option>
+                        <option>DESPESAS COM OBRAS CIVIS</option>
+                        <option>DESP.MONTAGEM EQUIPTOS/ESTRUTURAS/OUTRAS</option>
+                        <option>AQ.DE COMPONENTES/MAT.INSTAL./FERRAMENTA</option>
+                        <option>DESPESAS COM MEIO AMBIENTE</option>
+                        <option>DESPESAS COM SEGURANÇA</option>
+                        <option>DESPESAS COM SEGUROS</option>
+                        <option>DESP.CONSULTORIA INTERNA (AMS)-TEC.INFOR</option>
+                        <option>DESP.CONSULTORIA EXTERNA - TEC.INFOR</option>
+                        <option>AQUISIÇÃO DE HARDWARE (NOTEBOOKS, ETC)</option>
+                        <option>DESP.GERENCIAMENTO E COORDENAÇÃO</option>
+                        <option>AQUISIÇÃO DE SOFTWARE</option>
+                        <option>CONTINGÊNCIAS</option>
+                    </select>
                 </div>
                 <div class="c-6">
                     <label>Fornecedor da Atividade</label>
-                    <input type="text" class="act-supplier" required placeholder="Informe o fornecedor responsável" />
+                    <input type="text" class="act-supplier" required maxlength="160" placeholder="Informe o fornecedor responsável" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="c-12">
+                    <label>Descrição do Fornecedor</label>
+                    <textarea class="act-supplier-notes" maxlength="800" placeholder="Descreva as informações acordadas com o fornecedor."></textarea>
                 </div>
             </div>
             <div>
                 <label>Descrição da Atividade</label>
-                <textarea class="act-overview" required placeholder="Descreva os objetivos e entregáveis desta atividade."></textarea>
+                <textarea class="act-overview" required maxlength="800" placeholder="Descreva os objetivos e entregáveis desta atividade."></textarea>
             </div>
-            <div data-year-fields></div>
             <div class="c-12 btn-row vs">
                 <button type="button" class="btn danger icon" data-remove-activity><span class="material-symbols-outlined">delete</span></button>
             </div>
