@@ -935,14 +935,12 @@ class SPRestApi {
           const amountNumber = Number(anual?.capex_brl ?? 0);
           const annualYearNumber = Number(anual?.ano);
           const pepPayload = {
-            Title: pepElement,
-            amountBrl: Number.isFinite(amountNumber) ? amountNumber : 0,
-            year: Number.isFinite(projectYear)
-              ? projectYear
-              : (Number.isFinite(annualYearNumber) ? annualYearNumber : null),
-            pepName: anual?.descricao || '',
-            projectIdId: projectLookupId
-          };
+              Title: pepElement, // nome/código do PEP
+              amountBrl: Number.isFinite(amountNumber) ? amountNumber : 0,
+              year: Number.isFinite(projectYear) ? projectYear : (Number.isFinite(annualYearNumber) ? annualYearNumber : null),
+              projectIdId: projectLookupId,
+              activityIdId: atvId
+              };
           if (Number.isFinite(atvId)) {
             pepPayload.activityIdId = atvId;
           }
@@ -963,7 +961,7 @@ class SPRestApi {
       const actRes = await Activities.getItems({ select: 'Id,Title,startDate,endDate,PEPElement,activityDescription,supplier', filter: `milestoneIdId eq ${ms.Id}` });
       const acts = [];
       for (const act of actRes.d?.results || []) {
-        const alRes = await Peps.getItems({ select: 'Title,year,amountBrl,pepName', filter: `activityIdId eq ${act.Id}` });
+        const alRes = await Peps.getItems({ select: 'Title,year,amountBrl', filter: `activityIdId eq ${act.Id}` });
         const anual = (alRes.d?.results || []).map(a => ({
           ano: a.year,
           capex_brl: a.amountBrl,
