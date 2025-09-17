@@ -1,399 +1,334 @@
-<!--
-    Documento principal da solução CAPEX Forms.
-    Nesta etapa fiz uma rodada de comentários para descrever como o layout
-    está organizado e quais decisões tomei anteriormente para atender os
-    pedidos do usuário. A intenção é facilitar uma próxima revisão, já que
-    o protótipo evoluiu bastante ao longo das últimas interações.
--->
+<!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
-    <!-- Metadados básicos e a folha de estilo que controla o visual da página -->
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Formulário de Projeto - CAPEX</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CAPEX Projects</title>
+  <link rel="stylesheet" href="style.css">
 </head>
+<body>
+  <!-- =============================================================== -->
+  <!-- Cabeçalho principal com logo e acesso rápido para novo projeto -->
+  <!-- =============================================================== -->
+  <header class="main-header">
+    <div class="logo" aria-label="Logo CAPEX"></div>
+    <button id="newProjectBtn" type="button" class="btn primary">Novo Projeto</button>
+  </header>
 
-<body id="static-mirror">
-    <!-- ===================================================================== -->
-    <!-- Cabeçalho / Header: exibe logotipo e acesso rápido para novo projeto -->
-    <header class="main-header">
-        <div class="logo"></div>
-        <button type="button" id="newProjectBtn" class="new-project-btn">Novo Projeto</button>
-    </header>
+  <!-- =============================================================== -->
+  <!-- Aplicação: sidebar com lista e painel de detalhes do projeto -->
+  <!-- =============================================================== -->
+  <div id="app" class="app-layout">
+    <aside id="projectSidebar" class="sidebar">
+      <div class="sidebar-header">
+        <h2>Projetos</h2>
+        <input id="projectSearch" type="search" placeholder="Pesquisar por nome" autocomplete="off">
+      </div>
+      <div id="projectList" class="project-list" role="list"></div>
+    </aside>
 
-    <!-- ===================================================================== -->
-    <!-- Área principal / App container: divide a tela entre lista e detalhes -->
-    <div id="app">
-        <!-- =============================================================== -->
-        <!-- Sidebar (lista de projetos): mostra cards clicáveis com status -->
-        <aside id="projectSidebar">
-            <div id="projectList"></div>
-        </aside>
+    <section id="projectDetails" class="details" aria-live="polite">
+      <div class="empty-state">
+        <h2>Selecione um projeto</h2>
+        <p>Escolha um item na lista ao lado para visualizar as informações ou iniciar uma edição.</p>
+      </div>
+    </section>
+  </div>
 
-        <!-- =============================================================== -->
-        <!-- Painel de detalhes do projeto: descreve informações selecionadas -->
-        <main id="projectDetails">
-            <div class="project-details">
-                <div class="empty">
-                    <p class="empty-title">Selecione um projeto</p>
-                    <p>Clique em um projeto na lista ao lado para ver os detalhes</p>
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <!-- ===================================================================== -->
-    <!-- Formulário de projetos: cadastro e edição com marcos, atividades e PEPs -->
-    <form id="capexForm" novalidate style="display: none;">
-        <button type="button" id="backBtn" class="btn" style="display:none;">
-            <span class="material-symbols-outlined">arrow_back</span>
-            Voltar
-        </button>
-        <h2>Novo Projeto de CAPEX</h2>
-        <p class="hint">
-            Preencha os dados do projeto. Se o <strong>CAPEX BUDGET</strong> for superior a <strong>R$ 1.000.000,00</strong>,
-            você deverá adicionar <em>marcos</em> (milestones) e ao menos 2 atividade em cada marco.
-        </p>
-        <div id="status" class="status" role="status" aria-live="polite"></div>
-        <div id="errors" class="error-box" style="display:none;" role="alert" aria-live="assertive"></div>
-
-        <fieldset class="form-section">
-            <legend>Informações SAP</legend>
-            <p class="section-intro">Preencha primeiro os dados cadastrais e descritivos exigidos pelo SAP.</p>
-
-            <div class="sap-subsection">
-                <h3>Identificação do Projeto</h3>
-                <div class="grid">
-                    <div class="col-6">
-                        <label for="projectName">Nome do Projeto</label>
-                        <input id="projectName" name="projectName" type="text" required maxlength="160"
-                            placeholder="Ex.: Modernização da Linha de Laminação" />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="category">Categoria</label>
-                        <input id="category" name="category" type="text" required maxlength="120" />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="investmentType">Tipo de Investimento</label>
-                        <select id="investmentType" name="investmentType" required>
-                            <option value="">Selecione…</option>
-                            <option>Estratégico</option>
-                            <option>Normativo</option>
-                            <option>Reline</option>
-                        </select>
-                    </div>
-
-                    <div class="col-3">
-                        <label for="assetType">Tipo de Ativo</label>
-                        <input id="assetType" name="assetType" type="text" required maxlength="120" />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="projectFunction">Função do Projeto</label>
-                        <input id="projectFunction" name="projectFunction" type="text" required maxlength="160" />
-                    </div>
-                </div>
-            </div>
-
-            <div class="sap-subsection">
-                <h3>Planejamento Temporal</h3>
-                <div class="grid">
-                    <div class="col-2">
-                        <label for="approvalYear">Ano de Aprovação</label>
-                        <input id="approvalYear" name="approvalYear" type="number" min="1900" required />
-                    </div>
-
-                    <div class="col-2">
-                        <label for="startDate">Data de Início</label>
-                        <input id="startDate" name="startDate" type="date" required />
-                    </div>
-
-                    <div class="col-2">
-                        <label for="endDate">Data de Término</label>
-                        <input id="endDate" name="endDate" type="date" required />
-                    </div>
-                </div>
-            </div>
-
-            <div class="sap-subsection">
-                <h3>Orçamento e Recursos</h3>
-                <div class="grid">
-                    <div class="col-3">
-                        <label for="projectBudget">Orçamento do Projeto em R$</label>
-                        <input id="projectBudget" name="projectBudget" type="number" min="0" step="0.01" inputmode="decimal"
-                            required placeholder="500.000,00" />
-                        <div id="capexFlag" class="muted capex-flag"></div>
-                    </div>
-
-                    <div class="col-3">
-                        <label for="investmentLevel">Nível de Investimento</label>
-                        <input id="investmentLevel" name="investmentLevel" type="text" required maxlength="120" />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="fundingSource">Origem da Verba</label>
-                        <input id="fundingSource" name="fundingSource" type="text" required maxlength="120" />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="depreciationCostCenter">C Custo Depreciação</label>
-                        <input id="depreciationCostCenter" name="depreciationCostCenter" type="text" required maxlength="60" />
-                    </div>
-                </div>
-            </div>
-
-            <div class="sap-subsection">
-                <h3>Localização Operacional</h3>
-                <div class="grid">
-                    <div class="col-3">
-                        <label for="company">Empresa</label>
-                        <input id="company" name="company" type="text" required maxlength="120" />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="center">Centro</label>
-                        <input id="center" name="center" type="text" required maxlength="80" />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="unit">Unidade</label>
-                        <select id="unit" name="unit" required>
-                            <option value="">Selecione…</option>
-                            <option>Andrade</option>
-                            <option>Barra Mansa</option>
-                            <option>CEO</option>
-                            <option>CFTV</option>
-                            <option>Dir Logísitca e Planejamento</option>
-                            <option>ECA</option>
-                            <option>Suprimentos</option>
-                            <option>Guilman Amorim</option>
-                            <option>Juiz de Fora</option>
-                            <option>Metálicos</option>
-                            <option>Monlevade</option>
-                            <option>Piracicaba</option>
-                            <option>Resende</option>
-                            <option>Rio das Pedras</option>
-                            <option>Serra Azul</option>
-                            <option>Sitrel</option>
-                            <option>TI Corporativo</option>
-                            <option>TI Shared Services</option>
-                            <option>Trefilaria Juiz de Fora</option>
-                            <option>Trefilaria Resende</option>
-                            <option>Trefilaria Sabará</option>
-                            <option>Trefilaria São Paulo</option>
-                            <option>VP Comercial</option>
-                        </select>
-                    </div>
-
-                    <div class="col-3">
-                        <label for="projectLocation">Local de Implantação</label>
-                        <select id="projectLocation" name="projectLocation" required>
-                            <option value="">Selecione…</option>
-                            <option>Aciaria</option>
-                            <option>Alto Forno</option>
-                            <option>Cilindro e Discos Laminação</option>
-                            <option>Engenharia e Utilidades</option>
-                            <option>Guilman Amorim</option>
-                            <option>Geral</option>
-                            <option>Gerência Técnica | Qualidade</option>
-                            <option>Suprimentos Monlevade</option>
-                            <option>Laminação</option>
-                            <option>Logística | Estocagem | Expedição</option>
-                            <option>Melhorias Ambientais</option>
-                            <option>Melhorias Seguranças</option>
-                            <option>Redução</option>
-                            <option>Recursos Humanos</option>
-                            <option>Sinterização</option>
-                            <option>Tecnologia da Informação</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <div class="sap-subsection">
-                <h3>Responsáveis</h3>
-                <div class="grid">
-                    <div class="col-3">
-                        <label for="projectUser">Project User</label>
-                        <input id="projectUser" name="projectUser" type="text" required maxlength="120" />
-                    </div>
-
-                    <div class="col-3">
-                        <label for="projectLeader">Coordenador do Projeto</label>
-                        <input id="projectLeader" name="projectLeader" type="text" required maxlength="120" />
-                    </div>
-                </div>
-            </div>
-
-            <div class="sap-subsection sap-subsection--description">
-                <h3>Detalhamento Complementar</h3>
-                <div class="grid">
-                    <div class="col-6">
-                        <label for="projectSummary">Sumário do Projeto</label>
-                        <textarea id="projectSummary" name="projectSummary" required maxlength="1500"
-                            placeholder="Descreva resumidamente o objetivo do projeto..."></textarea>
-                    </div>
-
-                    <div class="col-6">
-                        <label for="projectComment">Comentário</label>
-                        <textarea id="projectComment" name="projectComment" required maxlength="2000"
-                            placeholder="Detalhe as principais características e premissas..."></textarea>
-                    </div>
-                </div>
-            </div>
-        </fieldset>
-
-        <fieldset id="pepSection" class="form-section" style="display: none;">
-            <legend>Elementos PEP</legend>
-            <div class="grid">
-                <div class="col-6">
-                    <label for="pepDropdown">Selecione o PEP</label>
-                    <select id="pepDropdown" required></select>
-                </div>
-                <div class="col-6">
-                    <label for="pepValue">Valor do PEP</label>
-                    <input type="number" id="pepValue" readonly step="0.01" />
-                </div>
-            </div>
-        </fieldset>
-
-        <fieldset class="form-section">
-            <legend>Indicadores de Desempenho</legend>
-            <p class="section-intro">Informe os indicadores que serão acompanhados e os valores esperados após o projeto.</p>
-            <div class="grid">
-                <div class="col-3">
-                    <label for="kpiType">Tipo de KPI</label>
-                    <input id="kpiType" name="kpiType" type="text" required maxlength="120" />
-                </div>
-
-                <div class="col-3">
-                    <label for="kpiName">Nome do KPI</label>
-                    <input id="kpiName" name="kpiName" type="text" required maxlength="160" />
-                </div>
-
-                <div class="col-6">
-                    <label for="kpiDescription">Descrição do KPI</label>
-                    <textarea id="kpiDescription" name="kpiDescription" required maxlength="1500"
-                        placeholder="Explique como o KPI será impactado pelo projeto..."></textarea>
-                </div>
-
-                <div class="col-3">
-                    <label for="kpiCurrent">KPI Atual</label>
-                    <input id="kpiCurrent" name="kpiCurrent" type="number" min="0" step="0.01" inputmode="decimal" required />
-                </div>
-
-                <div class="col-3">
-                    <label for="kpiExpected">KPI Esperado</label>
-                    <input id="kpiExpected" name="kpiExpected" type="number" min="0" step="0.01" inputmode="decimal" required />
-                </div>
-            </div>
-        </fieldset>
-
-        <!-- ================================================================= -->
-        <!-- Agrupamento condicional de marcos e atividades visível em CAPEX alto -->
-        <div id="milestoneSection" style="display:none;">
-            <fieldset class="form-section milestones-section">
-                <legend>KEY PROJECTS</legend>
-                <p class="muted">
-                    Projetos com orçamento acima de R$ 1.000.000,00 devem detalhar marcos e atividades indicando valores, prazos,
-                    descrição e fornecedores. Utilize os botões abaixo para organizar cada etapa do projeto.
-                </p>
-                <div class="btn-row vs">
-                    <button class="btn" type="button" id="addMilestoneBtn">+ Adicionar marco</button>
-                    <!-- <span id="milestoneReq" class="badge" title="Obrigatório quando CAPEX &gt; R$ 1 mi">requisito condicionado ao CAPEX</span> -->
-                </div>
-                <div id="milestones"></div>
-                <div class="muted">Cada marco deve possuir pelo menos <strong>2 atividade</strong> com todos os campos válidos e preenchidos.</div>
-            </fieldset>
-
-            <div class="divider"></div>
+  <!-- =============================================================== -->
+  <!-- Formulário de criação/edição de projetos CAPEX -->
+  <!-- =============================================================== -->
+  <div id="formOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="formTitle">
+    <form id="projectForm" class="project-form" novalidate>
+      <div class="form-header">
+        <h2 id="formTitle">Novo Projeto</h2>
+        <div class="form-header-actions">
+          <button type="button" id="closeFormBtn" class="btn ghost">Fechar</button>
         </div>
+      </div>
 
-        <div class="btn-row right">
-            <button type="reset" class="btn ghost">
-                <span class="material-symbols-outlined">cleaning_services</span>
-                Limpar
-            </button>
-            <button type="button" id="saveDraftBtn" class="btn secondary">
-                <span class="material-symbols-outlined">save_as</span>
-                Salvar rascunho
-            </button>
-            <button type="submit" class="btn primary">
-                <span class="material-symbols-outlined">send</span>
-                Enviar formulário
-            </button>
+      <input type="hidden" id="statusField" value="Rascunho">
+
+      <div id="formStatus" class="feedback" aria-live="polite"></div>
+      <div id="formErrors" class="feedback error" aria-live="assertive"></div>
+
+      <!-- ============================== -->
+      <!-- 1. Informações SAP             -->
+      <!-- ============================== -->
+      <fieldset class="form-section">
+        <legend>1. Informações SAP</legend>
+        <div class="field-group">
+          <label for="projectName">Nome do Projeto</label>
+          <input id="projectName" name="projectName" type="text" required maxlength="255" placeholder="Título do projeto">
         </div>
+        <div class="field-grid">
+          <div class="field-group">
+            <label for="category">Categoria</label>
+            <input id="category" name="category" type="text" required maxlength="120">
+          </div>
+          <div class="field-group">
+            <label for="investmentType">Tipo de Investimento</label>
+            <input id="investmentType" name="investmentType" type="text" required maxlength="120">
+          </div>
+          <div class="field-group">
+            <label for="assetType">Tipo de Ativo</label>
+            <input id="assetType" name="assetType" type="text" required maxlength="120">
+          </div>
+          <div class="field-group">
+            <label for="projectFunction">Função do Projeto</label>
+            <input id="projectFunction" name="projectFunction" type="text" required maxlength="160">
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ============================== -->
+      <!-- 2. Planejamento Temporal       -->
+      <!-- ============================== -->
+      <fieldset class="form-section">
+        <legend>2. Planejamento Temporal</legend>
+        <div class="field-grid">
+          <div class="field-group">
+            <label for="approvalYear">Ano de Aprovação</label>
+            <input id="approvalYear" name="approvalYear" type="number" min="1900" max="9999" required>
+          </div>
+          <div class="field-group">
+            <label for="startDate">Data de Início</label>
+            <input id="startDate" name="startDate" type="date" required>
+          </div>
+          <div class="field-group">
+            <label for="endDate">Data de Término</label>
+            <input id="endDate" name="endDate" type="date" required>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ============================== -->
+      <!-- 3. Orçamento e Recursos        -->
+      <!-- ============================== -->
+      <fieldset class="form-section">
+        <legend>3. Orçamento e Recursos</legend>
+        <div class="field-grid">
+          <div class="field-group">
+            <label for="projectBudget">Orçamento do Projeto em R$</label>
+            <input id="projectBudget" name="projectBudget" type="number" min="0" step="0.01" required>
+            <small id="budgetHint" class="hint"></small>
+          </div>
+          <div class="field-group">
+            <label for="investmentLevel">Nível de Investimento</label>
+            <input id="investmentLevel" name="investmentLevel" type="text" required maxlength="120">
+          </div>
+          <div class="field-group">
+            <label for="fundingSource">Origem da Verba</label>
+            <input id="fundingSource" name="fundingSource" type="text" required maxlength="120">
+          </div>
+          <div class="field-group">
+            <label for="depreciationCostCenter">C Custo Depreciação</label>
+            <input id="depreciationCostCenter" name="depreciationCostCenter" type="text" required maxlength="80">
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ============================== -->
+      <!-- 4. Localização Operacional     -->
+      <!-- ============================== -->
+      <fieldset class="form-section">
+        <legend>4. Localização Operacional</legend>
+        <div class="field-grid">
+          <div class="field-group">
+            <label for="company">Empresa</label>
+            <input id="company" name="company" type="text" required maxlength="120">
+          </div>
+          <div class="field-group">
+            <label for="center">Centro</label>
+            <input id="center" name="center" type="text" required maxlength="80">
+          </div>
+          <div class="field-group">
+            <label for="unit">Unidade</label>
+            <input id="unit" name="unit" type="text" required maxlength="80">
+          </div>
+          <div class="field-group">
+            <label for="location">Local de Implantação</label>
+            <input id="location" name="location" type="text" required maxlength="160">
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ============================== -->
+      <!-- 5. Responsáveis                -->
+      <!-- ============================== -->
+      <fieldset class="form-section">
+        <legend>5. Responsáveis</legend>
+        <div class="field-grid">
+          <div class="field-group">
+            <label for="projectUser">Project User</label>
+            <input id="projectUser" name="projectUser" type="text" required maxlength="160">
+          </div>
+          <div class="field-group">
+            <label for="projectLeader">Coordenador do Projeto</label>
+            <input id="projectLeader" name="projectLeader" type="text" required maxlength="160">
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ============================== -->
+      <!-- 6. Detalhamento Complementar   -->
+      <!-- ============================== -->
+      <fieldset class="form-section">
+        <legend>6. Detalhamento Complementar</legend>
+        <div class="field-group">
+          <label for="businessNeed">Sumário do Projeto</label>
+          <textarea id="businessNeed" name="businessNeed" rows="4" required></textarea>
+        </div>
+        <div class="field-group">
+          <label for="proposedSolution">Comentário</label>
+          <textarea id="proposedSolution" name="proposedSolution" rows="4"></textarea>
+        </div>
+      </fieldset>
+
+      <!-- ============================== -->
+      <!-- 7. Elemento PEP (até 1MM)      -->
+      <!-- ============================== -->
+      <fieldset id="simplePepSection" class="form-section hidden">
+        <legend>7. Elemento PEP</legend>
+        <p class="hint">Disponível apenas quando o orçamento é inferior a R$ 1.000.000,00.</p>
+        <div id="simplePepList" class="dynamic-list"></div>
+        <button type="button" id="addSimplePepBtn" class="btn ghost">Adicionar PEP</button>
+      </fieldset>
+
+      <!-- ============================== -->
+      <!-- 8. Indicadores de Desempenho   -->
+      <!-- ============================== -->
+      <fieldset class="form-section">
+        <legend>8. Indicadores de Desempenho</legend>
+        <div class="field-grid">
+          <div class="field-group">
+            <label for="kpiType">Tipo de KPI</label>
+            <input id="kpiType" name="kpiType" type="text" maxlength="120">
+          </div>
+          <div class="field-group">
+            <label for="kpiName">Nome do KPI</label>
+            <input id="kpiName" name="kpiName" type="text" maxlength="160">
+          </div>
+          <div class="field-group">
+            <label for="kpiCurrent">KPI Atual</label>
+            <input id="kpiCurrent" name="kpiCurrent" type="number" step="0.01">
+          </div>
+          <div class="field-group">
+            <label for="kpiExpected">KPI Esperado</label>
+            <input id="kpiExpected" name="kpiExpected" type="number" step="0.01">
+          </div>
+        </div>
+        <div class="field-group">
+          <label for="kpiDescription">Descrição do KPI</label>
+          <textarea id="kpiDescription" name="kpiDescription" rows="3"></textarea>
+        </div>
+      </fieldset>
+
+      <!-- ============================== -->
+      <!-- 9. Key Projects (a partir 1MM) -->
+      <!-- ============================== -->
+      <fieldset id="keyProjectSection" class="form-section hidden">
+        <legend>9. KEY Projects</legend>
+        <p class="hint">Disponível quando o orçamento é igual ou superior a R$ 1.000.000,00.</p>
+        <div id="milestoneList" class="dynamic-list"></div>
+        <button type="button" id="addMilestoneBtn" class="btn ghost">Adicionar Marco</button>
+      </fieldset>
+
+      <div class="form-actions">
+        <button type="submit" id="saveProjectBtn" class="btn primary">Salvar</button>
+        <button type="button" id="sendApprovalBtn" class="btn accent">Enviar para Aprovação</button>
+      </div>
     </form>
+  </div>
 
-    <!-- ===================================================================== -->
-    <!-- Renderização de Gantt: placeholder para o gráfico do cronograma -->
-    <h3 id="ganttCharTitle" style="display: none;">Programação do Projeto</h3>
-    <div id="ganttChart"></div>
+  <!-- =============================================================== -->
+  <!-- Templates para listas dinâmicas (PEPs, marcos e atividades)    -->
+  <!-- =============================================================== -->
+  <template id="simplePepTemplate">
+    <div class="pep-row" data-pep-id="">
+      <div class="field-group">
+        <label>Elemento PEP</label>
+        <input type="text" class="pep-title" maxlength="120" required>
+      </div>
+      <div class="field-group">
+        <label>Valor do PEP (R$)</label>
+        <input type="number" class="pep-amount" min="0" step="0.01" required>
+      </div>
+      <div class="field-group">
+        <label>Ano do PEP</label>
+        <input type="number" class="pep-year" min="1900" max="9999" required>
+      </div>
+      <button type="button" class="btn danger remove-row">Remover</button>
+    </div>
+  </template>
 
-    <!-- ===================================================================== -->
-    <!-- Templates (milestone e activity): estruturas clonadas dinamicamente -->
-    <template id="milestoneTemplate">
-        <div class="milestone" data-milestone>
-            <div class="milestone-header">
-                <div class="milestone-title" style="min-width:260px;">
-                    <label>Nome do Marco</label>
-                    <input type="text" class="milestone-name" required maxlength="160" />
-                </div>
-                <div class="btn-row">
-                    <button type="button" class="btn" data-add-activity>+ Adicionar atividade</button>
-                    <button type="button" class="btn danger" data-remove-milestone>Remover marco</button>
-                </div>
-            </div>
-            <div class="activities" data-activities></div>
+  <template id="milestoneTemplate">
+    <div class="milestone" data-milestone-id="">
+      <div class="milestone-header">
+        <div class="field-group">
+          <label>Nome do Marco</label>
+          <input type="text" class="milestone-title" maxlength="160" required>
         </div>
-    </template>
+        <button type="button" class="btn danger remove-milestone">Remover Marco</button>
+      </div>
+      <div class="activity-list"></div>
+      <button type="button" class="btn ghost add-activity">Adicionar Atividade</button>
+    </div>
+  </template>
 
-    <template id="activityTemplate">
-        <div class="activity" data-activity>
-            <div class="activity-grid grid">
-                <div class="activity-field activity-field-title col-6">
-                    <label>Título da Atividade</label>
-                    <input type="text" class="act-title" required maxlength="160" placeholder="Ex.: Compra do laminador" />
-                </div>
-                <div class="activity-field activity-field-years col-6">
-                    <label class="activity-year-title">Valor CAPEX da Atividade</label>
-                    <p class="activity-year-hint muted">Informe início e término para gerar os valores anuais da atividade.</p>
-                    <div class="activity-year-list" data-year-fields></div>
-                </div>
-                <div class="activity-field activity-field-start col-2">
-                    <label>Início da Atividade</label>
-                    <input type="date" class="act-start" required />
-                </div>
-                <div class="activity-field activity-field-end col-2">
-                    <label>Término da Atividade</label>
-                    <input type="date" class="act-end" required />
-                </div>
-                <div class="activity-field col-6">
-                    <label>Elemento PEP</label>
-                    <select class="act-pep" required></select>
-                </div>
-                <div class="activity-field activity-field-overview col-6">
-                    <label>Descrição Geral da Atividade</label>
-                    <textarea class="act-overview" required maxlength="600"
-                        placeholder="Descreva objetivos, entregáveis e premissas da atividade."></textarea>
-                </div>
-            </div>
-            <div class="activity-footer btn-row vs">
-                <button type="button" class="btn danger icon" data-remove-activity>
-                    <span class="material-symbols-outlined">delete</span>
-                </button>
-            </div>
+  <template id="activityTemplate">
+    <div class="activity" data-activity-id="">
+      <div class="activity-header">
+        <h4>Atividade</h4>
+        <button type="button" class="btn danger remove-activity">Remover Atividade</button>
+      </div>
+      <div class="field-grid">
+        <div class="field-group">
+          <label>Título da Atividade</label>
+          <input type="text" class="activity-title" maxlength="160" required>
         </div>
-    </template>
+        <div class="field-group">
+          <label>Início da Atividade</label>
+          <input type="date" class="activity-start" required>
+        </div>
+        <div class="field-group">
+          <label>Término da Atividade</label>
+          <input type="date" class="activity-end" required>
+        </div>
+      </div>
+      <div class="field-grid">
+        <div class="field-group">
+          <label>Fornecedor</label>
+          <input type="text" class="activity-supplier" maxlength="160">
+        </div>
+        <div class="field-group">
+          <label>Descrição Geral da Atividade</label>
+          <textarea class="activity-description" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="activity-pep-list"></div>
+      <button type="button" class="btn ghost add-activity-pep">Adicionar PEP da Atividade</button>
+    </div>
+  </template>
 
-    <!-- ===================================================================== -->
-    <!-- Dependências externas e script principal para lógica de interação -->
-    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-    <script src="./script.js"></script>
+  <template id="activityPepTemplate">
+    <div class="activity-pep" data-pep-id="">
+      <div class="field-group">
+        <label>Elemento PEP</label>
+        <input type="text" class="activity-pep-title" maxlength="120" required>
+      </div>
+      <div class="field-group">
+        <label>Valor CAPEX da atividade (R$)</label>
+        <input type="number" class="activity-pep-amount" min="0" step="0.01" required>
+      </div>
+      <div class="field-group">
+        <label>Ano</label>
+        <input type="number" class="activity-pep-year" min="1900" max="9999" required>
+      </div>
+      <button type="button" class="btn danger remove-activity-pep">Remover</button>
+    </div>
+  </template>
+
+  <script src="script.js" type="module"></script>
 </body>
-
 </html>
