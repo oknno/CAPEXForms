@@ -1222,7 +1222,6 @@ class SPRestApi {
         const start = a.querySelector('.act-start');
         const end = a.querySelector('.act-end');
         const overviewEl = a.querySelector('.act-overview');
-        const supplierEl = a.querySelector('.act-supplier');
         const yearRows = [...a.querySelectorAll('.row[data-year]')];
 
         if (!title.value.trim()) errs.push(`Atividade ${jdx} do marco ${idx}: informe o <strong>título</strong>.`);
@@ -1236,10 +1235,6 @@ class SPRestApi {
             errs.push(`Atividade ${jdx} do marco ${idx}: informe a <strong>descrição da atividade</strong>.`);
             errsEl.push(overviewEl);
           }
-        }
-        if (!supplierEl || !supplierEl.value.trim()) {
-          errs.push(`Atividade ${jdx} do marco ${idx}: informe o <strong>fornecedor da atividade</strong>.`);
-          if (supplierEl) errsEl.push(supplierEl);
         }
         if (yearRows.length === 0) {
           errs.push(`Atividade ${jdx} do marco ${idx}: defina <strong>datas de início e fim</strong> válidas para gerar campos anuais.`);
