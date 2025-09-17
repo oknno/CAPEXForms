@@ -463,7 +463,7 @@ class SPRestApi {
     titleEl.textContent = item.Title || '';
     const statusBadge = document.createElement('span');
     statusBadge.className = 'status-badge';
-    const statusValue = item.status || item.Status || '';
+    const statusValue = item.status || '';
     statusBadge.textContent = statusValue;
     statusBadge.style.background = getStatusColor(statusValue);
     header.append(titleEl, statusBadge);
@@ -471,12 +471,12 @@ class SPRestApi {
     const grid = document.createElement('div');
     grid.className = 'details-grid';
 
-    const budgetCard = createDetailCard('Orçamento', BRL.format((item.budgetBrl ?? item.CapexBudgetBRL) || 0), 'budget-value');
-    const responsible = createDetailCard('Responsável', item.projectLeader || item.projectUser || item.Responsavel || '');
-    const startDate = createDetailCard('Data de Início', formatDate(item.startDate || item.DataInicio));
-    const endDate = createDetailCard('Data de Conclusão', formatDate(item.endDate || item.DataFim || item.DataConclusao));
+    const budgetCard = createDetailCard('Orçamento', BRL.format(item.budgetBrl ?? 0), 'budget-value');
+    const responsible = createDetailCard('Responsável', item.projectLeader || item.projectUser || '');
+    const startDate = createDetailCard('Data de Início', formatDate(item.startDate));
+    const endDate = createDetailCard('Data de Conclusão', formatDate(item.endDate));
 
-    const descriptionCard = createDetailCard('Descrição do Projeto', item.businessNeed || item.proposedSolution || item.SumarioProjeto || item.NecessidadeNegocio || item.ComentarioProjeto || item.Descricao || '');
+    const descriptionCard = createDetailCard('Descrição do Projeto', item.businessNeed || item.proposedSolution || '');
     descriptionCard.classList.add('detail-desc');
 
     grid.append(budgetCard, responsible, startDate, endDate, descriptionCard);
@@ -496,7 +496,7 @@ class SPRestApi {
       return button;
     };
 
-    const status = item.status || item.Status || '';
+    const status = item.status || '';
 
     switch (status) {
       case 'Rascunho':
@@ -553,7 +553,7 @@ class SPRestApi {
 
       const statusBadge = document.createElement('span');
       statusBadge.className = 'status-badge';
-      const statusValue = item.status || item.Status;
+      const statusValue = item.status || '';
       statusBadge.style.background = getStatusColor(statusValue);
       statusBadge.textContent = statusValue || '';
 
@@ -561,8 +561,8 @@ class SPRestApi {
       title.textContent = item.Title || '';
 
       const budget = document.createElement('p');
-      const budgetValue = item.budgetBrl ?? item.CapexBudgetBRL;
-      budget.textContent = BRL.format(budgetValue || 0);
+      const budgetValue = item.budgetBrl;
+      budget.textContent = BRL.format(budgetValue ?? 0);
 
       card.append(statusBadge, title, budget);
       card.addEventListener('click', async () => {
@@ -580,32 +580,32 @@ class SPRestApi {
   // Preenche o formulário com os dados recuperados do SharePoint
   function fillForm(item) {
     document.getElementById('projectName').value = item.Title || '';
-    document.getElementById('approvalYear').value = item.approvalYear || item.AnoAprovacao || '';
-    document.getElementById('projectBudget').value = item.budgetBrl || item.CapexBudgetBRL || '';
-    document.getElementById('investmentLevel').value = item.investmentLevel || item.NivelInvestimento || '';
-    document.getElementById('fundingSource').value = item.fundingSource || item.OrigemVerba || '';
-    document.getElementById('unit').value = item.unit || item.Unidade || '';
-    document.getElementById('center').value = item.center || item.Centro || '';
-    document.getElementById('projectLocation').value = item.location || item.LocalImplantacao || '';
-    document.getElementById('projectUser').value = item.projectUser || item.ProjectUser || '';
-    document.getElementById('projectLeader').value = item.projectLeader || item.ProjectLeader || '';
-    document.getElementById('company').value = item.company || item.Empresa || '';
-    document.getElementById('depreciationCostCenter').value = item.depreciationCostCenter || item.CCustoDepreciacao || '';
-    document.getElementById('category').value = item.category || item.Categoria || '';
-    document.getElementById('investmentType').value = item.investmentType || item.TipoInvestimento || '';
-    document.getElementById('assetType').value = item.assetType || item.TipoAtivo || '';
-    document.getElementById('projectFunction').value = item.projectFunction || item.FuncaoProjeto || '';
-    const startVal = item.startDate || item.DataInicio || item.DataInicioProjeto || '';
-    const endVal = item.endDate || item.DataFim || item.DataFimProjeto || '';
+    document.getElementById('approvalYear').value = item.approvalYear ?? '';
+    document.getElementById('projectBudget').value = item.budgetBrl ?? '';
+    document.getElementById('investmentLevel').value = item.investmentLevel ?? '';
+    document.getElementById('fundingSource').value = item.fundingSource ?? '';
+    document.getElementById('unit').value = item.unit ?? '';
+    document.getElementById('center').value = item.center ?? '';
+    document.getElementById('projectLocation').value = item.location ?? '';
+    document.getElementById('projectUser').value = item.projectUser ?? '';
+    document.getElementById('projectLeader').value = item.projectLeader ?? '';
+    document.getElementById('company').value = item.company ?? '';
+    document.getElementById('depreciationCostCenter').value = item.depreciationCostCenter ?? '';
+    document.getElementById('category').value = item.category ?? '';
+    document.getElementById('investmentType').value = item.investmentType ?? '';
+    document.getElementById('assetType').value = item.assetType ?? '';
+    document.getElementById('projectFunction').value = item.projectFunction ?? '';
+    const startVal = item.startDate ?? '';
+    const endVal = item.endDate ?? '';
     document.getElementById('startDate').value = startVal ? startVal.substring(0, 10) : '';
     document.getElementById('endDate').value = endVal ? endVal.substring(0, 10) : '';
-    document.getElementById('projectSummary').value = item.businessNeed || item.SumarioProjeto || item.NecessidadeNegocio || '';
-    document.getElementById('projectComment').value = item.proposedSolution || item.ComentarioProjeto || item.SolucaoProposta || '';
-    document.getElementById('kpiType').value = item.kpiType || item.TipoKPI || item.KpiImpactado || '';
-    document.getElementById('kpiName').value = item.kpiName || item.NomeKPI || '';
-    document.getElementById('kpiDescription').value = item.kpiDescription || item.KpiDescricao || '';
-    document.getElementById('kpiCurrent').value = item.kpiCurrent || item.KpiValorAtual || '';
-    document.getElementById('kpiExpected').value = item.kpiExpected || item.KpiValorEsperado || '';
+    document.getElementById('projectSummary').value = item.businessNeed ?? '';
+    document.getElementById('projectComment').value = item.proposedSolution ?? '';
+    document.getElementById('kpiType').value = item.kpiType ?? '';
+    document.getElementById('kpiName').value = item.kpiName ?? '';
+    document.getElementById('kpiDescription').value = item.kpiDescription ?? '';
+    document.getElementById('kpiCurrent').value = item.kpiCurrent ?? '';
+    document.getElementById('kpiExpected').value = item.kpiExpected ?? '';
     updateCapexFlag();
     updateMilestoneVisibility();
   }
@@ -617,7 +617,7 @@ class SPRestApi {
     fillForm(item);
     const msData = await fetchProjectStructure(id);
     setMilestonesData(msData);
-    const statusValue = item.status || item.Status || '';
+    const statusValue = item.status || '';
     const editable = ['Rascunho', 'Reprovado para Revisão'].includes(statusValue);
     [...form.elements].forEach(el => el.disabled = !editable);
     if (saveDraftBtn) saveDraftBtn.style.display = editable ? 'inline-flex' : 'none';
@@ -940,15 +940,15 @@ class SPRestApi {
       const acts = [];
       for (const act of actRes.d?.results || []) {
         const alRes = await Peps.getItems({ select: 'year,amountBrl,pepName', filter: `activityIdId eq ${act.Id}` });
-        const anual = (alRes.d?.results || []).map(a => ({ ano: a.year ?? a.Ano, capex_brl: a.amountBrl ?? a.CapexBRL, descricao: a.pepName ?? a.Descricao }));
+        const anual = (alRes.d?.results || []).map(a => ({ ano: a.year, capex_brl: a.amountBrl, descricao: a.pepName }));
         acts.push({
           titulo: act.Title,
-          inicio: act.startDate || act.DataInicio,
-          fim: act.endDate || act.DataFim,
-          elementoPep: act.PEPElement || act.ElementoPEP,
-          descricao: act.activityDescription || act.DescricaoAtividade,
-          fornecedor: act.supplier || act.FornecedorAtividade,
-          descricaoFornecedor: (act.supplierNotes || act.DescricaoFornecedorAtividade || ''),
+          inicio: act.startDate,
+          fim: act.endDate,
+          elementoPep: act.PEPElement,
+          descricao: act.activityDescription,
+          fornecedor: act.supplier,
+          descricaoFornecedor: act.supplierNotes || '',
           anual
         });
       }
