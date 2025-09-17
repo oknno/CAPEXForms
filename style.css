@@ -437,7 +437,11 @@ p {
 .field-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.field-group.full-width {
+  grid-column: 1 / -1;
 }
 
 .hint {
@@ -575,5 +579,9 @@ p {
 
   .project-form {
     padding: 24px;
+  }
+
+  .field-grid {
+    grid-template-columns: 1fr;
   }
 }
