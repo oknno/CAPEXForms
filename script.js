@@ -359,6 +359,205 @@ function drawGantt(milestones) {
 }
 
 // ============================================================================
+// Gantt Chart
+// ============================================================================
+let ganttLoaderStarted = false;
+let ganttReady = false;
+let ganttRefreshScheduled = false;
+
+function initGantt() {
+  if (ganttLoaderStarted) return;
+  if (!window.google || !google.charts) return;
+  ganttLoaderStarted = true;
+  google.charts.load('current', { packages: ['gantt'] });
+  google.charts.setOnLoadCallback(() => {
+    ganttReady = true;
+    refreshGantt();
+  });
+}
+
+function queueGanttRefresh() {
+  if (ganttRefreshScheduled) return;
+  ganttRefreshScheduled = true;
+  requestAnimationFrame(() => {
+    ganttRefreshScheduled = false;
+    refreshGantt();
+  });
+}
+
+function refreshGantt() {
+  if (!ganttContainer) return;
+  if (keyProjectSection.classList.contains('hidden')) {
+    ganttContainer.classList.add('hidden');
+    if (ganttChartEl) {
+      ganttChartEl.innerHTML = '';
+    }
+    return;
+  }
+
+  const milestones = collectMilestonesForGantt();
+  const draw = () => drawGantt(milestones);
+
+  if (ganttReady && window.google?.visualization?.Gantt) {
+    draw();
+  } else if (ganttLoaderStarted && window.google?.charts) {
+    google.charts.setOnLoadCallback(draw);
+  } else {
+    initGantt();
+  }
+}
+
+function collectMilestonesForGantt() {
+  const milestones = [];
+  if (!milestoneList) return milestones;
+
+  milestoneList.querySelectorAll('.milestone').forEach((milestoneEl, index) => {
+    const titleInput = milestoneEl.querySelector('.milestone-title');
+    const nome = titleInput?.value.trim() || `Marco ${index + 1}`;
+    const atividades = [];
+
+    milestoneEl.querySelectorAll('.activity').forEach((activityEl, actIndex) => {
+      const title = activityEl.querySelector('.activity-title')?.value.trim() || `Atividade ${actIndex + 1}`;
+      const inicio = activityEl.querySelector('.activity-start')?.value || null;
+      const fim = activityEl.querySelector('.activity-end')?.value || null;
+      const anual = [];
+
+      activityEl.querySelectorAll('.activity-pep').forEach((pepEl) => {
+        const ano = parseNumber(pepEl.querySelector('.activity-pep-year')?.value);
+        const amountRaw = parseFloat(pepEl.querySelector('.activity-pep-amount')?.value);
+        const amount = Number.isFinite(amountRaw) ? amountRaw : 0;
+        const descricao = pepEl.querySelector('.activity-pep-title')?.value.trim() || '';
+
+        if (!descricao && !ano && amount === 0) {
+          return;
+        }
+
+        anual.push({
+          ano,
+          capex_brl: amount,
+          descricao
+        });
+      });
+
+      atividades.push({
+        titulo: title,
+        inicio,
+        fim,
+        anual
+      });
+    });
+
+    milestones.push({
+      nome,
+      atividades
+    });
+  });
+
+  return milestones;
+}
+
+function drawGantt(milestones) {
+  if (!ganttContainer || !ganttChartEl || !window.google?.visualization) return;
+
+  const data = new google.visualization.DataTable();
+  data.addColumn('string', 'Task ID');
+  data.addColumn('string', 'Task Name');
+  data.addColumn('string', 'Resource');
+  data.addColumn('date', 'Start Date');
+  data.addColumn('date', 'End Date');
+  data.addColumn('number', 'Duration');
+  data.addColumn('number', 'Percent Complete');
+  data.addColumn('string', 'Dependencies');
+  data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
+
+  const rows = [];
+  let idCounter = 0;
+
+  milestones.forEach((milestone) => {
+    if (!milestone) return;
+    idCounter += 1;
+    let msStart = null;
+    let msEnd = null;
+    const activityRows = [];
+    const activities = Array.isArray(milestone.atividades) ? milestone.atividades : [];
+
+    activities.forEach((activity, index) => {
+      const startDate = activity.inicio ? new Date(activity.inicio) : new Date();
+      const endDate = activity.fim ? new Date(activity.fim) : new Date(startDate.getTime() + 1000 * 60 * 60 * 24);
+      if (!msStart || startDate < msStart) msStart = startDate;
+      if (!msEnd || endDate > msEnd) msEnd = endDate;
+
+      const totalCapex = activity.anual.reduce((total, year) => total + (year.capex_brl || 0), 0);
+      const tooltipLines = activity.anual.map((year) => {
+        const yearLabel = year.ano ?? 'Ano não informado';
+        const description = year.descricao ? ` - ${year.descricao}` : '';
+        return `${yearLabel}: ${BRL.format(year.capex_brl || 0)}${description}`;
+      });
+
+      activityRows.push([
+        `ms-${idCounter}-${index}`,
+        activity.titulo || `Atividade ${index + 1}`,
+        'Atividade',
+        startDate,
+        endDate,
+        null,
+        0,
+        `ms-${idCounter}`,
+        `CAPEX total: ${BRL.format(totalCapex)}${tooltipLines.length ? `<br/>${tooltipLines.join('<br/>')}` : ''}`
+      ]);
+    });
+
+    if (msStart && msEnd) {
+      rows.push([
+        `ms-${idCounter}`,
+        milestone.nome,
+        'milestone',
+        msStart,
+        msEnd,
+        null,
+        0,
+        null,
+        milestone.nome
+      ]);
+    }
+
+    rows.push(...activityRows);
+  });
+
+  if (!rows.length) {
+    ganttChartEl.innerHTML = '';
+    ganttContainer.classList.add('hidden');
+    return;
+  }
+
+  ganttContainer.classList.remove('hidden');
+  if (ganttTitleEl) {
+    ganttTitleEl.classList.remove('hidden');
+  }
+
+  data.addRows(rows);
+  const chart = new google.visualization.Gantt(ganttChartEl);
+  chart.draw(data, {
+    height: Math.max(200, rows.length * 40 + 40),
+    tooltip: { isHtml: true },
+    gantt: {
+      criticalPathEnabled: false,
+      arrow: {
+        angle: 0,
+        width: 0,
+        color: '#ffffff',
+        radius: 0
+      },
+      trackHeight: 30,
+      palette: [
+        { color: '#460a78', dark: '#be2846', light: '#e63c41' },
+        { color: '#f58746', dark: '#e63c41', light: '#ffbe6e' }
+      ]
+    }
+  });
+}
+
+// ============================================================================
 // Inicialização
 // ============================================================================
 function init() {
@@ -530,9 +729,9 @@ async function loadProjectDetails(projectId) {
   try {
     const project = await sp.getItem('Projects', projectId);
     const [milestones, activities, peps] = await Promise.all([
-      sp.getItems('Milestones', { filter: `projectsId eq ${projectId}` }),
-      sp.getItems('Activities', { filter: `projectsId eq ${projectId}` }),
-      sp.getItems('Peps', { filter: `projectsId eq ${projectId}` })
+      sp.getItems('Milestones', { filter: `projectsIdId eq ${projectId}` }),
+      sp.getItems('Activities', { filter: `projectsIdId eq ${projectId}` }),
+      sp.getItems('Peps', { filter: `projectsIdId eq ${projectId}` })
     ]);
 
     const detail = {
@@ -540,8 +739,8 @@ async function loadProjectDetails(projectId) {
       milestones,
       activities,
       peps,
-      simplePeps: peps.filter((pep) => !pep.activitiesId),
-      activityPeps: peps.filter((pep) => pep.activitiesId)
+      simplePeps: peps.filter((pep) => !pep.activitiesIdId),
+      activityPeps: peps.filter((pep) => pep.activitiesIdId)
     };
 
     state.currentDetails = detail;
@@ -818,7 +1017,7 @@ function fillFormWithProject(detail) {
         id: milestone.Id,
         title: milestone.Title
       });
-      const relatedActivities = activities.filter((act) => act.milestonesId === milestone.Id);
+      const relatedActivities = activities.filter((act) => act.milestonesIdId === milestone.Id);
       relatedActivities.forEach((activity) => {
         const relatedPeps = activityPeps.filter((pep) => pep.activitiesId === activity.Id);
         const primaryPep = relatedPeps[0] || null;
@@ -948,7 +1147,6 @@ function ensureMilestoneBlock() {
   const block = createMilestoneBlock();
   milestoneList.append(block);
   addActivityBlock(block);
-  queueGanttRefresh();
 }
 
 function createSimplePepRow({ id = '', title = '', amount = '', year = '' } = {}) {
@@ -1115,8 +1313,7 @@ async function persistSimplePeps(projectId, approvalYear) {
       Title: title,
       amountBrl: amount,
       year,
-      projectsId: projectId,
-      activitiesId: null
+      projectsIdId: projectId
     };
     if (id) {
       await sp.updateItem('Peps', Number(id), payload);
@@ -1150,7 +1347,7 @@ async function persistKeyProjects(projectId) {
     const title = milestone.querySelector('.milestone-title').value.trim();
     const payload = {
       Title: title,
-      projectsId: projectId
+      projectsIdId: projectId
     };
     let milestoneId = Number(id);
     if (id) {
@@ -1170,8 +1367,8 @@ async function persistKeyProjects(projectId) {
         endDate: activity.querySelector('.activity-end').value || null,
         activityDescription: activity.querySelector('.activity-description').value.trim(),
         supplier: activity.querySelector('.activity-supplier').value.trim(),
-        projectsId: projectId,
-        milestonesId: milestoneId
+        projectsIdId: projectId,
+        milestonesIdId: milestoneId
       };
       let activityId = Number(activityIdRaw);
       if (activityIdRaw) {
