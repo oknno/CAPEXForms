@@ -153,6 +153,10 @@ const keyProjectSection = document.getElementById('keyProjectSection');
 const milestoneList = document.getElementById('milestoneList');
 const addMilestoneBtn = document.getElementById('addMilestoneBtn');
 
+const ganttContainer = document.getElementById('ganttContainer');
+const ganttTitleEl = document.getElementById('ganttChartTitle');
+const ganttChartEl = document.getElementById('ganttChart');
+
 const approvalYearInput = document.getElementById('approvalYear');
 const projectBudgetInput = document.getElementById('projectBudget');
 
@@ -160,6 +164,205 @@ const simplePepTemplate = document.getElementById('simplePepTemplate');
 const milestoneTemplate = document.getElementById('milestoneTemplate');
 const activityTemplate = document.getElementById('activityTemplate');
 const activityPepTemplate = document.getElementById('activityPepTemplate');
+
+// ============================================================================
+// Gantt Chart
+// ============================================================================
+let ganttLoaderStarted = false;
+let ganttReady = false;
+let ganttRefreshScheduled = false;
+
+function initGantt() {
+  if (ganttLoaderStarted) return;
+  if (!window.google || !google.charts) return;
+  ganttLoaderStarted = true;
+  google.charts.load('current', { packages: ['gantt'] });
+  google.charts.setOnLoadCallback(() => {
+    ganttReady = true;
+    refreshGantt();
+  });
+}
+
+function queueGanttRefresh() {
+  if (ganttRefreshScheduled) return;
+  ganttRefreshScheduled = true;
+  requestAnimationFrame(() => {
+    ganttRefreshScheduled = false;
+    refreshGantt();
+  });
+}
+
+function refreshGantt() {
+  if (!ganttContainer) return;
+  if (keyProjectSection.classList.contains('hidden')) {
+    ganttContainer.classList.add('hidden');
+    if (ganttChartEl) {
+      ganttChartEl.innerHTML = '';
+    }
+    return;
+  }
+
+  const milestones = collectMilestonesForGantt();
+  const draw = () => drawGantt(milestones);
+
+  if (ganttReady && window.google?.visualization?.Gantt) {
+    draw();
+  } else if (ganttLoaderStarted && window.google?.charts) {
+    google.charts.setOnLoadCallback(draw);
+  } else {
+    initGantt();
+  }
+}
+
+function collectMilestonesForGantt() {
+  const milestones = [];
+  if (!milestoneList) return milestones;
+
+  milestoneList.querySelectorAll('.milestone').forEach((milestoneEl, index) => {
+    const titleInput = milestoneEl.querySelector('.milestone-title');
+    const nome = titleInput?.value.trim() || `Marco ${index + 1}`;
+    const atividades = [];
+
+    milestoneEl.querySelectorAll('.activity').forEach((activityEl, actIndex) => {
+      const title = activityEl.querySelector('.activity-title')?.value.trim() || `Atividade ${actIndex + 1}`;
+      const inicio = activityEl.querySelector('.activity-start')?.value || null;
+      const fim = activityEl.querySelector('.activity-end')?.value || null;
+      const anual = [];
+
+      activityEl.querySelectorAll('.activity-pep').forEach((pepEl) => {
+        const ano = parseNumber(pepEl.querySelector('.activity-pep-year')?.value);
+        const amountRaw = parseFloat(pepEl.querySelector('.activity-pep-amount')?.value);
+        const amount = Number.isFinite(amountRaw) ? amountRaw : 0;
+        const descricao = pepEl.querySelector('.activity-pep-title')?.value.trim() || '';
+
+        if (!descricao && !ano && amount === 0) {
+          return;
+        }
+
+        anual.push({
+          ano,
+          capex_brl: amount,
+          descricao
+        });
+      });
+
+      atividades.push({
+        titulo: title,
+        inicio,
+        fim,
+        anual
+      });
+    });
+
+    milestones.push({
+      nome,
+      atividades
+    });
+  });
+
+  return milestones;
+}
+
+function drawGantt(milestones) {
+  if (!ganttContainer || !ganttChartEl || !window.google?.visualization) return;
+
+  const data = new google.visualization.DataTable();
+  data.addColumn('string', 'Task ID');
+  data.addColumn('string', 'Task Name');
+  data.addColumn('string', 'Resource');
+  data.addColumn('date', 'Start Date');
+  data.addColumn('date', 'End Date');
+  data.addColumn('number', 'Duration');
+  data.addColumn('number', 'Percent Complete');
+  data.addColumn('string', 'Dependencies');
+  data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
+
+  const rows = [];
+  let idCounter = 0;
+
+  milestones.forEach((milestone) => {
+    if (!milestone) return;
+    idCounter += 1;
+    let msStart = null;
+    let msEnd = null;
+    const activityRows = [];
+    const activities = Array.isArray(milestone.atividades) ? milestone.atividades : [];
+
+    activities.forEach((activity, index) => {
+      const startDate = activity.inicio ? new Date(activity.inicio) : new Date();
+      const endDate = activity.fim ? new Date(activity.fim) : new Date(startDate.getTime() + 1000 * 60 * 60 * 24);
+      if (!msStart || startDate < msStart) msStart = startDate;
+      if (!msEnd || endDate > msEnd) msEnd = endDate;
+
+      const totalCapex = activity.anual.reduce((total, year) => total + (year.capex_brl || 0), 0);
+      const tooltipLines = activity.anual.map((year) => {
+        const yearLabel = year.ano ?? 'Ano não informado';
+        const description = year.descricao ? ` - ${year.descricao}` : '';
+        return `${yearLabel}: ${BRL.format(year.capex_brl || 0)}${description}`;
+      });
+
+      activityRows.push([
+        `ms-${idCounter}-${index}`,
+        activity.titulo || `Atividade ${index + 1}`,
+        'Atividade',
+        startDate,
+        endDate,
+        null,
+        0,
+        `ms-${idCounter}`,
+        `CAPEX total: ${BRL.format(totalCapex)}${tooltipLines.length ? `<br/>${tooltipLines.join('<br/>')}` : ''}`
+      ]);
+    });
+
+    if (msStart && msEnd) {
+      rows.push([
+        `ms-${idCounter}`,
+        milestone.nome,
+        'milestone',
+        msStart,
+        msEnd,
+        null,
+        0,
+        null,
+        milestone.nome
+      ]);
+    }
+
+    rows.push(...activityRows);
+  });
+
+  if (!rows.length) {
+    ganttChartEl.innerHTML = '';
+    ganttContainer.classList.add('hidden');
+    return;
+  }
+
+  ganttContainer.classList.remove('hidden');
+  if (ganttTitleEl) {
+    ganttTitleEl.classList.remove('hidden');
+  }
+
+  data.addRows(rows);
+  const chart = new google.visualization.Gantt(ganttChartEl);
+  chart.draw(data, {
+    height: Math.max(200, rows.length * 40 + 40),
+    tooltip: { isHtml: true },
+    gantt: {
+      criticalPathEnabled: false,
+      arrow: {
+        angle: 0,
+        width: 0,
+        color: '#ffffff',
+        radius: 0
+      },
+      trackHeight: 30,
+      palette: [
+        { color: '#460a78', dark: '#be2846', light: '#e63c41' },
+        { color: '#f58746', dark: '#e63c41', light: '#ffbe6e' }
+      ]
+    }
+  });
+}
 
 // ============================================================================
 // Inicialização
@@ -170,6 +373,8 @@ function init() {
   approvalYearInput.value = currentYear;
   approvalYearInput.max = currentYear;
   loadProjects();
+  initGantt();
+  window.addEventListener('load', initGantt, { once: true });
 }
 
 function bindEvents() {
@@ -202,28 +407,37 @@ function bindEvents() {
   });
 
   milestoneList.addEventListener('click', (event) => {
-    if (event.target.classList.contains('remove-milestone')) {
-      event.target.closest('.milestone')?.remove();
+    const { target } = event;
+    if (target.classList.contains('remove-milestone')) {
+      target.closest('.milestone')?.remove();
+      queueGanttRefresh();
       return;
     }
-    if (event.target.classList.contains('add-activity')) {
-      const milestone = event.target.closest('.milestone');
+    if (target.classList.contains('add-activity')) {
+      const milestone = target.closest('.milestone');
       addActivityBlock(milestone);
+      queueGanttRefresh();
       return;
     }
-    if (event.target.classList.contains('remove-activity')) {
-      event.target.closest('.activity')?.remove();
+    if (target.classList.contains('remove-activity')) {
+      target.closest('.activity')?.remove();
+      queueGanttRefresh();
       return;
     }
-    if (event.target.classList.contains('add-activity-pep')) {
-      const activity = event.target.closest('.activity');
+    if (target.classList.contains('add-activity-pep')) {
+      const activity = target.closest('.activity');
       addActivityPepRow(activity);
+      queueGanttRefresh();
       return;
     }
-    if (event.target.classList.contains('remove-activity-pep')) {
-      event.target.closest('.activity-pep')?.remove();
+    if (target.classList.contains('remove-activity-pep')) {
+      target.closest('.activity-pep')?.remove();
+      queueGanttRefresh();
     }
   });
+
+  milestoneList.addEventListener('input', queueGanttRefresh);
+  milestoneList.addEventListener('change', queueGanttRefresh);
 }
 
 // ============================================================================
@@ -560,6 +774,7 @@ function openProjectForm(mode, detail = null) {
 
   updateSimplePepYears();
   overlay.classList.remove('hidden');
+  queueGanttRefresh();
 }
 
 function fillFormWithProject(detail) {
@@ -658,6 +873,8 @@ function fillFormWithProject(detail) {
       ensureMilestoneBlock();
     }
   }
+
+  queueGanttRefresh();
 }
 
 function closeForm() {
@@ -705,6 +922,8 @@ function updateBudgetSections(options = {}) {
       ensureSimplePepRow();
     }
   }
+
+  queueGanttRefresh();
 }
 
 function setSectionInteractive(section, enabled) {
@@ -731,6 +950,7 @@ function ensureMilestoneBlock() {
   const block = createMilestoneBlock();
   milestoneList.append(block);
   addActivityBlock(block, {}, true);
+  queueGanttRefresh();
 }
 
 function createSimplePepRow({ id = '', title = '', amount = '', year = '' } = {}) {
@@ -765,6 +985,7 @@ function addActivityBlock(milestoneElement, data = {}, addDefaultPep = true) {
   if (addDefaultPep) {
     addActivityPepRow(activity);
   }
+  queueGanttRefresh();
   return activity;
 }
 
@@ -783,6 +1004,7 @@ function addActivityPepRow(activityElement, data = {}) {
   const list = activityElement.querySelector('.activity-pep-list');
   const row = createActivityPepRow(data);
   list.append(row);
+  queueGanttRefresh();
   return row;
 }
 
