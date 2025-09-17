@@ -654,6 +654,17 @@
   align-items: start;
 }
 
+#static-mirror .activity-field-title,
+#static-mirror .activity-field-years,
+#static-mirror .activity-field-overview {
+  grid-column: span 6;
+}
+
+#static-mirror .activity-field-start,
+#static-mirror .activity-field-end {
+  grid-column: span 3;
+}
+
 #static-mirror .activity-field {
   display: flex;
   flex-direction: column;
@@ -712,15 +723,12 @@
 
   #static-mirror .activity-field-title,
   #static-mirror .activity-field-years,
-  #static-mirror .activity-field-overview,
-  #static-mirror .activity-field-supplier,
-  #static-mirror .activity-field-supplier-notes {
+  #static-mirror .activity-field-overview {
     grid-column: span 3;
   }
 
   #static-mirror .activity-field-start,
-  #static-mirror .activity-field-end,
-  #static-mirror .activity-field-pep {
+  #static-mirror .activity-field-end {
     grid-column: span 3;
   }
 
@@ -742,8 +750,6 @@
   #static-mirror .activity-field-title,
   #static-mirror .activity-field-start,
   #static-mirror .activity-field-end,
-  #static-mirror .activity-field-pep,
-  #static-mirror .activity-field-supplier,
   #static-mirror .activity-field-overview,
   #static-mirror .activity-field-years {
     grid-column: 1 / -1;
@@ -802,12 +808,6 @@
 #static-mirror .activity-capex .act-year .c-4,
 #static-mirror .activity-capex .act-year .c-8 {
   grid-column: 1 / -1;
-}
-
-#static-mirror .activity-supplier .supplier-description {
-  margin-top: 2px;
-  font-size: 13px;
-  line-height: 1.5;
 }
 
 #static-mirror .activity-actions {
