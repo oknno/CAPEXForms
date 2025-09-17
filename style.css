@@ -288,7 +288,6 @@ p {
   font-size: 13px;
   color: var(--muted);
 }
-
 .project-overview__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -437,7 +436,11 @@ p {
 .field-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+}
+
+.field-grid > .field-group:last-child:nth-child(odd):not(.full-width) {
+  grid-column: 1 / -1;
 }
 
 .field-group.full-width {
