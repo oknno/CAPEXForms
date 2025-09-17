@@ -231,6 +231,10 @@
         <legend>9. KEY Projects</legend>
         <p class="hint">Disponível quando o orçamento é igual ou superior a R$ 1.000.000,00.</p>
         <div id="milestoneList" class="dynamic-list"></div>
+        <div id="ganttContainer" class="gantt-container hidden" aria-live="polite">
+          <h3 id="ganttChartTitle">Cronograma do Projeto</h3>
+          <div id="ganttChart" class="gantt-chart" role="img" aria-label="Gráfico de Gantt do projeto"></div>
+        </div>
         <button type="button" id="addMilestoneBtn" class="btn ghost">Adicionar Marco</button>
       </fieldset>
 
@@ -329,6 +333,7 @@
     </div>
   </template>
 
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="script.js" type="module"></script>
 </body>
 </html>
