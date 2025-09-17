@@ -669,7 +669,7 @@ class SPRestApi {
         currentProjectId = info.d?.Id || info.d?.ID;
       }
       await clearProjectStructure(currentProjectId);
-      await saveProjectStructure(currentProjectId, milestones);
+      await saveProjectStructure(currentProjectId, milestones, data.ano_aprovacao);
       updateStatus('Rascunho salvo.', 'success');
       await loadUserProjects();
     } catch (e) {
@@ -892,37 +892,61 @@ class SPRestApi {
   }
 
   // Persiste marcos, atividades e alocações nas listas secundárias do SharePoint
-  async function saveProjectStructure(projectId, milestones) {
+  async function saveProjectStructure(projectId, milestones, projectApprovalYear) {
     const Milestones = SharePoint.getLista('Milestones');
     const Activities = SharePoint.getLista('Activities');
     const Peps = SharePoint.getLista('Peps');
-    for (const milestone of milestones) {
-      const infoMarco = await Milestones.addItem({ Title: milestone.nome, projectIdId: projectId });
-      const marcoId = infoMarco.d?.Id || infoMarco.d?.ID;
-      for (const atividade of milestone.atividades || []) {
-        const pepElement = atividade.elementoPep || '';
-        const infoAtv = await Activities.addItem({
-          Title: atividade.titulo,
-          startDate: atividade.inicio,
-          endDate: atividade.fim,
+    const projectLookupId = Number(projectId);
+    if (!Number.isFinite(projectLookupId)) {
+      throw new Error('Project ID inválido para salvar a estrutura.');
+    }
+    const approvalYearNumber = Number(projectApprovalYear);
+    const projectYear = Number.isFinite(approvalYearNumber) ? approvalYearNumber : null;
+    const milestonesList = Array.isArray(milestones) ? milestones : [];
+    for (const milestone of milestonesList) {
+      const milestonePayload = {
+        Title: (milestone?.nome || '').trim(),
+        projectIdId: projectLookupId
+      };
+      const infoMarco = await Milestones.addItem(milestonePayload);
+      const marcoIdRaw = infoMarco?.d?.Id ?? infoMarco?.d?.ID;
+      const marcoId = Number(marcoIdRaw);
+      if (!Number.isFinite(marcoId)) {
+        continue;
+      }
+      const atividades = Array.isArray(milestone?.atividades) ? milestone.atividades : [];
+      for (const atividade of atividades) {
+        const pepElement = (atividade?.elementoPep || '').trim();
+        const activityPayload = {
+          Title: (atividade?.titulo || '').trim(),
+          startDate: atividade?.inicio || null,
+          endDate: atividade?.fim || null,
           PEPElement: pepElement,
-          activityDescription: atividade.descricao,
-          supplier: atividade.fornecedor,
-          supplierNotes: atividade.descricaoFornecedor,
+          activityDescription: atividade?.descricao || '',
+          supplier: atividade?.fornecedor || '',
           milestoneIdId: marcoId,
-          projectIdId: projectId
-        });
-        const atvId = infoAtv.d?.Id || infoAtv.d?.ID;
-        for (const anual of atividade.anual || []) {
-          await Peps.addItem({
+          projectIdId: projectLookupId
+        };
+        const infoAtv = await Activities.addItem(activityPayload);
+        const atvIdRaw = infoAtv?.d?.Id ?? infoAtv?.d?.ID;
+        const atvId = Number(atvIdRaw);
+        const anualEntries = Array.isArray(atividade?.anual) ? atividade.anual : [];
+        for (const anual of anualEntries) {
+          const amountNumber = Number(anual?.capex_brl ?? 0);
+          const annualYearNumber = Number(anual?.ano);
+          const pepPayload = {
             Title: pepElement,
-            PEPElement: pepElement,
-            year: anual.ano,
-            amountBrl: anual.capex_brl,
-            pepName: anual.descricao,
-            activityIdId: atvId,
-            projectIdId: projectId
-          });
+            amountBrl: Number.isFinite(amountNumber) ? amountNumber : 0,
+            year: Number.isFinite(projectYear)
+              ? projectYear
+              : (Number.isFinite(annualYearNumber) ? annualYearNumber : null),
+            pepName: anual?.descricao || '',
+            projectIdId: projectLookupId
+          };
+          if (Number.isFinite(atvId)) {
+            pepPayload.activityIdId = atvId;
+          }
+          await Peps.addItem(pepPayload);
         }
       }
     }
@@ -936,19 +960,25 @@ class SPRestApi {
     const msRes = await Milestones.getItems({ select: 'Id,Title', filter: `projectIdId eq ${projectId}` });
     const result = [];
     for (const ms of msRes.d?.results || []) {
-      const actRes = await Activities.getItems({ select: 'Id,Title,startDate,endDate,PEPElement,activityDescription,supplier,supplierNotes', filter: `milestoneIdId eq ${ms.Id}` });
+      const actRes = await Activities.getItems({ select: 'Id,Title,startDate,endDate,PEPElement,activityDescription,supplier', filter: `milestoneIdId eq ${ms.Id}` });
       const acts = [];
       for (const act of actRes.d?.results || []) {
-        const alRes = await Peps.getItems({ select: 'year,amountBrl,pepName', filter: `activityIdId eq ${act.Id}` });
-        const anual = (alRes.d?.results || []).map(a => ({ ano: a.year, capex_brl: a.amountBrl, descricao: a.pepName }));
+        const alRes = await Peps.getItems({ select: 'Title,year,amountBrl,pepName', filter: `activityIdId eq ${act.Id}` });
+        const anual = (alRes.d?.results || []).map(a => ({
+          ano: a.year,
+          capex_brl: a.amountBrl,
+          descricao: a.pepName,
+          pepCode: a.Title
+        }));
+        const pepCodeFromActivity = (act.PEPElement || anual[0]?.pepCode || '').trim();
         acts.push({
           titulo: act.Title,
           inicio: act.startDate,
           fim: act.endDate,
-          elementoPep: act.PEPElement,
+          elementoPep: pepCodeFromActivity,
           descricao: act.activityDescription,
           fornecedor: act.supplier,
-          descricaoFornecedor: act.supplierNotes || '',
+          descricaoFornecedor: '',
           anual
         });
       }
@@ -1318,7 +1348,7 @@ class SPRestApi {
         throw new Error('Project ID inválido retornado pelo SharePoint.');
       }
 
-      await saveProjectStructure(projectId, payload.milestones);
+      await saveProjectStructure(projectId, payload.milestones, payload.projeto.ano_aprovacao);
       updateStatus('Formulário enviado com sucesso!', 'success');
       refreshGantt();
       await loadUserProjects();
