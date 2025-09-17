@@ -337,7 +337,7 @@ class SPRestApi {
 
   // Estados auxiliares controlando marcos, projeto atual e reset silencioso
   let milestoneCount = 0;
-  let currentProjectId = null;
+  let currentProjectsId = null;
   let resetFormWithoutAlert = true;
 
   // Helpers
@@ -385,7 +385,7 @@ class SPRestApi {
   // Limpa o formulário e volta ao estado padrão
   function resetForm() {
     form.reset();
-    currentProjectId = null;
+    currentProjectsId = null;
     [...form.elements].forEach(el => el.disabled = false);
     if (saveDraftBtn) saveDraftBtn.style.display = 'inline-flex';
     submitBtn.style.display = 'inline-flex';
@@ -627,7 +627,7 @@ class SPRestApi {
   // Abre um projeto específico em modo de edição quando permitido
   async function editProject(id) {
     const item = await SharePoint.getLista('Projects').getItemById(id);
-    currentProjectId = id;
+    currentProjectsId = id;
     fillForm(item);
     const msData = await fetchProjectStructure(id);
     setMilestonesData(msData);
@@ -676,14 +676,14 @@ class SPRestApi {
     try {
       let info;
       const projetos = SharePoint.getLista('Projects');
-      if (currentProjectId) {
-        info = await projetos.updateItem(currentProjectId, payload);
+      if (currentProjectsId) {
+        info = await projetos.updateItem(currentProjectsId, payload);
       } else {
         info = await projetos.addItem(payload);
-        currentProjectId = info.d?.Id || info.d?.ID;
+        currentProjectsId = info.d?.Id || info.d?.ID;
       }
-      await clearProjectStructure(currentProjectId);
-      await saveProjectStructure(currentProjectId, milestones, data.ano_aprovacao);
+      await clearProjectStructure(currentProjectsId);
+      await saveProjectStructure(currentProjectsId, milestones, data.ano_aprovacao);
       updateStatus('Rascunho salvo.', 'success');
       await loadUserProjects();
     } catch (e) {
@@ -696,7 +696,7 @@ class SPRestApi {
     try {
       await SharePoint.getLista('Projects').updateItem(id, { status });
       await loadUserProjects();
-      if (currentProjectId === id) {
+      if (currentProjectsId === id) {
         await editProject(id);
       }
     } catch (e) {
@@ -879,12 +879,12 @@ class SPRestApi {
   }
 
   // Remove registros relacionados antes de salvar uma nova versão da estrutura
-  async function clearProjectStructure(projectId) {
+  async function clearProjectStructure(projectsId) {
     const Milestones = SharePoint.getLista('Milestones');
     const Activities = SharePoint.getLista('Activities');
     const Peps = SharePoint.getLista('Peps');
 
-    const msRes = await Milestones.getItems({ select: 'Id', filter: `projectsIdId eq ${projectId}` });
+    const msRes = await Milestones.getItems({ select: 'Id', filter: `projectsIdId eq ${projectsId}` });
     const marcos = msRes.d?.results || [];
     for (const ms of marcos) {
       const actRes = await Activities.getItems({ select: 'Id', filter: `milestonesIdId eq ${ms.Id}` });
@@ -902,11 +902,11 @@ class SPRestApi {
   }
 
   // Persiste marcos, atividades e alocações nas listas secundárias do SharePoint
-  async function saveProjectStructure(projectId, milestones, projectApprovalYear) {
+  async function saveProjectStructure(projectsId, milestones, projectApprovalYear) {
     const Milestones = SharePoint.getLista('Milestones');
     const Activities = SharePoint.getLista('Activities');
     const Peps = SharePoint.getLista('Peps');
-    const projectLookupId = Number(projectId);
+    const projectLookupId = Number(projectsId);
     if (!Number.isFinite(projectLookupId)) {
       throw new Error('Project ID inválido para salvar a estrutura.');
     }
@@ -958,11 +958,11 @@ class SPRestApi {
   }
 
   // Recarrega marcos, atividades e alocações para edição posterior
-  async function fetchProjectStructure(projectId) {
+  async function fetchProjectStructure(projectsId) {
     const Milestones = SharePoint.getLista('Milestones');
     const Activities = SharePoint.getLista('Activities');
     const Peps = SharePoint.getLista('Peps');
-    const msRes = await Milestones.getItems({ select: 'Id,Title', filter: `projectsIdId eq ${projectId}` });
+    const msRes = await Milestones.getItems({ select: 'Id,Title', filter: `projectsIdId eq ${projectsId}` });
     const result = [];
     for (const ms of msRes.d?.results || []) {
       const actRes = await Activities.getItems({ select: 'Id,Title,startDate,endDate,activityDescription', filter: `milestonesIdId eq ${ms.Id}` });
@@ -1339,12 +1339,12 @@ class SPRestApi {
         kpiExpected: payload.projeto.kpi_esperado
       });
 
-      const projectId = Number(infoProjeto?.d?.Id ?? infoProjeto?.d?.ID);
-      if (!Number.isFinite(projectId)) {
+      const projectsId = Number(infoProjeto?.d?.Id ?? infoProjeto?.d?.ID);
+      if (!Number.isFinite(projectsId)) {
         throw new Error('Project ID inválido retornado pelo SharePoint.');
       }
 
-      await saveProjectStructure(projectId, payload.milestones, payload.projeto.ano_aprovacao);
+      await saveProjectStructure(projectsId, payload.milestones, payload.projeto.ano_aprovacao);
       updateStatus('Formulário enviado com sucesso!', 'success');
       refreshGantt();
       await loadUserProjects();
