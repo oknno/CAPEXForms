@@ -84,6 +84,35 @@ p {
   color: var(--red);
 }
 
+.icon-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.icon-btn:hover {
+  background: rgba(230, 60, 65, 0.12);
+  color: var(--red);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid rgba(70, 10, 120, 0.35);
+  outline-offset: 2px;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  font-size: 22px;
+  line-height: 1;
+}
+
 /* ============================================================ */
 /* Cabeçalho                                                     */
 /* ============================================================ */
@@ -288,6 +317,7 @@ p {
   font-size: 13px;
   color: var(--muted);
 }
+
 .project-overview__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -490,7 +520,6 @@ p {
 }
 
 .pep-row,
-.activity-pep,
 .activity,
 .milestone {
   border: 1px solid #ededf5;
@@ -503,7 +532,6 @@ p {
 }
 
 .pep-row button,
-.activity-pep button,
 .activity button,
 .milestone button {
   align-self: flex-start;
@@ -516,14 +544,29 @@ p {
   gap: 12px;
 }
 
+.milestone-header .field-group {
+  flex: 1 1 auto;
+}
+
 .activity-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.activity-list,
-.activity-pep-list {
+.activity-header h4 {
+  margin: 0;
+}
+
+.activity-primary-grid {
+  align-items: start;
+}
+
+.activity .remove-activity {
+  align-self: flex-end;
+}
+
+.activity-list {
   display: flex;
   flex-direction: column;
   gap: 16px;

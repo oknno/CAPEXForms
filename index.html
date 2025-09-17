@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CAPEX Projects</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -271,11 +272,13 @@
   <template id="milestoneTemplate">
     <div class="milestone" data-milestone-id="">
       <div class="milestone-header">
-        <div class="field-group">
+        <div class="field-group full-width">
           <label>Nome do Marco</label>
           <input type="text" class="milestone-title" maxlength="160" required>
         </div>
-        <button type="button" class="btn danger remove-milestone">Remover Marco</button>
+        <button type="button" class="icon-btn remove-milestone" aria-label="Remover marco">
+          <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+        </button>
       </div>
       <div class="activity-list"></div>
       <button type="button" class="btn ghost add-activity">Adicionar Atividade</button>
@@ -283,15 +286,18 @@
   </template>
 
   <template id="activityTemplate">
-    <div class="activity" data-activity-id="">
+    <div class="activity" data-activity-id="" data-pep-id="">
       <div class="activity-header">
         <h4>Atividade</h4>
-        <button type="button" class="btn danger remove-activity">Remover Atividade</button>
       </div>
-      <div class="field-grid">
+      <div class="field-grid activity-primary-grid">
         <div class="field-group">
           <label>Título da Atividade</label>
           <input type="text" class="activity-title" maxlength="160" required>
+        </div>
+        <div class="field-group">
+          <label>Valor da Atividade (R$)</label>
+          <input type="number" class="activity-pep-amount" min="0" step="0.01" required>
         </div>
         <div class="field-group">
           <label>Início da Atividade</label>
@@ -302,38 +308,23 @@
           <input type="date" class="activity-end" required>
         </div>
       </div>
-      <div class="field-grid">
-        <div class="field-group">
-          <label>Fornecedor</label>
-          <input type="text" class="activity-supplier" maxlength="160">
-        </div>
-        <div class="field-group full-width">
-          <label>Descrição Geral da Atividade</label>
-          <textarea class="activity-description" rows="3"></textarea>
-        </div>
+      <div class="field-group full-width">
+        <label>Elemento PEP</label>
+        <input type="text" class="activity-pep-title" maxlength="120" required>
       </div>
-      <div class="activity-pep-list"></div>
-      <button type="button" class="btn ghost add-activity-pep">Adicionar PEP da Atividade</button>
-    </div>
-  </template>
+      <input type="hidden" class="activity-pep-year">
+      <div class="field-group full-width">
+        <label>Fornecedor</label>
+        <input type="text" class="activity-supplier" maxlength="160">
+      </div>
+      <div class="field-group full-width">
+        <label>Descrição Geral da Atividade</label>
+        <textarea class="activity-description" rows="5"></textarea>
 
-  <template id="activityPepTemplate">
-    <div class="activity-pep" data-pep-id="">
-      <div class="field-grid">
-        <div class="field-group">
-          <label>Elemento PEP</label>
-          <input type="text" class="activity-pep-title" maxlength="120" required>
-        </div>
-        <div class="field-group">
-          <label>Valor CAPEX da atividade (R$)</label>
-          <input type="number" class="activity-pep-amount" min="0" step="0.01" required>
-        </div>
-        <div class="field-group">
-          <label>Ano</label>
-          <input type="number" class="activity-pep-year" min="1900" max="9999" required>
-        </div>
       </div>
-      <button type="button" class="btn danger remove-activity-pep">Remover</button>
+      <button type="button" class="icon-btn remove-activity" aria-label="Remover atividade">
+        <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+      </button>
     </div>
   </template>
 
