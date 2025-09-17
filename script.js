@@ -451,7 +451,11 @@ function bindEvents() {
 // ============================================================================
 async function loadProjects() {
   try {
-    const results = await sp.getItems('Projects', { orderby: 'Created desc' });
+    const currentUserId = _spPageContextInfo.userId; // pega o ID do usuário logado
+    const results = await sp.getItems('Projects', { 
+      orderby: 'Created desc',
+      filter: `AuthorId eq ${currentUserId}`
+    });
     state.projects = results;
     renderProjectList();
   } catch (error) {
@@ -490,6 +494,9 @@ function renderProjectList() {
     const content = document.createElement('div');
     content.className = 'project-card-content';
 
+    const bottom = document.createElement('div');
+    bottom.className = 'project-card-bottom';
+
     const status = document.createElement('span');
     status.className = 'project-card-status';
     status.textContent = item.status || 'Sem status';
@@ -510,7 +517,6 @@ function renderProjectList() {
       budgetRow.append(budget);
       content.append(budgetRow);
     }
-
     card.append(accent, content);
     card.addEventListener('click', () => selectProject(item.Id));
     projectList.append(card);
@@ -533,9 +539,9 @@ async function loadProjectDetails(projectId) {
   try {
     const project = await sp.getItem('Projects', projectId);
     const [milestones, activities, peps] = await Promise.all([
-      sp.getItems('Milestones', { filter: `projectsId eq ${projectId}` }),
-      sp.getItems('Activities', { filter: `projectsId eq ${projectId}` }),
-      sp.getItems('Peps', { filter: `projectsId eq ${projectId}` })
+      sp.getItems('Milestones', { filter: `projectsIdId eq ${projectId}` }),
+      sp.getItems('Activities', { filter: `projectsIdId eq ${projectId}` }),
+      sp.getItems('Peps', { filter: `projectsIdId eq ${projectId}` })
     ]);
 
     const detail = {
@@ -543,8 +549,8 @@ async function loadProjectDetails(projectId) {
       milestones,
       activities,
       peps,
-      simplePeps: peps.filter((pep) => !pep.activitiesId),
-      activityPeps: peps.filter((pep) => pep.activitiesId)
+      simplePeps: peps.filter((pep) => !pep.activitiesIdId),
+      activityPeps: peps.filter((pep) => pep.activitiesIdId)
     };
 
     state.currentDetails = detail;
@@ -596,6 +602,7 @@ function renderProjectDetails(detail) {
   highlightGrid.append(
     createHighlightBox('Orçamento', project.budgetBrl ? BRL.format(project.budgetBrl) : '—', { variant: 'budget' }),
     createHighlightBox('Responsável', project.projectLeader || project.projectUser || 'Não informado')
+
   );
   wrapper.append(highlightGrid);
 
@@ -638,7 +645,7 @@ function renderProjectDetails(detail) {
     editBtn.textContent = 'Editar Projeto';
     editBtn.addEventListener('click', () => openProjectForm('edit', detail));
     actions.append(editBtn);
-
+    
     const approveBtn = document.createElement('button');
     approveBtn.type = 'button';
     approveBtn.className = 'btn accent';
@@ -650,6 +657,7 @@ function renderProjectDetails(detail) {
       });
     });
     actions.append(approveBtn);
+
   } else {
     const fallbackBtn = document.createElement('button');
     fallbackBtn.type = 'button';
@@ -657,6 +665,7 @@ function renderProjectDetails(detail) {
     fallbackBtn.textContent = 'Visualizar Projeto';
     fallbackBtn.addEventListener('click', () => openProjectForm('edit', detail));
     actions.append(fallbackBtn);
+
   }
 
   if (actions.childElementCount) {
@@ -809,7 +818,7 @@ function fillFormWithProject(detail) {
         id: milestone.Id,
         title: milestone.Title
       });
-      const relatedActivities = activities.filter((act) => act.milestonesId === milestone.Id);
+      const relatedActivities = activities.filter((act) => act.milestonesIdId === milestone.Id);
       relatedActivities.forEach((activity) => {
         const relatedPeps = activityPeps.filter((pep) => pep.activitiesId === activity.Id);
         const primaryPep = relatedPeps[0] || null;
@@ -1128,8 +1137,7 @@ async function persistSimplePeps(projectId, approvalYear) {
       Title: title,
       amountBrl: amount,
       year,
-      projectsId: projectId,
-      activitiesId: null
+      projectsIdId: projectId
     };
     if (id) {
       await sp.updateItem('Peps', Number(id), payload);
@@ -1163,7 +1171,7 @@ async function persistKeyProjects(projectId) {
     const title = milestone.querySelector('.milestone-title').value.trim();
     const payload = {
       Title: title,
-      projectsId: projectId
+      projectsIdId: projectId
     };
     let milestoneId = Number(id);
     if (id) {
@@ -1183,8 +1191,8 @@ async function persistKeyProjects(projectId) {
         endDate: activity.querySelector('.activity-end').value || null,
         activityDescription: activity.querySelector('.activity-description').value.trim(),
         supplier: activity.querySelector('.activity-supplier').value.trim(),
-        projectsId: projectId,
-        milestonesId: milestoneId
+        projectsIdId: projectId,
+        milestonesIdId: milestoneId
       };
       let activityId = Number(activityIdRaw);
       if (activityIdRaw) {
