@@ -262,6 +262,7 @@ p {
   align-items: flex-start;
   overflow-y: auto;
   padding: 40px 24px;
+  z-index: 10;
 }
 
 .overlay.hidden {
