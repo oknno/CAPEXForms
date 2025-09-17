@@ -511,9 +511,9 @@ async function loadProjectDetails(projectId) {
   try {
     const project = await sp.getItem('Projects', projectId);
     const [milestones, activities, peps] = await Promise.all([
-      sp.getItems('Milestones', { filter: `projectsId eq ${projectId}` }),
-      sp.getItems('Activities', { filter: `projectsId eq ${projectId}` }),
-      sp.getItems('Peps', { filter: `projectsId eq ${projectId}` })
+      sp.getItems('Milestones', { filter: `ProjectsId eq ${projectId}` }),
+      sp.getItems('Activities', { filter: `ProjectsId eq ${projectId}` }),
+      sp.getItems('Peps', { filter: `ProjectsId eq ${projectId}` })
     ]);
 
     const detail = {
@@ -1111,8 +1111,7 @@ async function persistSimplePeps(projectId, approvalYear) {
       Title: title,
       amountBrl: amount,
       year,
-      projectsId: projectId,
-      activitiesId: null
+      ProjectsId: Number(projectId),
     };
     if (id) {
       await sp.updateItem('Peps', Number(id), payload);
@@ -1146,7 +1145,7 @@ async function persistKeyProjects(projectId) {
     const title = milestone.querySelector('.milestone-title').value.trim();
     const payload = {
       Title: title,
-      projectsId: projectId
+      ProjectsId: Number(projectId)
     };
     let milestoneId = Number(id);
     if (id) {
@@ -1166,8 +1165,8 @@ async function persistKeyProjects(projectId) {
         endDate: activity.querySelector('.activity-end').value || null,
         activityDescription: activity.querySelector('.activity-description').value.trim(),
         supplier: activity.querySelector('.activity-supplier').value.trim(),
-        projectsId: projectId,
-        milestonesId: milestoneId
+        ProjectsId: Number(projectId),
+        MilestonesId: Number(milestoneId)
       };
       let activityId = Number(activityIdRaw);
       if (activityIdRaw) {
@@ -1185,8 +1184,8 @@ async function persistKeyProjects(projectId) {
           Title: pepRow.querySelector('.activity-pep-title').value.trim(),
           amountBrl: parseFloat(pepRow.querySelector('.activity-pep-amount').value) || 0,
           year: parseNumber(pepRow.querySelector('.activity-pep-year').value),
-          projectsId: projectId,
-          activitiesId: activityId
+          ProjectsId: Number(projectId),
+          ActivitiesId: Number(activityId)
         };
         let pepId = Number(pepIdRaw);
         if (pepIdRaw) {
