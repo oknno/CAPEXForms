@@ -1032,114 +1032,120 @@ class SPRestApi {
   // CRUD de Peps
   // ========================================================================
   async function clearProjectStructure(projectsId) {
-    const Milestones = SharePoint.getLista('Milestones');
-    const Activities = SharePoint.getLista('Activities');
-    const Peps = SharePoint.getLista('Peps');
+  const Milestones = SharePoint.getLista('milestones');
+  const Activities = SharePoint.getLista('activities');
+  const Peps = SharePoint.getLista('peps');
 
-    const msRes = await Milestones.getItems({ select: 'Id', filter: `projectsId eq ${projectsId}` });
-    const marcos = msRes.d?.results || [];
-    for (const ms of marcos) {
-      const actRes = await Activities.getItems({ select: 'Id', filter: `milestonesId eq ${ms.Id}` });
-      const acts = actRes.d?.results || [];
-      for (const act of acts) {
-        const alRes = await Peps.getItems({ select: 'Id', filter: `activitiesId eq ${act.Id}` });
-        const als = alRes.d?.results || [];
-        for (const al of als) {
-          await Peps.deleteItem(al.Id);
-        }
-        await Activities.deleteItem(act.Id);
+  const msRes = await Milestones.getItems({ select: 'Id', filter: `projectsId eq ${projectsId}` });
+  const marcos = msRes.d?.results || [];
+  for (const ms of marcos) {
+    const actRes = await Activities.getItems({ select: 'Id', filter: `milestonesId eq ${ms.Id}` });
+    const acts = actRes.d?.results || [];
+    for (const act of acts) {
+      const alRes = await Peps.getItems({ select: 'Id', filter: `activitiesId eq ${act.Id}` });
+      const als = alRes.d?.results || [];
+      for (const al of als) {
+        await Peps.deleteItem(al.Id);
       }
-      await Milestones.deleteItem(ms.Id);
+      await Activities.deleteItem(act.Id);
     }
+    await Milestones.deleteItem(ms.Id);
+  }
+}
+
+async function saveProjectStructure(projectsId, milestones, projectApprovalYear) {
+  const Milestones = SharePoint.getLista('milestones');
+  const Activities = SharePoint.getLista('activities');
+  const Peps = SharePoint.getLista('peps');
+  const projectLookupId = Number(projectsId);
+
+  if (!Number.isFinite(projectLookupId)) {
+    throw new Error('Project ID inválido para salvar a estrutura.');
   }
 
-  async function saveProjectStructure(projectsId, milestones, projectApprovalYear) {
-    const Milestones = SharePoint.getLista('Milestones');
-    const Activities = SharePoint.getLista('Activities');
-    const Peps = SharePoint.getLista('Peps');
-    const projectLookupId = Number(projectsId);
-    if (!Number.isFinite(projectLookupId)) {
-      throw new Error('Project ID inválido para salvar a estrutura.');
-    }
-    const approvalYearNumber = Number(projectApprovalYear);
-    const projectYear = Number.isFinite(approvalYearNumber) ? approvalYearNumber : null;
-    const milestonesList = Array.isArray(milestones) ? milestones : [];
-    for (const milestone of milestonesList) {
-      const milestonePayload = {
-        Title: (milestone?.nome || '').trim(),
+  const approvalYearNumber = Number(projectApprovalYear);
+  const projectYear = Number.isFinite(approvalYearNumber) ? approvalYearNumber : null;
+
+  const milestonesList = Array.isArray(milestones) ? milestones : [];
+  for (const milestone of milestonesList) {
+    const milestonePayload = {
+      Title: (milestone?.nome || '').trim(),
+      projectsId: projectLookupId
+    };
+
+    const infoMarco = await Milestones.addItem(milestonePayload);
+    const marcoIdRaw = infoMarco?.d?.Id ?? infoMarco?.d?.ID;
+    const marcoId = Number(marcoIdRaw);
+    if (!Number.isFinite(marcoId)) continue;
+
+    const atividades = Array.isArray(milestone?.atividades) ? milestone.atividades : [];
+    for (const atividade of atividades) {
+      const activityPayload = {
+        Title: (atividade?.titulo || '').trim(),
+        startDate: atividade?.inicio || null,
+        endDate: atividade?.fim || null,
+        activityDescription: atividade?.descricao || '',
+        milestonesId: marcoId,
         projectsId: projectLookupId
       };
-      const infoMarco = await Milestones.addItem(milestonePayload);
-      const marcoIdRaw = infoMarco?.d?.Id ?? infoMarco?.d?.ID;
-      const marcoId = Number(marcoIdRaw);
-      if (!Number.isFinite(marcoId)) {
-        continue;
-      }
-      const atividades = Array.isArray(milestone?.atividades) ? milestone.atividades : [];
-      for (const atividade of atividades) {
-        const activityPayload = {
-          Title: (atividade?.titulo || '').trim(),
-          startDate: atividade?.inicio || null,
-          endDate: atividade?.fim || null,
-          activityDescription: atividade?.descricao || '',
-          milestonesId: marcoId,
-          projectsId: projectLookupId
+
+      const infoAtv = await Activities.addItem(activityPayload);
+      const atvIdRaw = infoAtv?.d?.Id ?? infoAtv?.d?.ID;
+      const atvId = Number(atvIdRaw);
+
+      const anualEntries = Array.isArray(atividade?.anual) ? atividade.anual : [];
+      for (const anual of anualEntries) {
+        const amountNumber = Number(anual?.capex_brl ?? 0);
+        const annualYearNumber = Number(anual?.ano);
+
+        const pepPayload = {
+          Title: String((atividade?.pep || '') || atividade?.titulo || '').trim(),
+          amountBrl: Number.isFinite(amountNumber) ? amountNumber : 0,
+          year: Number.isFinite(projectYear) ? projectYear : (Number.isFinite(annualYearNumber) ? annualYearNumber : null),
+          projectsId: projectLookupId,
+          activitiesId: atvId
         };
-        const infoAtv = await Activities.addItem(activityPayload);
-        const atvIdRaw = infoAtv?.d?.Id ?? infoAtv?.d?.ID;
-        const atvId = Number(atvIdRaw);
-        const anualEntries = Array.isArray(atividade?.anual) ? atividade.anual : [];
-        for (const anual of anualEntries) {
-          const amountNumber = Number(anual?.capex_brl ?? 0);
-          const annualYearNumber = Number(anual?.ano);
-          const pepTitle = String((atividade?.pep || '') || atividade?.titulo || '').trim();
-          const pepPayload = {
-            Title: pepTitle,
-            amountBrl: Number.isFinite(amountNumber) ? amountNumber : 0,
-            year: Number.isFinite(projectYear) ? projectYear : (Number.isFinite(annualYearNumber) ? annualYearNumber : null),
-            projectsIdId: projectLookupId,
-            descricao: atividade?.descricao || ''
-          };
-          if (Number.isFinite(atvId)) {
-            pepPayload.activitiesId = atvId;
-          }
-          await Peps.addItem(pepPayload);
-        }
+
+        await Peps.addItem(pepPayload);
       }
     }
+  }
+}
+
+async function fetchProjectStructure(projectsId) {
+  const Milestones = SharePoint.getLista('milestones');
+  const Activities = SharePoint.getLista('activities');
+  const Peps = SharePoint.getLista('peps');
+
+  const msRes = await Milestones.getItems({ select: 'Id,Title', filter: `projectsId eq ${projectsId}` });
+  const result = [];
+
+  for (const ms of msRes.d?.results || []) {
+    const actRes = await Activities.getItems({ select: 'Id,Title,startDate,endDate,activityDescription', filter: `milestonesId eq ${ms.Id}` });
+    const acts = [];
+
+    for (const act of actRes.d?.results || []) {
+      const alRes = await Peps.getItems({ select: 'Id,Title,year,amountBrl', filter: `activitiesId eq ${act.Id}` });
+      const anual = (alRes.d?.results || []).map(a => ({
+        ano: a.year,
+        capex_brl: a.amountBrl,
+        pepTitle: a.Title
+      }));
+
+      acts.push({
+        titulo: act.Title,
+        inicio: act.startDate,
+        fim: act.endDate,
+        descricao: act.activityDescription || '',
+        anual
+      });
+    }
+
+    result.push({ nome: ms.Title, atividades: acts });
   }
 
-  async function fetchProjectStructure(projectsId) {
-    const Milestones = SharePoint.getLista('Milestones');
-    const Activities = SharePoint.getLista('Activities');
-    const Peps = SharePoint.getLista('Peps');
-    const msRes = await Milestones.getItems({ select: 'Id,Title', filter: `projectsId eq ${projectsId}` });
-    const result = [];
-    for (const ms of msRes.d?.results || []) {
-      const actRes = await Activities.getItems({ select: 'Id,Title,startDate,endDate,activityDescription', filter: `milestonesId eq ${ms.Id}` });
-      const acts = [];
-      for (const act of actRes.d?.results || []) {
-        const alRes = await Peps.getItems({ select: 'Title,year,amountBrl,descricao', filter: `activitiesId eq ${act.Id}` });
-        const anual = (alRes.d?.results || []).map(a => ({
-          ano: a.year,
-          capex_brl: a.amountBrl,
-          descricao: a.descricao || '',
-          pepCode: a.Title
-        }));
-        const pepInfo = anual.find(entry => entry.pepCode);
-        acts.push({
-          titulo: act.Title,
-          inicio: act.startDate,
-          fim: act.endDate,
-          descricao: act.activityDescription || '',
-          pep: pepInfo?.pepCode || '',
-          anual
-        });
-      }
-      result.push({ nome: ms.Title, atividades: acts });
-    }
-    return result;
-  }
+  return result;
+}
 
   // ========================================================================
   // Validações do formulário
