@@ -227,23 +227,18 @@ function collectMilestonesForGantt() {
       const inicio = activityEl.querySelector('.activity-start')?.value || null;
       const fim = activityEl.querySelector('.activity-end')?.value || null;
       const anual = [];
+      const ano = parseNumber(activityEl.querySelector('.activity-pep-year')?.value);
+      const amountRaw = parseFloat(activityEl.querySelector('.activity-pep-amount')?.value);
+      const amount = Number.isFinite(amountRaw) ? amountRaw : 0;
+      const descricao = activityEl.querySelector('.activity-pep-title')?.value.trim() || '';
 
-      activityEl.querySelectorAll('.activity-pep').forEach((pepEl) => {
-        const ano = parseNumber(pepEl.querySelector('.activity-pep-year')?.value);
-        const amountRaw = parseFloat(pepEl.querySelector('.activity-pep-amount')?.value);
-        const amount = Number.isFinite(amountRaw) ? amountRaw : 0;
-        const descricao = pepEl.querySelector('.activity-pep-title')?.value.trim() || '';
-
-        if (!descricao && !ano && amount === 0) {
-          return;
-        }
-
+      if (descricao || ano || amount > 0) {
         anual.push({
           ano,
           capex_brl: amount,
           descricao
         });
-      });
+      }
 
       atividades.push({
         titulo: title,
@@ -957,6 +952,7 @@ function ensureMilestoneBlock() {
   const block = createMilestoneBlock();
   milestoneList.append(block);
   addActivityBlock(block);
+  queueGanttRefresh();
 }
 
 function createSimplePepRow({ id = '', title = '', amount = '', year = '' } = {}) {

@@ -237,6 +237,10 @@
           <div id="ganttChart" class="gantt-chart" role="img" aria-label="Gráfico de Gantt do projeto"></div>
         </div>
         <button type="button" id="addMilestoneBtn" class="btn ghost">Adicionar Marco</button>
+        <div id="ganttContainer" class="gantt-container hidden" aria-live="polite">
+          <h3 id="ganttChartTitle">Cronograma do Projeto</h3>
+          <div id="ganttChart" class="gantt-chart" role="img" aria-label="Gráfico de Gantt do projeto"></div>
+        </div>
       </fieldset>
 
       <div class="form-actions">
@@ -265,7 +269,9 @@
           <input type="number" class="pep-year" min="1900" max="9999" required>
         </div>
       </div>
-      <button type="button" class="btn danger remove-row">Remover</button>
+      <button type="button" class="btn danger remove-row" aria-label="Remover PEP">
+        <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+      </button>
     </div>
   </template>
 
@@ -320,7 +326,6 @@
       <div class="field-group full-width">
         <label>Descrição Geral da Atividade</label>
         <textarea class="activity-description" rows="5"></textarea>
-
       </div>
       <button type="button" class="icon-btn remove-activity" aria-label="Remover atividade">
         <span class="material-symbols-outlined" aria-hidden="true">delete</span>
