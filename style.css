@@ -469,7 +469,11 @@ p {
   grid-template-columns: repeat(2, minmax(280px, 1fr));
 }
 
-.field-grid > .field-group:last-child:nth-child(odd):not(.full-width) {
+.field-grid.three-cols {
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+}
+
+.field-grid:not(.three-cols) > .field-group:last-child:nth-child(odd):not(.full-width) {
   grid-column: 1 / -1;
 }
 
