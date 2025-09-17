@@ -1036,13 +1036,13 @@ class SPRestApi {
     const Activities = SharePoint.getLista('Activities');
     const Peps = SharePoint.getLista('Peps');
 
-    const msRes = await Milestones.getItems({ select: 'Id', filter: `projectsIdId eq ${projectsId}` });
+    const msRes = await Milestones.getItems({ select: 'Id', filter: `projectsId eq ${projectsId}` });
     const marcos = msRes.d?.results || [];
     for (const ms of marcos) {
-      const actRes = await Activities.getItems({ select: 'Id', filter: `milestonesIdId eq ${ms.Id}` });
+      const actRes = await Activities.getItems({ select: 'Id', filter: `milestonesId eq ${ms.Id}` });
       const acts = actRes.d?.results || [];
       for (const act of acts) {
-        const alRes = await Peps.getItems({ select: 'Id', filter: `activitiesIdId eq ${act.Id}` });
+        const alRes = await Peps.getItems({ select: 'Id', filter: `activitiesId eq ${act.Id}` });
         const als = alRes.d?.results || [];
         for (const al of als) {
           await Peps.deleteItem(al.Id);
@@ -1067,7 +1067,7 @@ class SPRestApi {
     for (const milestone of milestonesList) {
       const milestonePayload = {
         Title: (milestone?.nome || '').trim(),
-        projectsIdId: projectLookupId
+        projectsId: projectLookupId
       };
       const infoMarco = await Milestones.addItem(milestonePayload);
       const marcoIdRaw = infoMarco?.d?.Id ?? infoMarco?.d?.ID;
@@ -1082,8 +1082,8 @@ class SPRestApi {
           startDate: atividade?.inicio || null,
           endDate: atividade?.fim || null,
           activityDescription: atividade?.descricao || '',
-          milestonesIdId: marcoId,
-          projectsIdId: projectLookupId
+          milestonesId: marcoId,
+          projectsId: projectLookupId
         };
         const infoAtv = await Activities.addItem(activityPayload);
         const atvIdRaw = infoAtv?.d?.Id ?? infoAtv?.d?.ID;
@@ -1101,7 +1101,7 @@ class SPRestApi {
             descricao: atividade?.descricao || ''
           };
           if (Number.isFinite(atvId)) {
-            pepPayload.activitiesIdId = atvId;
+            pepPayload.activitiesId = atvId;
           }
           await Peps.addItem(pepPayload);
         }
@@ -1113,13 +1113,13 @@ class SPRestApi {
     const Milestones = SharePoint.getLista('Milestones');
     const Activities = SharePoint.getLista('Activities');
     const Peps = SharePoint.getLista('Peps');
-    const msRes = await Milestones.getItems({ select: 'Id,Title', filter: `projectsIdId eq ${projectsId}` });
+    const msRes = await Milestones.getItems({ select: 'Id,Title', filter: `projectsId eq ${projectsId}` });
     const result = [];
     for (const ms of msRes.d?.results || []) {
-      const actRes = await Activities.getItems({ select: 'Id,Title,startDate,endDate,activityDescription', filter: `milestonesIdId eq ${ms.Id}` });
+      const actRes = await Activities.getItems({ select: 'Id,Title,startDate,endDate,activityDescription', filter: `milestonesId eq ${ms.Id}` });
       const acts = [];
       for (const act of actRes.d?.results || []) {
-        const alRes = await Peps.getItems({ select: 'Title,year,amountBrl,descricao', filter: `activitiesIdId eq ${act.Id}` });
+        const alRes = await Peps.getItems({ select: 'Title,year,amountBrl,descricao', filter: `activitiesId eq ${act.Id}` });
         const anual = (alRes.d?.results || []).map(a => ({
           ano: a.year,
           capex_brl: a.amountBrl,
