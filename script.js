@@ -446,7 +446,11 @@ function bindEvents() {
 // ============================================================================
 async function loadProjects() {
   try {
-    const results = await sp.getItems('Projects', { orderby: 'Created desc' });
+    const currentUserId = _spPageContextInfo.userId; // pega o ID do usuário logado
+    const results = await sp.getItems('Projects', { 
+      orderby: 'Created desc',
+      filter: `AuthorId eq ${currentUserId}`
+    });
     state.projects = results;
     renderProjectList();
   } catch (error) {
