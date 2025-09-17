@@ -3,6 +3,10 @@
 //  Aqui concentro tanto a camada de integração com SharePoint quanto os
 //  comportamentos da interface montada em HTML estático.
 //
+
+// ============================================================================
+// Classe de integração com SharePoint (SPRestApi)
+// ============================================================================
 class SPRestApi {
     /**
      * Cria uma instância da API REST do SharePoint.
@@ -295,20 +299,60 @@ class SPRestApi {
     }
 }
 
-//
-//  A partir daqui começa a lógica de interface, encapsulada em uma IIFE
-//  para não poluir o escopo global quando o script é carregado no SharePoint.
-//
+// ============================================================================
+// Escopo principal: lógica da interface e orquestração dos fluxos
+// ============================================================================
 (function () {
-  // Formatação monetária utilizada em toda a interface
+  // ========================================================================
+  // Utilitários (formatadores, parsers, helpers)
+  // ========================================================================
   const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-  // Limiar que define quando o fluxo de marcos precisa ser exibido
-  const REQ_THRESHOLD = 500000; // 1.5 milhões
 
-  // Cliente já configurado apontando para o site utilizado nas demonstrações
+  function parseNumberBRL(val) {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const normalized = String(val).replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+    return Number(normalized || 0);
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      return isNaN(d) ? '' : d.toLocaleDateString('pt-BR');
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function getStatusColor(status) {
+    switch (status) {
+      case 'Rascunho': return '#414141';
+      case 'Em Aprovação': return '#970886';
+      case 'Reprovado': return '#f83241';
+      case 'Reprovado para Revisão': return '#fe8f46';
+      case 'Aprovado': return '#3d9308';
+      default: return '#414141';
+    }
+  }
+
+  function getValueFromSelector(queryOrId, defaultValue = "", parent = document) {
+    let e = null;
+    try {
+      e = typeof parent.getElementById === "function" ? parent.getElementById(queryOrId) : parent.querySelector('#' + queryOrId);
+    } catch (error) {
+    }
+    if (e === null) e = parent.querySelector(queryOrId);
+    if (e === null) e = { value: defaultValue };
+    return e.value;
+  }
+
+  // ========================================================================
+  // Controle de estado global (referências e variáveis compartilhadas)
+  // ========================================================================
+  const REQ_THRESHOLD = 500000; // 1.5 milhões
   const SharePoint = new SPRestApi('https://arcelormittal.sharepoint.com/sites/controladorialongos/capex/');
 
-  // Cache de elementos chave presentes no formulário e na área de leitura
   const form = document.getElementById('capexForm');
   const statusBox = document.getElementById('status');
   const submitBtn = form.querySelector('button[type="submit"]');
@@ -325,53 +369,43 @@ class SPRestApi {
   const newProjectBtn = document.getElementById('newProjectBtn');
   const saveDraftBtn = document.getElementById('saveDraftBtn');
   const backBtn = document.getElementById('backBtn');
-  google.charts.load('current', { packages: ['gantt'] });
-
-  // Templates HTML usados para gerar marcos e atividades dinamicamente
   const milestoneTpl = document.getElementById('milestoneTemplate');
   const activityTpl = document.getElementById('activityTemplate');
+
+  google.charts.load('current', { packages: ['gantt'] });
 
   const currentYear = new Date().getFullYear();
   approvalYearInput.max = currentYear;
   approvalYearInput.placeholder = currentYear;
 
-  // Estados auxiliares controlando marcos, projeto atual e reset silencioso
   let milestoneCount = 0;
   let currentProjectsId = null;
   let resetFormWithoutAlert = true;
 
-  // Helpers
-  // Feedback visual ao usuário sobre o progresso das ações
+  // ========================================================================
+  // Manipulação de UI (mostrar/ocultar formulário, detalhes, feedback)
+  // ========================================================================
   function updateStatus(message = '', type = 'info') {
     if (!statusBox) return;
     statusBox.textContent = message;
     statusBox.className = `status ${type}`;
   }
 
-  // Converte valores com formatação brasileira em números nativos
-  function parseNumberBRL(val) {
-    if (typeof val === 'number') return val;
-    if (!val) return 0;
-    // aceita ponto ou vírgula como separador decimal
-    const normalized = String(val).replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
-    return Number(normalized || 0);
-  }
-
-  // Aponta se o orçamento atual excede o limite para marcos obrigatórios
   function overThreshold() {
     return parseNumberBRL(projectBudgetInput.value) > REQ_THRESHOLD;
   }
 
-  // Atualiza a legenda que orienta quando marcos devem ser adicionados
   function updateCapexFlag() {
     const n = parseNumberBRL(projectBudgetInput.value);
-    if (!n) { capexFlag.textContent = ''; return; }
+    if (!n) {
+      capexFlag.textContent = '';
+      return;
+    }
     capexFlag.innerHTML = n > REQ_THRESHOLD
       ? `<span class="ok">Orçamento do Projeto ${BRL.format(n)} &gt; ${BRL.format(REQ_THRESHOLD)} — marcos obrigatórios.</span>`
       : `Orçamento do Projeto ${BRL.format(n)} ≤ ${BRL.format(REQ_THRESHOLD)} — marcos não necessários.`;
   }
 
-  // Esconde ou revela a seção de marcos de acordo com o orçamento
   function updateMilestoneVisibility() {
     const show = overThreshold();
     milestoneSection.style.display = show ? 'block' : 'none';
@@ -382,7 +416,6 @@ class SPRestApi {
     }
   }
 
-  // Limpa o formulário e volta ao estado padrão
   function resetForm() {
     form.reset();
     currentProjectsId = null;
@@ -394,7 +427,6 @@ class SPRestApi {
     refreshGantt();
   }
 
-  // Alterna a UI para o modo de edição/cadastro
   function showForm() {
     if (appContainer) appContainer.style.display = 'none';
     form.style.display = 'block';
@@ -403,7 +435,6 @@ class SPRestApi {
     document.body.style.overflow = 'auto';
   }
 
-  // Retorna para a visão em lista e oculta o formulário
   function showProjectList() {
     form.style.display = 'none';
     if (appContainer) appContainer.style.display = 'flex';
@@ -413,30 +444,6 @@ class SPRestApi {
     document.body.style.overflow = 'hidden';
   }
 
-  // Mantém consistência das cores exibidas no selo de status
-  function getStatusColor(status) {
-    switch (status) {
-      case 'Rascunho': return '#414141';
-      case 'Em Aprovação': return '#970886';
-      case 'Reprovado': return '#f83241';
-      case 'Reprovado para Revisão': return '#fe8f46';
-      case 'Aprovado': return '#3d9308';
-      default: return '#414141';
-    }
-  }
-
-  // Formata datas vindas do SharePoint para o padrão brasileiro
-  function formatDate(dateStr) {
-    if (!dateStr) return '';
-    try {
-      const d = new Date(dateStr);
-      return isNaN(d) ? '' : d.toLocaleDateString('pt-BR');
-    } catch (e) {
-      return '';
-    }
-  }
-
-  // Renderiza os detalhes resumidos do projeto no painel principal
   function showProjectDetails(item) {
     if (!projectDetails) return;
 
@@ -539,18 +546,39 @@ class SPRestApi {
     projectDetails.appendChild(wrapper);
   }
 
-  // Botão superior que leva o usuário direto para o formulário de criação
-  if (newProjectBtn) {
-    newProjectBtn.addEventListener('click', () => {
-      resetFormWithoutAlert = true;
-      resetForm();
-      showForm();
-      updateStatus('', 'info');
-      resetFormWithoutAlert = false;
-    });
+  // ========================================================================
+  // CRUD de Projetos (create, update, delete, list)
+  // ========================================================================
+  function getProjectData() {
+    return {
+      nome: getValueFromSelector('projectName').trim(),
+      ano_aprovacao: parseInt(getValueFromSelector('approvalYear', 0), 10),
+      capex_budget_brl: parseNumberBRL(getValueFromSelector('projectBudget')),
+      nivel_investimento: getValueFromSelector('investmentLevel').trim(),
+      origem_verba: getValueFromSelector('fundingSource').trim(),
+      project_user: getValueFromSelector('projectUser').trim(),
+      project_leader: getValueFromSelector('projectLeader').trim(),
+      empresa: getValueFromSelector('company').trim(),
+      centro: getValueFromSelector('center').trim(),
+      unidade: getValueFromSelector('unit').trim(),
+      local_implantacao: getValueFromSelector('projectLocation').trim(),
+      ccusto_depreciacao: getValueFromSelector('depreciationCostCenter').trim(),
+      categoria: getValueFromSelector('category').trim(),
+      tipo_investimento: getValueFromSelector('investmentType').trim(),
+      tipo_ativo: getValueFromSelector('assetType').trim(),
+      funcao_projeto: getValueFromSelector('projectFunction').trim(),
+      data_inicio: getValueFromSelector('startDate', '').trim(),
+      data_fim: getValueFromSelector('endDate', '').trim(),
+      sumario: getValueFromSelector('projectSummary', '').trim(),
+      comentario: getValueFromSelector('projectComment', '').trim(),
+      kpi_tipo: getValueFromSelector('kpiType', '').trim(),
+      kpi_nome: getValueFromSelector('kpiName', '').trim(),
+      kpi_descricao: getValueFromSelector('kpiDescription', '').trim(),
+      kpi_atual: parseNumberBRL(getValueFromSelector('kpiCurrent', 0).trim()),
+      kpi_esperado: parseNumberBRL(getValueFromSelector('kpiExpected', 0).trim())
+    };
   }
 
-  // Busca e renderiza cartões com os projetos do usuário atual
   async function loadUserProjects() {
     if (!projectList) return;
     projectList.innerHTML = '';
@@ -591,7 +619,6 @@ class SPRestApi {
     showProjectDetails(null);
   }
 
-  // Preenche o formulário com os dados recuperados do SharePoint
   function fillForm(item) {
     document.getElementById('projectName').value = item.Title || '';
     document.getElementById('approvalYear').value = item.approvalYear ?? '';
@@ -624,7 +651,6 @@ class SPRestApi {
     updateMilestoneVisibility();
   }
 
-  // Abre um projeto específico em modo de edição quando permitido
   async function editProject(id) {
     const item = await SharePoint.getLista('Projects').getItemById(id);
     currentProjectsId = id;
@@ -640,7 +666,6 @@ class SPRestApi {
     updateStatus(`Status atual: ${statusValue}`, 'info');
   }
 
-  // Persiste o formulário como rascunho e salva a estrutura hierárquica
   async function saveDraft() {
     const data = getProjectData();
     const milestones = getMilestonesData();
@@ -691,7 +716,6 @@ class SPRestApi {
     }
   }
 
-  // Atualiza rapidamente o status do item e re-renderiza a lista
   async function updateProjectStatus(id, status) {
     try {
       await SharePoint.getLista('Projects').updateItem(id, { status });
@@ -704,7 +728,9 @@ class SPRestApi {
     }
   }
 
-  // Cria um novo marco e garante que ele venha com uma atividade inicial
+  // ========================================================================
+  // CRUD de Milestones
+  // ========================================================================
   function addMilestone(nameDefault) {
     milestoneCount++;
     const node = milestoneTpl.content.cloneNode(true);
@@ -714,7 +740,7 @@ class SPRestApi {
     const actsWrap = node.querySelector('[data-activities]');
     const btnAddAct = node.querySelector('[data-add-activity]');
     const btnRemove = node.querySelector('[data-remove-milestone]');
-    
+
     nameInput.value = nameDefault || `Milestone ${milestoneCount}`;
     if (nameSummaryHeader) {
       nameSummaryHeader.textContent = nameInput.value;
@@ -732,14 +758,12 @@ class SPRestApi {
     });
 
     milestonesWrap.appendChild(node);
-    // Adiciona a primeira atividade por padrão para incentivar o preenchimento
     const justAdded = milestonesWrap.lastElementChild.querySelector('[data-activities]');
     addActivity(justAdded);
     renumberMilestones();
     refreshGantt();
   }
 
-  // Atualiza a numeração padrão dos marcos conforme adições/remoções
   function renumberMilestones() {
     const all = [...milestonesWrap.querySelectorAll('.milestone-name')];
     let idx = 1;
@@ -751,7 +775,41 @@ class SPRestApi {
     }
   }
 
-  // Insere uma atividade dentro de um marco, controlando datas e alocações
+  function setMilestonesData(milestones) {
+    milestonesWrap.innerHTML = '';
+    milestoneCount = 0;
+    milestones.forEach(ms => {
+      addMilestone(ms.nome);
+      const msNode = milestonesWrap.lastElementChild;
+      const actsWrap = msNode.querySelector('[data-activities]');
+      actsWrap.innerHTML = '';
+      (ms.atividades || []).forEach(act => {
+        addActivity(actsWrap);
+        const actNode = actsWrap.lastElementChild;
+        actNode.querySelector('.act-title').value = act.titulo || '';
+        const start = actNode.querySelector('.act-start');
+        const end = actNode.querySelector('.act-end');
+        if (act.inicio) start.value = act.inicio.substring(0,10);
+        if (act.fim) end.value = act.fim.substring(0,10);
+        start.dispatchEvent(new Event('change'));
+        end.dispatchEvent(new Event('change'));
+        const overview = actNode.querySelector('.act-overview');
+        if (overview) overview.value = act.descricao || '';
+        (act.anual || []).forEach(a => {
+          const row = actNode.querySelector(`.row[data-year="${a.ano}"]`);
+          if (row) {
+            row.querySelector('.act-capex').value = a.capex_brl;
+            row.querySelector('.act-desc').value = a.descricao;
+          }
+        });
+      });
+    });
+    refreshGantt();
+  }
+
+  // ========================================================================
+  // CRUD de Activities
+  // ========================================================================
   function addActivity(container) {
     const node = activityTpl.content.cloneNode(true);
     const act = node.querySelector('[data-activity]');
@@ -760,7 +818,6 @@ class SPRestApi {
     const end = node.querySelector('.act-end');
     const yearWrap = node.querySelector('[data-year-fields]');
 
-    // regra: início <= fim
     function validateDates() {
       if (start.value && end.value && start.value > end.value) {
         end.setCustomValidity('A data de fim não pode ser anterior à data de início.');
@@ -769,7 +826,6 @@ class SPRestApi {
       }
     }
     function updateYearFields() {
-      //yearWrap.innerHTML = '';
       if (!start.value || !end.value) {
         refreshGantt();
         return;
@@ -799,7 +855,7 @@ class SPRestApi {
 
       [...yearWrap.querySelectorAll('.row[data-year]')].forEach(ye=>{
         if(!years.includes(ye.dataset.year)) ye.remove();
-      })
+      });
 
       refreshGantt();
     }
@@ -821,38 +877,6 @@ class SPRestApi {
     refreshGantt();
   }
 
-  // Coleta os campos principais do formulário para montar o payload do projeto
-  function getProjectData(){
-    return {
-      nome: getValueFromSelector('projectName').trim(),
-      ano_aprovacao: parseInt(getValueFromSelector('approvalYear', 0), 10),
-      capex_budget_brl: parseNumberBRL(getValueFromSelector('projectBudget')), 
-      nivel_investimento: getValueFromSelector('investmentLevel').trim(),
-      origem_verba: getValueFromSelector('fundingSource').trim(),
-      project_user: getValueFromSelector('projectUser').trim(),
-      project_leader: getValueFromSelector('projectLeader').trim(),
-      empresa: getValueFromSelector('company').trim(),
-      centro: getValueFromSelector('center').trim(),
-      unidade: getValueFromSelector('unit').trim(),
-      local_implantacao: getValueFromSelector('projectLocation').trim(),
-      ccusto_depreciacao: getValueFromSelector('depreciationCostCenter').trim(),
-      categoria: getValueFromSelector('category').trim(),
-      tipo_investimento: getValueFromSelector('investmentType').trim(),
-      tipo_ativo: getValueFromSelector('assetType').trim(),
-      funcao_projeto: getValueFromSelector('projectFunction').trim(),
-      data_inicio: getValueFromSelector('startDate', '').trim(),
-      data_fim: getValueFromSelector('endDate', '').trim(),
-      sumario: getValueFromSelector('projectSummary', '').trim(),
-      comentario: getValueFromSelector('projectComment', '').trim(),
-      kpi_tipo: getValueFromSelector('kpiType', '').trim(),
-      kpi_nome: getValueFromSelector('kpiName', '').trim(),
-      kpi_descricao: getValueFromSelector('kpiDescription', '').trim(),
-      kpi_atual: parseNumberBRL(getValueFromSelector('kpiCurrent', 0).trim()),
-      kpi_esperado: parseNumberBRL(getValueFromSelector('kpiExpected', 0).trim())
-    }
-  }
-
-  // Extrai toda a hierarquia de marcos, atividades e alocações anuais
   function getMilestonesData() {
     const milestones = [];
     const msNodes = [...milestonesWrap.querySelectorAll('[data-milestone]')];
@@ -878,7 +902,9 @@ class SPRestApi {
     return milestones;
   }
 
-  // Remove registros relacionados antes de salvar uma nova versão da estrutura
+  // ========================================================================
+  // CRUD de Peps
+  // ========================================================================
   async function clearProjectStructure(projectsId) {
     const Milestones = SharePoint.getLista('Milestones');
     const Activities = SharePoint.getLista('Activities');
@@ -901,7 +927,6 @@ class SPRestApi {
     }
   }
 
-  // Persiste marcos, atividades e alocações nas listas secundárias do SharePoint
   async function saveProjectStructure(projectsId, milestones, projectApprovalYear) {
     const Milestones = SharePoint.getLista('Milestones');
     const Activities = SharePoint.getLista('Activities');
@@ -957,7 +982,6 @@ class SPRestApi {
     }
   }
 
-  // Recarrega marcos, atividades e alocações para edição posterior
   async function fetchProjectStructure(projectsId) {
     const Milestones = SharePoint.getLista('Milestones');
     const Activities = SharePoint.getLista('Activities');
@@ -988,170 +1012,15 @@ class SPRestApi {
     return result;
   }
 
-  // Recria dinamicamente a interface com base nos dados carregados
-  function setMilestonesData(milestones) {
-    milestonesWrap.innerHTML = '';
-    milestoneCount = 0;
-    milestones.forEach(ms => {
-      addMilestone(ms.nome);
-      const msNode = milestonesWrap.lastElementChild;
-      const actsWrap = msNode.querySelector('[data-activities]');
-      actsWrap.innerHTML = '';
-      (ms.atividades || []).forEach(act => {
-        addActivity(actsWrap);
-        const actNode = actsWrap.lastElementChild;
-        actNode.querySelector('.act-title').value = act.titulo || '';
-        const start = actNode.querySelector('.act-start');
-        const end = actNode.querySelector('.act-end');
-        if (act.inicio) start.value = act.inicio.substring(0,10);
-        if (act.fim) end.value = act.fim.substring(0,10);
-        start.dispatchEvent(new Event('change'));
-        end.dispatchEvent(new Event('change'));
-        const overview = actNode.querySelector('.act-overview');
-        if (overview) overview.value = act.descricao || '';
-        (act.anual || []).forEach(a => {
-          const row = actNode.querySelector(`.row[data-year="${a.ano}"]`);
-          if (row) {
-            row.querySelector('.act-capex').value = a.capex_brl;
-            row.querySelector('.act-desc').value = a.descricao;
-          }
-        });
-      });
-    });
-    refreshGantt();
-  }
-
-  // Monta o gráfico de Gantt respeitando o estilo e cores definidos
-  function drawGantt(milestones) {
-    const chartEl = document.getElementById('ganttChart');
-    const titleEl = document.getElementById('ganttCharTitle');
-    
-    const data = new google.visualization.DataTable();
-    data.addColumn('string', 'Task ID');
-    data.addColumn('string', 'Task Name');
-    data.addColumn('string', 'Resource');
-    data.addColumn('date', 'Start Date');
-    data.addColumn('date', 'End Date');
-    data.addColumn('number', 'Duration');
-    data.addColumn('number', 'Percent Complete');
-    data.addColumn('string', 'Dependencies');
-    data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
-
-    const rows = [];
-    let idCounter = 0;
-    milestones.forEach((ms, i) => {
-      idCounter++;
-      let msStart = null;
-      let msEnd = null;
-      const actRows = [];
-      // calcula o intervalo do marco
-      ms.atividades.forEach((act, j) => {
-        const startDate = act.inicio ? new Date(act.inicio) : new Date();
-        const endDate = act.fim ? new Date(act.fim) : new Date( startDate.getTime() + 1000 * 60 * 60 * 24 );
-        if (startDate && (!msStart || startDate < msStart)) msStart = startDate;
-        if (endDate && (!msEnd || endDate > msEnd)) msEnd = endDate;
-        const totalCapex = (act.anual || []).reduce((sum, y) => sum + (y.capex_brl || 0), 0);
-        const descTooltip = (act.anual || []).map(y => `${y.ano}: ${BRL.format(y.capex_brl)} - ${y.descricao}`).join('<br/>');
-        actRows.push([
-            `ms-${idCounter}-${j}`,//Task ID
-            act.titulo || `Atividade ${j+1}`, //Task Name
-            "Atividade", //Resource
-            startDate, //Start Date
-            endDate, //End Date
-            null, //Duration
-            0, //Percent Complete
-            `ms-${idCounter}`, //Dependencies
-            `CAPEX total: ${BRL.format(totalCapex)}${descTooltip ? '<br/>' + descTooltip : ''}`    //tooltip
-          ]);
-      });
-
-      if (msStart && msEnd) {
-        rows.push([
-          `ms-${idCounter}`,
-          ms.nome,
-          'milestone',
-          msStart,
-          msEnd,
-          null,
-          0,
-          null,
-          ms.nome
-        ]);
-      }
-      rows.push(...actRows);
-    });
-
-    if (!rows.length) {
-      chartEl.innerHTML = '';
-      titleEl.style.display = 'none';
-      return;
-    }
-
-    titleEl.style.display = 'block';
-
-    data.addRows(rows);
-    const chart = new google.visualization.Gantt(chartEl);
-    chart.draw(data, {
-      height: Math.max(200, rows.length * 40 + 40),
-      tooltip: { isHtml: true },
-      gantt: {
-        criticalPathEnabled: false,
-        arrow: {
-          angle: 0,
-          width: 0,
-          color: '#ffffff',
-          radius: 0
-        },
-        trackHeight: 30,
-        palette: [
-          { color: '#460a78', dark: '#be2846', light: '#e63c41' }, // milestones nas cores da empresa
-          { color: '#f58746', dark: '#e63c41', light: '#ffbe6e' } // atividades nas cores da empresa
-        ]
-      }
-    });
-  }
-
-  // Atualiza o gráfico sempre que algum dado de marcos/atividades muda
-  function refreshGantt() {
-    const milestones = getMilestonesData();
-    const draw = () => drawGantt(milestones);
-    if (google.visualization && google.visualization.Gantt) {
-      draw();
-    } else {
-      google.charts.setOnLoadCallback(draw);
-    }
-  }
-
-  // UI events
-  // Principais listeners responsáveis por manter a UI sincronizada com as ações
-  addMilestoneBtn.addEventListener('click', () => addMilestone());
-  milestoneSection.addEventListener('input', refreshGantt);
-  milestoneSection.addEventListener('change', refreshGantt);
-  if (saveDraftBtn) saveDraftBtn.addEventListener('click', saveDraft);
-  if (backBtn) backBtn.addEventListener('click', showProjectList);
-
-  if (projectBudgetInput) {
-    projectBudgetInput.addEventListener('input', () => {
-      updateCapexFlag();
-      updateMilestoneVisibility();
-      refreshGantt();
-    });
-    projectBudgetInput.addEventListener('change', () => {
-      updateCapexFlag();
-      updateMilestoneVisibility();
-      refreshGantt();
-    });
-  }
-
-  // Validation
-  // Bloco extenso de validações que cobre as regras discutidas com o usuário
+  // ========================================================================
+  // Validações do formulário
+  // ========================================================================
   function validateForm() {
     const errs = [];
     const errsEl = [];
     errorsBox.style.display = 'none';
     errorsBox.innerHTML = '';
 
-    // Valida campos básicos do projeto
     const reqFields = [
       { id: 'projectName', label: 'Nome do Projeto' },
       { id: 'approvalYear', label: 'Ano de Aprovação' },
@@ -1197,7 +1066,6 @@ class SPRestApi {
       approvalYearInput.classList.remove('is-invalid');
     }
 
-    // Requisito de marcos se CAPEX > 1,5 mi
     const mustHaveMilestone = overThreshold();
     const milestones = [...milestonesWrap.querySelectorAll('[data-milestone]')];
 
@@ -1205,7 +1073,6 @@ class SPRestApi {
       errs.push('O valor CAPEX é superior a R$ 1,5 milhão. Adicione pelo menos <strong>1 marco</strong>.');
     }
 
-    // Para cada marco: nome e pelo menos 1 atividade com campos válidos
     milestones.forEach((ms, i) => {
       const idx = i + 1;
       const name = ms.querySelector('.milestone-name');
@@ -1268,26 +1135,146 @@ class SPRestApi {
         errsEl[0].scrollIntoView({ behavior: "smooth" });
         errsEl[0].focus();
       } catch (error) {
-        
+
       }
       return false;
     }
     return true;
   }
 
-  // Função utilitária para recuperar valores sem duplicar lógica de busca
-  function getValueFromSelector(queryOrId, defaultValue = "", parent = document){
-    let e = null;
-    try {
-      e = typeof parent.getElementById === "function"? parent.getElementById(queryOrId): parent.querySelector('#'+queryOrId);
-    } catch (error) {
-    } 
-    if( e === null ) e = parent.querySelector(queryOrId);
-    if( e === null ) e = { value: defaultValue };
-    return e.value;
+  // ========================================================================
+  // Renderização de Gantt
+  // ========================================================================
+  function drawGantt(milestones) {
+    const chartEl = document.getElementById('ganttChart');
+    const titleEl = document.getElementById('ganttCharTitle');
+
+    const data = new google.visualization.DataTable();
+    data.addColumn('string', 'Task ID');
+    data.addColumn('string', 'Task Name');
+    data.addColumn('string', 'Resource');
+    data.addColumn('date', 'Start Date');
+    data.addColumn('date', 'End Date');
+    data.addColumn('number', 'Duration');
+    data.addColumn('number', 'Percent Complete');
+    data.addColumn('string', 'Dependencies');
+    data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
+
+    const rows = [];
+    let idCounter = 0;
+    milestones.forEach((ms) => {
+      idCounter++;
+      let msStart = null;
+      let msEnd = null;
+      const actRows = [];
+      (ms.atividades || []).forEach((act, index) => {
+        const startDate = act.inicio ? new Date(act.inicio) : new Date();
+        const endDate = act.fim ? new Date(act.fim) : new Date(startDate.getTime() + 1000 * 60 * 60 * 24);
+        if (startDate && (!msStart || startDate < msStart)) msStart = startDate;
+        if (endDate && (!msEnd || endDate > msEnd)) msEnd = endDate;
+        const totalCapex = (act.anual || []).reduce((sum, y) => sum + (y.capex_brl || 0), 0);
+        const descTooltip = (act.anual || []).map((y) => `${y.ano}: ${BRL.format(y.capex_brl)} - ${y.descricao}`).join('<br/>');
+        actRows.push([
+          `ms-${idCounter}-${index}`,
+          act.titulo || `Atividade ${index + 1}`,
+          'Atividade',
+          startDate,
+          endDate,
+          null,
+          0,
+          `ms-${idCounter}`,
+          `CAPEX total: ${BRL.format(totalCapex)}${descTooltip ? '<br/>' + descTooltip : ''}`
+        ]);
+      });
+
+      if (msStart && msEnd) {
+        rows.push([
+          `ms-${idCounter}`,
+          ms.nome,
+          'milestone',
+          msStart,
+          msEnd,
+          null,
+          0,
+          null,
+          ms.nome
+        ]);
+      }
+      rows.push(...actRows);
+    });
+
+    if (!rows.length) {
+      chartEl.innerHTML = '';
+      titleEl.style.display = 'none';
+      return;
+    }
+
+    titleEl.style.display = 'block';
+
+    data.addRows(rows);
+    const chart = new google.visualization.Gantt(chartEl);
+    chart.draw(data, {
+      height: Math.max(200, rows.length * 40 + 40),
+      tooltip: { isHtml: true },
+      gantt: {
+        criticalPathEnabled: false,
+        arrow: {
+          angle: 0,
+          width: 0,
+          color: '#ffffff',
+          radius: 0
+        },
+        trackHeight: 30,
+        palette: [
+          { color: '#460a78', dark: '#be2846', light: '#e63c41' },
+          { color: '#f58746', dark: '#e63c41', light: '#ffbe6e' }
+        ]
+      }
+    });
   }
 
-  // Fluxo completo de submissão que simula a integração final com SharePoint
+  function refreshGantt() {
+    const milestones = getMilestonesData();
+    const draw = () => drawGantt(milestones);
+    if (google.visualization && google.visualization.Gantt) {
+      draw();
+    } else {
+      google.charts.setOnLoadCallback(draw);
+    }
+  }
+
+  // ========================================================================
+  // Listeners de eventos (submit, reset, botões, inputs)
+  // ========================================================================
+  if (newProjectBtn) {
+    newProjectBtn.addEventListener('click', () => {
+      resetFormWithoutAlert = true;
+      resetForm();
+      showForm();
+      updateStatus('', 'info');
+      resetFormWithoutAlert = false;
+    });
+  }
+
+  addMilestoneBtn.addEventListener('click', () => addMilestone());
+  milestoneSection.addEventListener('input', refreshGantt);
+  milestoneSection.addEventListener('change', refreshGantt);
+  if (saveDraftBtn) saveDraftBtn.addEventListener('click', saveDraft);
+  if (backBtn) backBtn.addEventListener('click', showProjectList);
+
+  if (projectBudgetInput) {
+    projectBudgetInput.addEventListener('input', () => {
+      updateCapexFlag();
+      updateMilestoneVisibility();
+      refreshGantt();
+    });
+    projectBudgetInput.addEventListener('change', () => {
+      updateCapexFlag();
+      updateMilestoneVisibility();
+      refreshGantt();
+    });
+  }
+
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     updateCapexFlag();
@@ -1297,7 +1284,6 @@ class SPRestApi {
     updateStatus('Enviando dados...', 'info');
     submitBtn.disabled = true;
 
-    // Se chegou aqui, tudo válido. Monte um payload de exemplo e mostre no console.
     const payload = {
       projeto: getProjectData(),
       milestones: getMilestonesData()
@@ -1350,7 +1336,6 @@ class SPRestApi {
     }
   });
 
-  // Reset personalizado que confirma com o usuário antes de apagar campos
   form.addEventListener('reset', ev => {
     if (resetFormWithoutAlert === false && !confirm('Tem certeza que deseja limpar o formulário?')) {
       ev.preventDefault();
@@ -1359,8 +1344,6 @@ class SPRestApi {
     }
   });
 
-  // Estado inicial
-  // Reaplica cálculos e carrega os projetos assim que o script é executado
   updateCapexFlag();
   updateMilestoneVisibility();
   refreshGantt();
