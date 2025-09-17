@@ -463,19 +463,20 @@ class SPRestApi {
     titleEl.textContent = item.Title || '';
     const statusBadge = document.createElement('span');
     statusBadge.className = 'status-badge';
-    statusBadge.textContent = item.Status || '';
-    statusBadge.style.background = getStatusColor(item.Status);
+    const statusValue = item.status || item.Status || '';
+    statusBadge.textContent = statusValue;
+    statusBadge.style.background = getStatusColor(statusValue);
     header.append(titleEl, statusBadge);
 
     const grid = document.createElement('div');
     grid.className = 'details-grid';
 
-    const budgetCard = createDetailCard('Orçamento', BRL.format(item.CapexBudgetBRL || 0), 'budget-value');
-    const responsible = createDetailCard('Responsável', item.Responsavel || item.ProjectLeader || '');
-    const startDate = createDetailCard('Data de Início', formatDate(item.DataInicio));
-    const endDate = createDetailCard('Data de Conclusão', formatDate(item.DataFim || item.DataConclusao));
+    const budgetCard = createDetailCard('Orçamento', BRL.format((item.budgetBrl ?? item.CapexBudgetBRL) || 0), 'budget-value');
+    const responsible = createDetailCard('Responsável', item.projectLeader || item.projectUser || item.Responsavel || '');
+    const startDate = createDetailCard('Data de Início', formatDate(item.startDate || item.DataInicio));
+    const endDate = createDetailCard('Data de Conclusão', formatDate(item.endDate || item.DataFim || item.DataConclusao));
 
-    const descriptionCard = createDetailCard('Descrição do Projeto', item.SumarioProjeto || item.NecessidadeNegocio || item.ComentarioProjeto || item.Descricao || '');
+    const descriptionCard = createDetailCard('Descrição do Projeto', item.businessNeed || item.proposedSolution || item.SumarioProjeto || item.NecessidadeNegocio || item.ComentarioProjeto || item.Descricao || '');
     descriptionCard.classList.add('detail-desc');
 
     grid.append(budgetCard, responsible, startDate, endDate, descriptionCard);
@@ -495,7 +496,7 @@ class SPRestApi {
       return button;
     };
 
-    const status = item.Status || '';
+    const status = item.status || item.Status || '';
 
     switch (status) {
       case 'Rascunho':
@@ -539,9 +540,9 @@ class SPRestApi {
   async function loadUserProjects() {
     if (!projectList) return;
     projectList.innerHTML = '';
-    const projetos = SharePoint.getLista('Projetos');
+    const projetos = SharePoint.getLista('Projects');
     const res = await projetos.getItems({
-      select: 'Id,Title,CapexBudgetBRL,Status',
+      select: 'Id,Title,budgetBrl,status',
       filter: `AuthorId eq '${_spPageContextInfo.userId}'`
     });
     const items = res.d?.results || [];
@@ -552,14 +553,16 @@ class SPRestApi {
 
       const statusBadge = document.createElement('span');
       statusBadge.className = 'status-badge';
-      statusBadge.style.background = getStatusColor(item.Status);
-      statusBadge.textContent = item.Status || '';
+      const statusValue = item.status || item.Status;
+      statusBadge.style.background = getStatusColor(statusValue);
+      statusBadge.textContent = statusValue || '';
 
       const title = document.createElement('h3');
       title.textContent = item.Title || '';
 
       const budget = document.createElement('p');
-      budget.textContent = BRL.format(item.CapexBudgetBRL || 0);
+      const budgetValue = item.budgetBrl ?? item.CapexBudgetBRL;
+      budget.textContent = BRL.format(budgetValue || 0);
 
       card.append(statusBadge, title, budget);
       card.addEventListener('click', async () => {
@@ -577,47 +580,50 @@ class SPRestApi {
   // Preenche o formulário com os dados recuperados do SharePoint
   function fillForm(item) {
     document.getElementById('projectName').value = item.Title || '';
-    document.getElementById('approvalYear').value = item.AnoAprovacao || '';
-    document.getElementById('projectBudget').value = item.CapexBudgetBRL || '';
-    document.getElementById('investmentLevel').value = item.NivelInvestimento || '';
-    document.getElementById('fundingSource').value = item.OrigemVerba || '';
-    document.getElementById('unit').value = item.Unidade || '';
-    document.getElementById('center').value = item.Centro || '';
-    document.getElementById('projectLocation').value = item.LocalImplantacao || '';
-    document.getElementById('projectUser').value = item.ProjectUser || '';
-    document.getElementById('projectLeader').value = item.ProjectLeader || '';
-    document.getElementById('company').value = item.Empresa || '';
-    document.getElementById('depreciationCostCenter').value = item.CCustoDepreciacao || '';
-    document.getElementById('category').value = item.Categoria || '';
-    document.getElementById('investmentType').value = item.TipoInvestimento || '';
-    document.getElementById('assetType').value = item.TipoAtivo || '';
-    document.getElementById('projectFunction').value = item.FuncaoProjeto || '';
-    document.getElementById('startDate').value = item.DataInicio ? item.DataInicio.substring(0, 10) : (item.DataInicioProjeto ? item.DataInicioProjeto.substring(0,10) : '');
-    document.getElementById('endDate').value = item.DataFim ? item.DataFim.substring(0, 10) : (item.DataFimProjeto ? item.DataFimProjeto.substring(0,10) : '');
-    document.getElementById('projectSummary').value = item.SumarioProjeto || item.NecessidadeNegocio || '';
-    document.getElementById('projectComment').value = item.ComentarioProjeto || item.SolucaoProposta || '';
-    document.getElementById('kpiType').value = item.TipoKPI || item.KpiImpactado || '';
-    document.getElementById('kpiName').value = item.NomeKPI || '';
-    document.getElementById('kpiDescription').value = item.KpiDescricao || '';
-    document.getElementById('kpiCurrent').value = item.KpiValorAtual || '';
-    document.getElementById('kpiExpected').value = item.KpiValorEsperado || '';
+    document.getElementById('approvalYear').value = item.approvalYear || item.AnoAprovacao || '';
+    document.getElementById('projectBudget').value = item.budgetBrl || item.CapexBudgetBRL || '';
+    document.getElementById('investmentLevel').value = item.investmentLevel || item.NivelInvestimento || '';
+    document.getElementById('fundingSource').value = item.fundingSource || item.OrigemVerba || '';
+    document.getElementById('unit').value = item.unit || item.Unidade || '';
+    document.getElementById('center').value = item.center || item.Centro || '';
+    document.getElementById('projectLocation').value = item.location || item.LocalImplantacao || '';
+    document.getElementById('projectUser').value = item.projectUser || item.ProjectUser || '';
+    document.getElementById('projectLeader').value = item.projectLeader || item.ProjectLeader || '';
+    document.getElementById('company').value = item.company || item.Empresa || '';
+    document.getElementById('depreciationCostCenter').value = item.depreciationCostCenter || item.CCustoDepreciacao || '';
+    document.getElementById('category').value = item.category || item.Categoria || '';
+    document.getElementById('investmentType').value = item.investmentType || item.TipoInvestimento || '';
+    document.getElementById('assetType').value = item.assetType || item.TipoAtivo || '';
+    document.getElementById('projectFunction').value = item.projectFunction || item.FuncaoProjeto || '';
+    const startVal = item.startDate || item.DataInicio || item.DataInicioProjeto || '';
+    const endVal = item.endDate || item.DataFim || item.DataFimProjeto || '';
+    document.getElementById('startDate').value = startVal ? startVal.substring(0, 10) : '';
+    document.getElementById('endDate').value = endVal ? endVal.substring(0, 10) : '';
+    document.getElementById('projectSummary').value = item.businessNeed || item.SumarioProjeto || item.NecessidadeNegocio || '';
+    document.getElementById('projectComment').value = item.proposedSolution || item.ComentarioProjeto || item.SolucaoProposta || '';
+    document.getElementById('kpiType').value = item.kpiType || item.TipoKPI || item.KpiImpactado || '';
+    document.getElementById('kpiName').value = item.kpiName || item.NomeKPI || '';
+    document.getElementById('kpiDescription').value = item.kpiDescription || item.KpiDescricao || '';
+    document.getElementById('kpiCurrent').value = item.kpiCurrent || item.KpiValorAtual || '';
+    document.getElementById('kpiExpected').value = item.kpiExpected || item.KpiValorEsperado || '';
     updateCapexFlag();
     updateMilestoneVisibility();
   }
 
   // Abre um projeto específico em modo de edição quando permitido
   async function editProject(id) {
-    const item = await SharePoint.getLista('Projetos').getItemById(id);
+    const item = await SharePoint.getLista('Projects').getItemById(id);
     currentProjectId = id;
     fillForm(item);
     const msData = await fetchProjectStructure(id);
     setMilestonesData(msData);
-    const editable = ['Rascunho', 'Reprovado para Revisão'].includes(item.Status);
+    const statusValue = item.status || item.Status || '';
+    const editable = ['Rascunho', 'Reprovado para Revisão'].includes(statusValue);
     [...form.elements].forEach(el => el.disabled = !editable);
     if (saveDraftBtn) saveDraftBtn.style.display = editable ? 'inline-flex' : 'none';
     submitBtn.style.display = editable ? 'inline-flex' : 'none';
     showForm();
-    updateStatus(`Status atual: ${item.Status}`, 'info');
+    updateStatus(`Status atual: ${statusValue}`, 'info');
   }
 
   // Persiste o formulário como rascunho e salva a estrutura hierárquica
@@ -626,41 +632,36 @@ class SPRestApi {
     const milestones = getMilestonesData();
     const payload = {
       Title: data.nome,
-      AnoAprovacao: data.ano_aprovacao,
-      CapexBudgetBRL: data.capex_budget_brl,
-      NivelInvestimento: data.nivel_investimento,
-      OrigemVerba: data.origem_verba,
-      ProjectUser: data.project_user,
-      ProjectLeader: data.project_leader,
-      Empresa: data.empresa,
-      Centro: data.centro,
-      Unidade: data.unidade,
-      LocalImplantacao: data.local_implantacao,
-      CCustoDepreciacao: data.ccusto_depreciacao,
-      Categoria: data.categoria,
-      TipoInvestimento: data.tipo_investimento,
-      TipoAtivo: data.tipo_ativo,
-      FuncaoProjeto: data.funcao_projeto,
-      DataInicio: data.data_inicio || null,
-      DataFim: data.data_fim || null,
-      DataInicioProjeto: data.data_inicio || null,
-      DataFimProjeto: data.data_fim || null,
-      SumarioProjeto: data.sumario,
-      ComentarioProjeto: data.comentario,
-      NecessidadeNegocio: data.sumario,
-      SolucaoProposta: data.comentario,
-      TipoKPI: data.kpi_tipo,
-      KpiImpactado: data.kpi_tipo,
-      NomeKPI: data.kpi_nome,
-      KpiDescricao: data.kpi_descricao,
-      KpiValorAtual: data.kpi_atual,
-      KpiValorEsperado: data.kpi_esperado,
-      Status: 'Rascunho'
+      approvalYear: data.ano_aprovacao,
+      budgetBrl: data.capex_budget_brl,
+      investmentLevel: data.nivel_investimento,
+      fundingSource: data.origem_verba,
+      projectUser: data.project_user,
+      projectLeader: data.project_leader,
+      company: data.empresa,
+      center: data.centro,
+      unit: data.unidade,
+      location: data.local_implantacao,
+      depreciationCostCenter: data.ccusto_depreciacao,
+      category: data.categoria,
+      investmentType: data.tipo_investimento,
+      assetType: data.tipo_ativo,
+      projectFunction: data.funcao_projeto,
+      startDate: data.data_inicio || null,
+      endDate: data.data_fim || null,
+      businessNeed: data.sumario,
+      proposedSolution: data.comentario,
+      kpiType: data.kpi_tipo,
+      kpiName: data.kpi_nome,
+      kpiDescription: data.kpi_descricao,
+      kpiCurrent: data.kpi_atual,
+      kpiExpected: data.kpi_esperado,
+      status: 'Rascunho'
     };
     updateStatus('Salvando rascunho...', 'info');
     try {
       let info;
-      const projetos = SharePoint.getLista('Projetos');
+      const projetos = SharePoint.getLista('Projects');
       if (currentProjectId) {
         info = await projetos.updateItem(currentProjectId, payload);
       } else {
@@ -679,7 +680,7 @@ class SPRestApi {
   // Atualiza rapidamente o status do item e re-renderiza a lista
   async function updateProjectStatus(id, status) {
     try {
-      await SharePoint.getLista('Projetos').updateItem(id, { Status: status });
+      await SharePoint.getLista('Projects').updateItem(id, { status });
       await loadUserProjects();
       if (currentProjectId === id) {
         await editProject(id);
@@ -869,54 +870,58 @@ class SPRestApi {
 
   // Remove registros relacionados antes de salvar uma nova versão da estrutura
   async function clearProjectStructure(projectId) {
-    const Marcos = SharePoint.getLista('Marcos');
-    const Atividades = SharePoint.getLista('Atividades1');
-    const Alocacoes = SharePoint.getLista('AlocacoesAnuais');
+    const Milestones = SharePoint.getLista('Milestones');
+    const Activities = SharePoint.getLista('Activities');
+    const Peps = SharePoint.getLista('Peps');
 
-    const msRes = await Marcos.getItems({ select: 'Id', filter: `ProjetoId eq ${projectId}` });
+    const msRes = await Milestones.getItems({ select: 'Id', filter: `projectIdId eq ${projectId}` });
     const marcos = msRes.d?.results || [];
     for (const ms of marcos) {
-      const actRes = await Atividades.getItems({ select: 'Id', filter: `MarcoId eq ${ms.Id}` });
+      const actRes = await Activities.getItems({ select: 'Id', filter: `milestoneIdId eq ${ms.Id}` });
       const acts = actRes.d?.results || [];
       for (const act of acts) {
-        const alRes = await Alocacoes.getItems({ select: 'Id', filter: `AtividadeId eq ${act.Id}` });
+        const alRes = await Peps.getItems({ select: 'Id', filter: `activityIdId eq ${act.Id}` });
         const als = alRes.d?.results || [];
         for (const al of als) {
-          await Alocacoes.deleteItem(al.Id);
+          await Peps.deleteItem(al.Id);
         }
-        await Atividades.deleteItem(act.Id);
+        await Activities.deleteItem(act.Id);
       }
-      await Marcos.deleteItem(ms.Id);
+      await Milestones.deleteItem(ms.Id);
     }
   }
 
   // Persiste marcos, atividades e alocações nas listas secundárias do SharePoint
   async function saveProjectStructure(projectId, milestones) {
-    const Marcos = SharePoint.getLista('Marcos');
-    const Atividades = SharePoint.getLista('Atividades1');
-    const Alocacoes = SharePoint.getLista('AlocacoesAnuais');
+    const Milestones = SharePoint.getLista('Milestones');
+    const Activities = SharePoint.getLista('Activities');
+    const Peps = SharePoint.getLista('Peps');
     for (const milestone of milestones) {
-      const infoMarco = await Marcos.addItem({ Title: milestone.nome, ProjetoId: projectId });
+      const infoMarco = await Milestones.addItem({ Title: milestone.nome, projectIdId: projectId });
       const marcoId = infoMarco.d?.Id || infoMarco.d?.ID;
       for (const atividade of milestone.atividades || []) {
-        const infoAtv = await Atividades.addItem({
+        const pepElement = atividade.elementoPep || '';
+        const infoAtv = await Activities.addItem({
           Title: atividade.titulo,
-          DataInicio: atividade.inicio,
-          DataFim: atividade.fim,
-          ElementoPEP: atividade.elementoPep,
-          DescricaoAtividade: atividade.descricao,
-          FornecedorAtividade: atividade.fornecedor,
-          DescricaoFornecedorAtividade: atividade.descricaoFornecedor,
-          MarcoId: marcoId
+          startDate: atividade.inicio,
+          endDate: atividade.fim,
+          PEPElement: pepElement,
+          activityDescription: atividade.descricao,
+          supplier: atividade.fornecedor,
+          supplierNotes: atividade.descricaoFornecedor,
+          milestoneIdId: marcoId,
+          projectIdId: projectId
         });
         const atvId = infoAtv.d?.Id || infoAtv.d?.ID;
         for (const anual of atividade.anual || []) {
-          await Alocacoes.addItem({
-            Title: '',
-            Ano: anual.ano,
-            CapexBRL: anual.capex_brl,
-            Descricao: anual.descricao,
-            AtividadeId: atvId
+          await Peps.addItem({
+            Title: pepElement,
+            PEPElement: pepElement,
+            year: anual.ano,
+            amountBrl: anual.capex_brl,
+            pepName: anual.descricao,
+            activityIdId: atvId,
+            projectIdId: projectId
           });
         }
       }
@@ -925,25 +930,25 @@ class SPRestApi {
 
   // Recarrega marcos, atividades e alocações para edição posterior
   async function fetchProjectStructure(projectId) {
-    const Marcos = SharePoint.getLista('Marcos');
-    const Atividades = SharePoint.getLista('Atividades1');
-    const Alocacoes = SharePoint.getLista('AlocacoesAnuais');
-    const msRes = await Marcos.getItems({ select: 'Id,Title', filter: `ProjetoId eq ${projectId}` });
+    const Milestones = SharePoint.getLista('Milestones');
+    const Activities = SharePoint.getLista('Activities');
+    const Peps = SharePoint.getLista('Peps');
+    const msRes = await Milestones.getItems({ select: 'Id,Title', filter: `projectIdId eq ${projectId}` });
     const result = [];
     for (const ms of msRes.d?.results || []) {
-      const actRes = await Atividades.getItems({ select: 'Id,Title,DataInicio,DataFim,ElementoPEP,DescricaoAtividade,FornecedorAtividade,DescricaoFornecedorAtividade', filter: `MarcoId eq ${ms.Id}` });
+      const actRes = await Activities.getItems({ select: 'Id,Title,startDate,endDate,PEPElement,activityDescription,supplier,supplierNotes', filter: `milestoneIdId eq ${ms.Id}` });
       const acts = [];
       for (const act of actRes.d?.results || []) {
-        const alRes = await Alocacoes.getItems({ select: 'Ano,CapexBRL,Descricao', filter: `AtividadeId eq ${act.Id}` });
-        const anual = (alRes.d?.results || []).map(a => ({ ano: a.Ano, capex_brl: a.CapexBRL, descricao: a.Descricao }));
+        const alRes = await Peps.getItems({ select: 'year,amountBrl,pepName', filter: `activityIdId eq ${act.Id}` });
+        const anual = (alRes.d?.results || []).map(a => ({ ano: a.year ?? a.Ano, capex_brl: a.amountBrl ?? a.CapexBRL, descricao: a.pepName ?? a.Descricao }));
         acts.push({
           titulo: act.Title,
-          inicio: act.DataInicio,
-          fim: act.DataFim,
-          elementoPep: act.ElementoPEP,
-          descricao: act.DescricaoAtividade,
-          fornecedor: act.FornecedorAtividade,
-          descricaoFornecedor: act.DescricaoFornecedorAtividade || '',
+          inicio: act.startDate || act.DataInicio,
+          fim: act.endDate || act.DataFim,
+          elementoPep: act.PEPElement || act.ElementoPEP,
+          descricao: act.activityDescription || act.DescricaoAtividade,
+          fornecedor: act.supplier || act.FornecedorAtividade,
+          descricaoFornecedor: (act.supplierNotes || act.DescricaoFornecedorAtividade || ''),
           anual
         });
       }
@@ -1277,40 +1282,35 @@ class SPRestApi {
       milestones: getMilestonesData()
     };
 
-    const Projetos = SharePoint.getLista('Projetos');
+    const Projetos = SharePoint.getLista('Projects');
 
     try {
       const infoProjeto = await Projetos.addItem({
         Title: payload.projeto.nome,
-        AnoAprovacao: payload.projeto.ano_aprovacao,
-        CapexBudgetBRL: payload.projeto.capex_budget_brl,
-        NivelInvestimento: payload.projeto.nivel_investimento,
-        OrigemVerba: payload.projeto.origem_verba,
-        ProjectUser: payload.projeto.project_user,
-        ProjectLeader: payload.projeto.project_leader,
-        Empresa: payload.projeto.empresa,
-        Centro: payload.projeto.centro,
-        Unidade: payload.projeto.unidade,
-        LocalImplantacao: payload.projeto.local_implantacao,
-        CCustoDepreciacao: payload.projeto.ccusto_depreciacao,
-        Categoria: payload.projeto.categoria,
-        TipoInvestimento: payload.projeto.tipo_investimento,
-        TipoAtivo: payload.projeto.tipo_ativo,
-        FuncaoProjeto: payload.projeto.funcao_projeto,
-        DataInicio: payload.projeto.data_inicio || null,
-        DataFim: payload.projeto.data_fim || null,
-        DataInicioProjeto: payload.projeto.data_inicio || null,
-        DataFimProjeto: payload.projeto.data_fim || null,
-        SumarioProjeto: payload.projeto.sumario,
-        ComentarioProjeto: payload.projeto.comentario,
-        NecessidadeNegocio: payload.projeto.sumario,
-        SolucaoProposta: payload.projeto.comentario,
-        TipoKPI: payload.projeto.kpi_tipo,
-        KpiImpactado: payload.projeto.kpi_tipo,
-        NomeKPI: payload.projeto.kpi_nome,
-        KpiDescricao: payload.projeto.kpi_descricao,
-        KpiValorAtual: payload.projeto.kpi_atual,
-        KpiValorEsperado: payload.projeto.kpi_esperado
+        approvalYear: payload.projeto.ano_aprovacao,
+        budgetBrl: payload.projeto.capex_budget_brl,
+        investmentLevel: payload.projeto.nivel_investimento,
+        fundingSource: payload.projeto.origem_verba,
+        projectUser: payload.projeto.project_user,
+        projectLeader: payload.projeto.project_leader,
+        company: payload.projeto.empresa,
+        center: payload.projeto.centro,
+        unit: payload.projeto.unidade,
+        location: payload.projeto.local_implantacao,
+        depreciationCostCenter: payload.projeto.ccusto_depreciacao,
+        category: payload.projeto.categoria,
+        investmentType: payload.projeto.tipo_investimento,
+        assetType: payload.projeto.tipo_ativo,
+        projectFunction: payload.projeto.funcao_projeto,
+        startDate: payload.projeto.data_inicio || null,
+        endDate: payload.projeto.data_fim || null,
+        businessNeed: payload.projeto.sumario,
+        proposedSolution: payload.projeto.comentario,
+        kpiType: payload.projeto.kpi_tipo,
+        kpiName: payload.projeto.kpi_nome,
+        kpiDescription: payload.projeto.kpi_descricao,
+        kpiCurrent: payload.projeto.kpi_atual,
+        kpiExpected: payload.projeto.kpi_esperado
       });
 
       await saveProjectStructure(infoProjeto.d.ID, payload.milestones);
