@@ -231,6 +231,10 @@
         <legend>9. KEY Projects</legend>
         <p class="hint">Disponível quando o orçamento é igual ou superior a R$ 1.000.000,00.</p>
         <div id="milestoneList" class="dynamic-list"></div>
+        <div id="ganttContainer" class="gantt-container hidden" aria-live="polite">
+          <h3 id="ganttChartTitle">Cronograma do Projeto</h3>
+          <div id="ganttChart" class="gantt-chart" role="img" aria-label="Gráfico de Gantt do projeto"></div>
+        </div>
         <button type="button" id="addMilestoneBtn" class="btn ghost">Adicionar Marco</button>
       </fieldset>
 
@@ -246,17 +250,19 @@
   <!-- =============================================================== -->
   <template id="simplePepTemplate">
     <div class="pep-row" data-pep-id="">
-      <div class="field-group">
-        <label>Elemento PEP</label>
-        <input type="text" class="pep-title" maxlength="120" required>
-      </div>
-      <div class="field-group">
-        <label>Valor do PEP (R$)</label>
-        <input type="number" class="pep-amount" min="0" step="0.01" required>
-      </div>
-      <div class="field-group">
-        <label>Ano do PEP</label>
-        <input type="number" class="pep-year" min="1900" max="9999" required>
+      <div class="field-grid">
+        <div class="field-group">
+          <label>Elemento PEP</label>
+          <input type="text" class="pep-title" maxlength="120" required>
+        </div>
+        <div class="field-group">
+          <label>Valor do PEP (R$)</label>
+          <input type="number" class="pep-amount" min="0" step="0.01" required>
+        </div>
+        <div class="field-group">
+          <label>Ano do PEP</label>
+          <input type="number" class="pep-year" min="1900" max="9999" required>
+        </div>
       </div>
       <button type="button" class="btn danger remove-row">Remover</button>
     </div>
@@ -301,7 +307,7 @@
           <label>Fornecedor</label>
           <input type="text" class="activity-supplier" maxlength="160">
         </div>
-        <div class="field-group">
+        <div class="field-group full-width">
           <label>Descrição Geral da Atividade</label>
           <textarea class="activity-description" rows="3"></textarea>
         </div>
@@ -313,22 +319,25 @@
 
   <template id="activityPepTemplate">
     <div class="activity-pep" data-pep-id="">
-      <div class="field-group">
-        <label>Elemento PEP</label>
-        <input type="text" class="activity-pep-title" maxlength="120" required>
-      </div>
-      <div class="field-group">
-        <label>Valor CAPEX da atividade (R$)</label>
-        <input type="number" class="activity-pep-amount" min="0" step="0.01" required>
-      </div>
-      <div class="field-group">
-        <label>Ano</label>
-        <input type="number" class="activity-pep-year" min="1900" max="9999" required>
+      <div class="field-grid">
+        <div class="field-group">
+          <label>Elemento PEP</label>
+          <input type="text" class="activity-pep-title" maxlength="120" required>
+        </div>
+        <div class="field-group">
+          <label>Valor CAPEX da atividade (R$)</label>
+          <input type="number" class="activity-pep-amount" min="0" step="0.01" required>
+        </div>
+        <div class="field-group">
+          <label>Ano</label>
+          <input type="number" class="activity-pep-year" min="1900" max="9999" required>
+        </div>
       </div>
       <button type="button" class="btn danger remove-activity-pep">Remover</button>
     </div>
   </template>
 
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="script.js" type="module"></script>
 </body>
 </html>
