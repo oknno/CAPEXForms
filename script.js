@@ -133,6 +133,16 @@ const state = {
   }
 };
 
+function updateProjectState(projectId, changes = {}) {
+  if (!projectId) return;
+  const index = state.projects.findIndex((item) => Number(item.Id) === Number(projectId));
+  if (index === -1) return;
+  state.projects[index] = {
+    ...state.projects[index],
+    ...changes
+  };
+}
+
 const newProjectBtn = document.getElementById('newProjectBtn');
 const projectSearch = document.getElementById('projectSearch');
 const projectList = document.getElementById('projectList');
@@ -484,10 +494,6 @@ function renderProjectList() {
     const content = document.createElement('div');
     content.className = 'project-card-content';
 
-    const title = document.createElement('span');
-    title.className = 'project-card-title';
-    title.textContent = item.Title || 'Projeto sem título';
-
     const bottom = document.createElement('div');
     bottom.className = 'project-card-bottom';
 
@@ -495,23 +501,22 @@ function renderProjectList() {
     status.className = 'project-card-status';
     status.textContent = item.status || 'Sem status';
     status.style.color = statusColor(item.status);
-    bottom.append(status);
 
-    const metaPieces = [];
-    if (item.approvalYear) {
-      metaPieces.push(item.approvalYear);
-    }
+    const title = document.createElement('span');
+    title.className = 'project-card-title';
+    title.textContent = item.Title || 'Projeto sem título';
+
+    content.append(status, title);
+
     if (item.budgetBrl) {
-      metaPieces.push(BRL.format(item.budgetBrl));
+      const budgetRow = document.createElement('div');
+      budgetRow.className = 'project-card-bottom';
+      const budget = document.createElement('span');
+      budget.className = 'project-card-meta';
+      budget.textContent = BRL.format(item.budgetBrl);
+      budgetRow.append(budget);
+      content.append(budgetRow);
     }
-    if (metaPieces.length) {
-      const meta = document.createElement('span');
-      meta.className = 'project-card-meta';
-      meta.textContent = metaPieces.join(' • ');
-      bottom.append(meta);
-    }
-
-    content.append(title, bottom);
     card.append(accent, content);
     card.addEventListener('click', () => selectProject(item.Id));
     projectList.append(card);
@@ -569,18 +574,6 @@ function renderProjectDetails(detail) {
 
   const { project } = detail;
 
-  if (project.status === 'Reprovado') {
-    const message = document.createElement('div');
-    message.className = 'empty-state';
-    const title = document.createElement('h2');
-    title.textContent = project.Title || 'Projeto reprovado';
-    const text = document.createElement('p');
-    text.textContent = 'Este projeto foi reprovado e está disponível apenas para consulta.';
-    message.append(title, text);
-    projectDetails.append(message);
-    return;
-  }
-
   const wrapper = document.createElement('div');
   wrapper.className = 'project-overview';
 
@@ -609,6 +602,7 @@ function renderProjectDetails(detail) {
   highlightGrid.append(
     createHighlightBox('Orçamento', project.budgetBrl ? BRL.format(project.budgetBrl) : '—', { variant: 'budget' }),
     createHighlightBox('Responsável', project.projectLeader || project.projectUser || 'Não informado')
+
   );
   wrapper.append(highlightGrid);
 
@@ -633,32 +627,25 @@ function renderProjectDetails(detail) {
   const actions = document.createElement('div');
   actions.className = 'project-overview__actions';
 
-  const canEdit = ['Rascunho', 'Reprovado para Revisão'].includes(project.status);
-  const canSendApproval = ['Rascunho', 'Reprovado para Revisão'].includes(project.status);
-  const canReject = project.status === 'Em Aprovação';
+  const statusKey = project.status || '';
+  const canEditAndSend = ['Rascunho', 'Reprovado para Revisão'].includes(statusKey);
+  const viewOnlyStatuses = ['Aprovado', 'Reprovado', 'Em Aprovação'];
 
-  if (canEdit) {
+  if (viewOnlyStatuses.includes(statusKey)) {
+    const viewBtn = document.createElement('button');
+    viewBtn.type = 'button';
+    viewBtn.className = 'btn ghost';
+    viewBtn.textContent = 'Visualizar Projeto';
+    viewBtn.addEventListener('click', () => openProjectForm('edit', detail));
+    actions.append(viewBtn);
+  } else if (canEditAndSend) {
     const editBtn = document.createElement('button');
     editBtn.type = 'button';
     editBtn.className = 'btn primary';
     editBtn.textContent = 'Editar Projeto';
     editBtn.addEventListener('click', () => openProjectForm('edit', detail));
     actions.append(editBtn);
-  }
-
-  if (canReject) {
-    const rejectBtn = document.createElement('button');
-    rejectBtn.type = 'button';
-    rejectBtn.className = 'btn ghost';
-    rejectBtn.textContent = 'Recusar';
-    rejectBtn.addEventListener('click', () => {
-      openProjectForm('edit', detail);
-      statusField.value = 'Reprovado para Revisão';
-    });
-    actions.append(rejectBtn);
-  }
-
-  if (canSendApproval) {
+    
     const approveBtn = document.createElement('button');
     approveBtn.type = 'button';
     approveBtn.className = 'btn accent';
@@ -670,6 +657,15 @@ function renderProjectDetails(detail) {
       });
     });
     actions.append(approveBtn);
+
+  } else {
+    const fallbackBtn = document.createElement('button');
+    fallbackBtn.type = 'button';
+    fallbackBtn.className = 'btn ghost';
+    fallbackBtn.textContent = 'Visualizar Projeto';
+    fallbackBtn.addEventListener('click', () => openProjectForm('edit', detail));
+    actions.append(fallbackBtn);
+
   }
 
   if (actions.childElementCount) {
@@ -1049,6 +1045,28 @@ async function handleFormSubmit(event) {
     }
 
     await persistRelatedRecords(Number(savedProjectId || projectId), payload);
+
+    const resolvedId = Number(savedProjectId || projectId);
+    if (resolvedId) {
+      updateProjectState(resolvedId, {
+        Title: payload.Title,
+        status: payload.status,
+        budgetBrl: payload.budgetBrl
+      });
+      renderProjectList();
+      if (state.currentDetails?.project?.Id === resolvedId) {
+        state.currentDetails = {
+          ...state.currentDetails,
+          project: {
+            ...state.currentDetails.project,
+            Title: payload.Title,
+            status: payload.status,
+            budgetBrl: payload.budgetBrl
+          }
+        };
+        renderProjectDetails(state.currentDetails);
+      }
+    }
 
     showStatus('Projeto salvo com sucesso.', true);
     await loadProjects();
