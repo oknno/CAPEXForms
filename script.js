@@ -350,7 +350,7 @@ class SPRestApi {
   // ========================================================================
   // Controle de estado global (referências e variáveis compartilhadas)
   // ========================================================================
-  const REQ_THRESHOLD = 500000; // 1.5 milhões
+  const REQ_THRESHOLD = 1000000; // 1 milhão
   const SharePoint = new SPRestApi('https://arcelormittal.sharepoint.com/sites/controladorialongos/capex/');
 
   const form = document.getElementById('capexForm');
@@ -363,6 +363,9 @@ class SPRestApi {
   const approvalYearInput = document.getElementById('approvalYear');
   const capexFlag = document.getElementById('capexFlag');
   const milestoneSection = document.getElementById('milestoneSection');
+  const pepSection = document.getElementById('pepSection');
+  const pepDropdown = document.getElementById('pepDropdown');
+  const pepValueInput = document.getElementById('pepValue');
   const projectList = document.getElementById('projectList');
   const projectDetails = document.getElementById('projectDetails');
   const appContainer = document.getElementById('app');
@@ -381,10 +384,87 @@ class SPRestApi {
   let milestoneCount = 0;
   let currentProjectsId = null;
   let resetFormWithoutAlert = true;
+  let availablePeps = [];
 
   // ========================================================================
   // Manipulação de UI (mostrar/ocultar formulário, detalhes, feedback)
   // ========================================================================
+  function populatePepSelect(selectEl, preferredValue = '') {
+    if (!selectEl) return;
+    const desiredValue = preferredValue || selectEl.dataset.selectedPep || selectEl.value || '';
+    const currentScroll = selectEl.scrollTop;
+    selectEl.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Selecione…';
+    selectEl.appendChild(placeholder);
+
+    availablePeps.forEach((pep) => {
+      const option = document.createElement('option');
+      option.value = pep.code;
+      option.textContent = pep.code;
+      option.dataset.amount = pep.amount;
+      selectEl.appendChild(option);
+    });
+
+    selectEl.value = desiredValue;
+    if (selectEl.value !== desiredValue) {
+      selectEl.value = '';
+    }
+    selectEl.dataset.selectedPep = desiredValue || selectEl.value || '';
+    if (selectEl.value) {
+      selectEl.classList.remove('is-invalid');
+    }
+    selectEl.scrollTop = currentScroll;
+  }
+
+  function updatePepValueDisplay() {
+    if (!pepDropdown || !pepValueInput) return;
+    const selectedCode = pepDropdown.value || '';
+    pepDropdown.dataset.selectedPep = selectedCode;
+    const info = availablePeps.find(pep => pep.code === selectedCode);
+    if (info) {
+      pepValueInput.value = info.amount ?? 0;
+      if (selectedCode) {
+        pepDropdown.classList.remove('is-invalid');
+      }
+    } else {
+      pepValueInput.value = '';
+    }
+  }
+
+  async function loadPepOptions() {
+    if (pepDropdown && pepDropdown.options.length === 0) {
+      populatePepSelect(pepDropdown, pepDropdown.dataset.selectedPep || pepDropdown.value);
+    }
+    try {
+      const PepsList = SharePoint.getLista('Peps');
+      const res = await PepsList.getItems({ select: 'Title,amountBrl' });
+      const items = res.d?.results || [];
+      const unique = new Map();
+      items.forEach(item => {
+        const code = (item.Title || '').trim();
+        if (!code) return;
+        if (!unique.has(code)) {
+          const amount = Number(item.amountBrl ?? 0);
+          unique.set(code, { code, amount: Number.isFinite(amount) ? amount : 0 });
+        }
+      });
+      availablePeps = Array.from(unique.values()).sort((a, b) => a.code.localeCompare(b.code, 'pt-BR'));
+    } catch (error) {
+      availablePeps = [];
+    }
+
+    if (pepDropdown) {
+      populatePepSelect(pepDropdown, pepDropdown.dataset.selectedPep || pepDropdown.value);
+      updatePepValueDisplay();
+    }
+    [...document.querySelectorAll('.act-pep')].forEach(select => {
+      populatePepSelect(select, select.dataset.selectedPep || select.value);
+    });
+  }
+
   function updateStatus(message = '', type = 'info') {
     if (!statusBox) return;
     statusBox.textContent = message;
@@ -392,7 +472,7 @@ class SPRestApi {
   }
 
   function overThreshold() {
-    return parseNumberBRL(projectBudgetInput.value) > REQ_THRESHOLD;
+    return parseNumberBRL(projectBudgetInput.value) >= REQ_THRESHOLD;
   }
 
   function updateCapexFlag() {
@@ -401,18 +481,37 @@ class SPRestApi {
       capexFlag.textContent = '';
       return;
     }
-    capexFlag.innerHTML = n > REQ_THRESHOLD
-      ? `<span class="ok">Orçamento do Projeto ${BRL.format(n)} &gt; ${BRL.format(REQ_THRESHOLD)} — marcos obrigatórios.</span>`
-      : `Orçamento do Projeto ${BRL.format(n)} ≤ ${BRL.format(REQ_THRESHOLD)} — marcos não necessários.`;
+    capexFlag.innerHTML = n >= REQ_THRESHOLD
+      ? `<span class="ok">Orçamento do Projeto ${BRL.format(n)} &ge; ${BRL.format(REQ_THRESHOLD)} — marcos obrigatórios.</span>`
+      : `Orçamento do Projeto ${BRL.format(n)} &lt; ${BRL.format(REQ_THRESHOLD)} — marcos não necessários.`;
   }
 
   function updateMilestoneVisibility() {
-    const show = overThreshold();
-    milestoneSection.style.display = show ? 'block' : 'none';
-    if (!show) {
+    const budget = parseNumberBRL(projectBudgetInput.value);
+    const showMilestones = budget >= REQ_THRESHOLD;
+    const showPep = budget > 0 && budget < REQ_THRESHOLD;
+
+    milestoneSection.style.display = showMilestones ? 'block' : 'none';
+    if (!showMilestones) {
       milestonesWrap.innerHTML = '';
       milestoneCount = 0;
       refreshGantt();
+    }
+
+    if (pepSection) {
+      pepSection.style.display = showPep ? 'block' : 'none';
+      if (!showPep) {
+        if (pepDropdown) {
+          pepDropdown.value = '';
+          pepDropdown.dataset.selectedPep = '';
+          pepDropdown.classList.remove('is-invalid');
+        }
+        if (pepValueInput) {
+          pepValueInput.value = '';
+        }
+      } else if (pepDropdown) {
+        updatePepValueDisplay();
+      }
     }
   }
 
@@ -422,6 +521,17 @@ class SPRestApi {
     [...form.elements].forEach(el => el.disabled = false);
     if (saveDraftBtn) saveDraftBtn.style.display = 'inline-flex';
     submitBtn.style.display = 'inline-flex';
+    if (pepDropdown) {
+      pepDropdown.value = '';
+      pepDropdown.dataset.selectedPep = '';
+      pepDropdown.classList.remove('is-invalid');
+    }
+    if (pepValueInput) {
+      pepValueInput.value = '';
+    }
+    if (pepSection) {
+      pepSection.style.display = 'none';
+    }
     milestonesWrap.innerHTML = '';
     milestoneCount = 0;
     refreshGantt();
@@ -793,13 +903,20 @@ class SPRestApi {
         if (act.fim) end.value = act.fim.substring(0,10);
         start.dispatchEvent(new Event('change'));
         end.dispatchEvent(new Event('change'));
+        const pepSelect = actNode.querySelector('.act-pep');
+        if (pepSelect) {
+          pepSelect.dataset.selectedPep = act.pep || '';
+          populatePepSelect(pepSelect, act.pep || '');
+          if (act.pep) {
+            pepSelect.classList.remove('is-invalid');
+          }
+        }
         const overview = actNode.querySelector('.act-overview');
         if (overview) overview.value = act.descricao || '';
         (act.anual || []).forEach(a => {
           const row = actNode.querySelector(`.row[data-year="${a.ano}"]`);
           if (row) {
             row.querySelector('.act-capex').value = a.capex_brl;
-            row.querySelector('.act-desc').value = a.descricao;
           }
         });
       });
@@ -817,6 +934,17 @@ class SPRestApi {
     const start = node.querySelector('.act-start');
     const end = node.querySelector('.act-end');
     const yearWrap = node.querySelector('[data-year-fields]');
+    const pepSelect = node.querySelector('.act-pep');
+
+    if (pepSelect) {
+      populatePepSelect(pepSelect, pepSelect.dataset.selectedPep || '');
+      pepSelect.addEventListener('change', () => {
+        pepSelect.dataset.selectedPep = pepSelect.value || '';
+        if (pepSelect.value) {
+          pepSelect.classList.remove('is-invalid');
+        }
+      });
+    }
 
     function validateDates() {
       if (start.value && end.value && start.value > end.value) {
@@ -844,10 +972,6 @@ class SPRestApi {
           <div class="act-year-field act-year-value">
             <label>Valor CAPEX da atividade (BRL) - ${y}</label>
             <input type="number" class="act-capex" data-year="${y}" min="0" step="0.01" inputmode="decimal" required placeholder="Ex.: 250000,00" />
-          </div>
-          <div class="act-year-field act-year-desc">
-            <label>Descrição - ${y}</label>
-            <textarea class="act-desc" data-year="${y}" required maxlength="600" placeholder="Detalhe a atividade, entregáveis e premissas."></textarea>
           </div>
         `;
         yearWrap.appendChild(row);
@@ -887,13 +1011,15 @@ class SPRestApi {
         const anual = [...a.querySelectorAll('.row[data-year]')].map(row => ({
           ano: parseInt(row.dataset.year, 10),
           capex_brl: parseNumberBRL(getValueFromSelector('.act-capex', 0, row)),
-          descricao: getValueFromSelector('.act-desc', "", row).trim(),
         }));
+        const pepSelect = a.querySelector('.act-pep');
+        const pepCode = pepSelect ? (pepSelect.value || '').trim() : '';
         return {
           titulo: getValueFromSelector('.act-title', "", a).trim(),
           inicio: getValueFromSelector('.act-start', today, a),
           fim: getValueFromSelector('.act-end', today, a),
           descricao: getValueFromSelector('.act-overview', "", a).trim(),
+          pep: pepCode,
           anual,
         };
       });
@@ -966,12 +1092,13 @@ class SPRestApi {
         for (const anual of anualEntries) {
           const amountNumber = Number(anual?.capex_brl ?? 0);
           const annualYearNumber = Number(anual?.ano);
-          const pepTitle = String(anual?.descricao || atividade?.titulo || '').trim();
+          const pepTitle = String((atividade?.pep || '') || atividade?.titulo || '').trim();
           const pepPayload = {
             Title: pepTitle,
             amountBrl: Number.isFinite(amountNumber) ? amountNumber : 0,
             year: Number.isFinite(projectYear) ? projectYear : (Number.isFinite(annualYearNumber) ? annualYearNumber : null),
-            projectsId: projectLookupId
+            projectsIdId: projectLookupId,
+            descricao: atividade?.descricao || ''
           };
           if (Number.isFinite(atvId)) {
             pepPayload.activitiesId = atvId;
@@ -999,11 +1126,13 @@ class SPRestApi {
           descricao: a.descricao || '',
           pepCode: a.Title
         }));
+        const pepInfo = anual.find(entry => entry.pepCode);
         acts.push({
           titulo: act.Title,
           inicio: act.startDate,
           fim: act.endDate,
           descricao: act.activityDescription || '',
+          pep: pepInfo?.pepCode || '',
           anual
         });
       }
@@ -1070,7 +1199,18 @@ class SPRestApi {
     const milestones = [...milestonesWrap.querySelectorAll('[data-milestone]')];
 
     if (mustHaveMilestone && milestones.length === 0) {
-      errs.push('O valor CAPEX é superior a R$ 1,5 milhão. Adicione pelo menos <strong>1 marco</strong>.');
+      errs.push('O valor CAPEX é superior ou igual a R$ 1.000.000,00. Adicione pelo menos <strong>1 marco</strong>.');
+    }
+
+    if (!mustHaveMilestone && pepSection && pepSection.style.display !== 'none') {
+      if (pepDropdown) {
+        if (!pepDropdown.value) {
+          errs.push('Selecione um <strong>elemento PEP</strong> na seção Elementos PEP.');
+          errsEl.push(pepDropdown);
+        } else {
+          pepDropdown.classList.remove('is-invalid');
+        }
+      }
     }
 
     milestones.forEach((ms, i) => {
@@ -1089,6 +1229,7 @@ class SPRestApi {
         const start = a.querySelector('.act-start');
         const end = a.querySelector('.act-end');
         const overviewEl = a.querySelector('.act-overview');
+        const pepSelect = a.querySelector('.act-pep');
         const yearRows = [...a.querySelectorAll('.row[data-year]')];
 
         if (!title.value.trim()) errs.push(`Atividade ${jdx} do marco ${idx}: informe o <strong>título</strong>.`);
@@ -1103,6 +1244,14 @@ class SPRestApi {
             errsEl.push(overviewEl);
           }
         }
+        if (pepSelect) {
+          if (!pepSelect.value) {
+            errs.push(`Atividade ${jdx} do marco ${idx}: selecione o <strong>elemento PEP</strong>.`);
+            errsEl.push(pepSelect);
+          } else {
+            pepSelect.classList.remove('is-invalid');
+          }
+        }
         if (yearRows.length === 0) {
           errs.push(`Atividade ${jdx} do marco ${idx}: defina <strong>datas de início e fim</strong> válidas para gerar campos anuais.`);
         }
@@ -1111,10 +1260,6 @@ class SPRestApi {
           const cap = parseNumberBRL(getValueFromSelector('.act-capex', 0, row));
           if (isNaN(cap) || cap < 0) {
             errs.push(`Atividade ${jdx} do marco ${idx}, ano ${ano}: informe o <strong>valor CAPEX</strong> (BRL) válido (≥ 0).`);
-          }
-
-          if (getValueFromSelector('.act-desc', "", row).trim().length === 0) {
-            errs.push(`Atividade ${jdx} do marco ${idx}, ano ${ano}: informe a <strong>descrição</strong>.`);
           }
         });
       });
@@ -1173,7 +1318,8 @@ class SPRestApi {
         if (startDate && (!msStart || startDate < msStart)) msStart = startDate;
         if (endDate && (!msEnd || endDate > msEnd)) msEnd = endDate;
         const totalCapex = (act.anual || []).reduce((sum, y) => sum + (y.capex_brl || 0), 0);
-        const descTooltip = (act.anual || []).map((y) => `${y.ano}: ${BRL.format(y.capex_brl)} - ${y.descricao}`).join('<br/>');
+        const descTooltip = (act.anual || []).map((y) => `${y.ano}: ${BRL.format(y.capex_brl)}`).join('<br/>');
+        const pepTooltip = act.pep ? `<br/>PEP: ${act.pep}` : '';
         actRows.push([
           `ms-${idCounter}-${index}`,
           act.titulo || `Atividade ${index + 1}`,
@@ -1183,7 +1329,7 @@ class SPRestApi {
           null,
           0,
           `ms-${idCounter}`,
-          `CAPEX total: ${BRL.format(totalCapex)}${descTooltip ? '<br/>' + descTooltip : ''}`
+          `CAPEX total: ${BRL.format(totalCapex)}${descTooltip ? '<br/>' + descTooltip : ''}${pepTooltip}`
         ]);
       });
 
@@ -1275,6 +1421,12 @@ class SPRestApi {
     });
   }
 
+  if (pepDropdown) {
+    pepDropdown.addEventListener('change', () => {
+      updatePepValueDisplay();
+    });
+  }
+
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     updateCapexFlag();
@@ -1346,6 +1498,7 @@ class SPRestApi {
 
   updateCapexFlag();
   updateMilestoneVisibility();
+  loadPepOptions();
   refreshGantt();
   loadUserProjects();
 })();
