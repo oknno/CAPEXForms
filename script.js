@@ -1054,9 +1054,9 @@ class SPRestApi {
 }
 
 async function saveProjectStructure(projectsId, milestones, projectApprovalYear) {
-  const Milestones = SharePoint.getLista('milestones');
-  const Activities = SharePoint.getLista('activities');
-  const Peps = SharePoint.getLista('peps');
+  const Milestones = SharePoint.getLista('Milestones');
+  const Activities = SharePoint.getLista('Activities');
+  const Peps = SharePoint.getLista('Peps');
   const projectLookupId = Number(projectsId);
 
   if (!Number.isFinite(projectLookupId)) {
@@ -1113,9 +1113,9 @@ async function saveProjectStructure(projectsId, milestones, projectApprovalYear)
 }
 
 async function fetchProjectStructure(projectsId) {
-  const Milestones = SharePoint.getLista('milestones');
-  const Activities = SharePoint.getLista('activities');
-  const Peps = SharePoint.getLista('peps');
+  const Milestones = SharePoint.getLista('Milestones');
+  const Activities = SharePoint.getLista('Activities');
+  const Peps = SharePoint.getLista('Peps');
 
   const msRes = await Milestones.getItems({ select: 'Id,Title', filter: `projectsId eq ${projectsId}` });
   const result = [];
