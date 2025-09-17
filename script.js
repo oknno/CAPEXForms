@@ -100,7 +100,6 @@ class SPRestApi {
         };
         const payload = JSON.stringify({
             "__metadata": { "type": this.encodeEntityType(lista) },
-            "Title": "",
             ...data
         });
         const response = await this.request(url, "POST", headers, payload);
@@ -155,10 +154,25 @@ class SPRestApi {
             ...data
         });
         const response = await fetch(url, { method: "POST", headers, body: payload });
-        if (response.ok) return { d: { Id: parseInt(id) } };
-        const errorData = await response.json();
-        console.error('Erro detalhado do SharePoint:', errorData.error.message.value);
-        return false;
+        const text = await response.text();
+        if (!response.ok) {
+            try {
+                const errorData = text ? JSON.parse(text) : {};
+                console.error('Erro detalhado do SharePoint:', errorData.error?.message?.value || errorData);
+            } catch (parseErr) {
+                console.error('Erro ao atualizar item no SharePoint:', text || parseErr);
+            }
+            return false;
+        }
+        if (!text) {
+            return {};
+        }
+        try {
+            return JSON.parse(text);
+        } catch (parseErr) {
+            console.warn('Resposta vazia ou inválida ao atualizar item:', parseErr);
+            return {};
+        }
     }
 
     /**
@@ -851,15 +865,11 @@ class SPRestApi {
           capex_brl: parseNumberBRL(getValueFromSelector('.act-capex', 0, row)),
           descricao: getValueFromSelector('.act-desc', "", row).trim(),
         }));
-        const supplierNotes = getValueFromSelector('.act-supplier-notes', "", a).trim();
         return {
           titulo: getValueFromSelector('.act-title', "", a).trim(),
           inicio: getValueFromSelector('.act-start', today, a),
           fim: getValueFromSelector('.act-end', today, a),
-          elementoPep: getValueFromSelector('[name="kpi"]', "", a),
           descricao: getValueFromSelector('.act-overview', "", a).trim(),
-          fornecedor: getValueFromSelector('.act-supplier', "", a).trim(),
-          descricaoFornecedor: supplierNotes,
           anual,
         };
       });
@@ -916,14 +926,11 @@ class SPRestApi {
       }
       const atividades = Array.isArray(milestone?.atividades) ? milestone.atividades : [];
       for (const atividade of atividades) {
-        const pepElement = (atividade?.elementoPep || '').trim();
         const activityPayload = {
           Title: (atividade?.titulo || '').trim(),
           startDate: atividade?.inicio || null,
           endDate: atividade?.fim || null,
-          PEPElement: pepElement,
           activityDescription: atividade?.descricao || '',
-          supplier: atividade?.fornecedor || '',
           milestoneIdId: marcoId,
           projectIdId: projectLookupId
         };
@@ -934,13 +941,13 @@ class SPRestApi {
         for (const anual of anualEntries) {
           const amountNumber = Number(anual?.capex_brl ?? 0);
           const annualYearNumber = Number(anual?.ano);
+          const pepTitle = String(anual?.descricao || atividade?.titulo || '').trim();
           const pepPayload = {
-              Title: pepElement, // nome/código do PEP
-              amountBrl: Number.isFinite(amountNumber) ? amountNumber : 0,
-              year: Number.isFinite(projectYear) ? projectYear : (Number.isFinite(annualYearNumber) ? annualYearNumber : null),
-              projectIdId: projectLookupId,
-              activityIdId: atvId
-              };
+            Title: pepTitle,
+            amountBrl: Number.isFinite(amountNumber) ? amountNumber : 0,
+            year: Number.isFinite(projectYear) ? projectYear : (Number.isFinite(annualYearNumber) ? annualYearNumber : null),
+            projectIdId: projectLookupId
+          };
           if (Number.isFinite(atvId)) {
             pepPayload.activityIdId = atvId;
           }
@@ -958,25 +965,21 @@ class SPRestApi {
     const msRes = await Milestones.getItems({ select: 'Id,Title', filter: `projectIdId eq ${projectId}` });
     const result = [];
     for (const ms of msRes.d?.results || []) {
-      const actRes = await Activities.getItems({ select: 'Id,Title,startDate,endDate,PEPElement,activityDescription,supplier', filter: `milestoneIdId eq ${ms.Id}` });
+      const actRes = await Activities.getItems({ select: 'Id,Title,startDate,endDate,activityDescription', filter: `milestoneIdId eq ${ms.Id}` });
       const acts = [];
       for (const act of actRes.d?.results || []) {
-        const alRes = await Peps.getItems({ select: 'Title,year,amountBrl', filter: `activityIdId eq ${act.Id}` });
+        const alRes = await Peps.getItems({ select: 'Title,year,amountBrl,descricao', filter: `activityIdId eq ${act.Id}` });
         const anual = (alRes.d?.results || []).map(a => ({
           ano: a.year,
           capex_brl: a.amountBrl,
-          descricao: a.pepName,
+          descricao: a.descricao || '',
           pepCode: a.Title
         }));
-        const pepCodeFromActivity = (act.PEPElement || anual[0]?.pepCode || '').trim();
         acts.push({
           titulo: act.Title,
           inicio: act.startDate,
           fim: act.endDate,
-          elementoPep: pepCodeFromActivity,
-          descricao: act.activityDescription,
-          fornecedor: act.supplier,
-          descricaoFornecedor: '',
+          descricao: act.activityDescription || '',
           anual
         });
       }
@@ -1004,13 +1007,8 @@ class SPRestApi {
         if (act.fim) end.value = act.fim.substring(0,10);
         start.dispatchEvent(new Event('change'));
         end.dispatchEvent(new Event('change'));
-        actNode.querySelector('[name="kpi"]').value = act.elementoPep || '';
         const overview = actNode.querySelector('.act-overview');
-        const supplier = actNode.querySelector('.act-supplier');
-        const supplierNotes = actNode.querySelector('.act-supplier-notes');
         if (overview) overview.value = act.descricao || '';
-        if (supplier) supplier.value = act.fornecedor || '';
-        if (supplierNotes) supplierNotes.value = act.descricaoFornecedor || '';
         (act.anual || []).forEach(a => {
           const row = actNode.querySelector(`.row[data-year="${a.ano}"]`);
           if (row) {
