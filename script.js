@@ -1098,8 +1098,7 @@ async function persistSimplePeps(projectId, approvalYear) {
       Title: title,
       amountBrl: amount,
       year,
-      projectsId: projectId,
-      activitiesId: null
+      projectsIdId: projectId
     };
     if (id) {
       await sp.updateItem('Peps', Number(id), payload);
