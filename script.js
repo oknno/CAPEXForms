@@ -1313,7 +1313,12 @@ class SPRestApi {
         kpiExpected: payload.projeto.kpi_esperado
       });
 
-      await saveProjectStructure(infoProjeto.d.ID, payload.milestones);
+      const projectId = Number(infoProjeto?.d?.Id ?? infoProjeto?.d?.ID);
+      if (!Number.isFinite(projectId)) {
+        throw new Error('Project ID inválido retornado pelo SharePoint.');
+      }
+
+      await saveProjectStructure(projectId, payload.milestones);
       updateStatus('Formulário enviado com sucesso!', 'success');
       refreshGantt();
       await loadUserProjects();
