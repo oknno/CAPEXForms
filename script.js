@@ -1032,9 +1032,9 @@ class SPRestApi {
   // CRUD de Peps
   // ========================================================================
   async function clearProjectStructure(projectsId) {
-  const Milestones = SharePoint.getLista('milestones');
-  const Activities = SharePoint.getLista('activities');
-  const Peps = SharePoint.getLista('peps');
+  const Milestones = SharePoint.getLista('Milestones');
+  const Activities = SharePoint.getLista('Activities');
+  const Peps = SharePoint.getLista('Peps');
 
   const msRes = await Milestones.getItems({ select: 'Id', filter: `projectsId eq ${projectsId}` });
   const marcos = msRes.d?.results || [];
