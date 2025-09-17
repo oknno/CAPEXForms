@@ -247,6 +247,20 @@
             </div>
         </fieldset>
 
+        <fieldset id="pepSection" class="form-section" style="display: none;">
+            <legend>Elementos PEP</legend>
+            <div class="grid">
+                <div class="col-6">
+                    <label for="pepDropdown">Selecione o PEP</label>
+                    <select id="pepDropdown" required></select>
+                </div>
+                <div class="col-6">
+                    <label for="pepValue">Valor do PEP</label>
+                    <input type="number" id="pepValue" readonly step="0.01" />
+                </div>
+            </div>
+        </fieldset>
+
         <fieldset class="form-section">
             <legend>Indicadores de Desempenho</legend>
             <p class="section-intro">Informe os indicadores que serão acompanhados e os valores esperados após o projeto.</p>
@@ -285,12 +299,12 @@
             <fieldset class="form-section milestones-section">
                 <legend>KEY PROJECTS</legend>
                 <p class="muted">
-                    Projetos com orçamento acima de R$ 500.000,00 devem detalhar marcos e atividades indicando valores, prazos,
+                    Projetos com orçamento acima de R$ 1.000.000,00 devem detalhar marcos e atividades indicando valores, prazos,
                     descrição e fornecedores. Utilize os botões abaixo para organizar cada etapa do projeto.
                 </p>
                 <div class="btn-row vs">
                     <button class="btn" type="button" id="addMilestoneBtn">+ Adicionar marco</button>
-                    <!-- <span id="milestoneReq" class="badge" title="Obrigatório quando CAPEX &gt; R$ 1,5 mi">requisito condicionado ao CAPEX</span> -->
+                    <!-- <span id="milestoneReq" class="badge" title="Obrigatório quando CAPEX &gt; R$ 1 mi">requisito condicionado ao CAPEX</span> -->
                 </div>
                 <div id="milestones"></div>
                 <div class="muted">Cada marco deve possuir pelo menos <strong>2 atividade</strong> com todos os campos válidos e preenchidos.</div>
@@ -357,6 +371,10 @@
                 <div class="activity-field activity-field-end col-2">
                     <label>Término da Atividade</label>
                     <input type="date" class="act-end" required />
+                </div>
+                <div class="activity-field col-6">
+                    <label>Elemento PEP</label>
+                    <select class="act-pep" required></select>
                 </div>
                 <div class="activity-field activity-field-overview col-6">
                     <label>Descrição Geral da Atividade</label>
