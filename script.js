@@ -118,8 +118,8 @@ const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' 
 const DATE_FMT = new Intl.DateTimeFormat('pt-BR');
 const BUDGET_THRESHOLD = 1_000_000;
 
-const SITE_URL = window.SHAREPOINT_SITE_URL || 'https://<seu-tenant>.sharepoint.com/sites/<seu-site>';
-const sp = new SharePointService(SITE_URL);
+const SITE_URL = window.SHAREPOINT_SITE_URL || 'https://arcelormittal.sharepoint.com/sites/controladorialongos/capex';
+const sp = new SharePointService("https://arcelormittal.sharepoint.com/sites/controladorialongos/capex");
 
 const state = {
   projects: [],
