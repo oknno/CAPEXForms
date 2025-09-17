@@ -1,1510 +1,1053 @@
-//
-//  Script principal do protótipo CAPEX Forms.
-//  Aqui concentro tanto a camada de integração com SharePoint quanto os
-//  comportamentos da interface montada em HTML estático.
-//
-
 // ============================================================================
-// Classe de integração com SharePoint (SPRestApi)
+// Integração com SharePoint via REST API
 // ============================================================================
-class SPRestApi {
-    /**
-     * Cria uma instância da API REST do SharePoint.
-     * @param {string} site - URL do site SharePoint. https://<seu contoso>.sharepoint.com/sites/<seu site>
-     * @param {string|null} lista - Nome da lista padrão (opcional).
-     */
-    constructor(site = 'https://<seu contoso>.sharepoint.com/sites/<seu site>', lista = null) {
-        this.site = site;
-        this.listaAtual = lista;
-    }
-
-    /**
-     * Define a lista atual para operações subsequentes.
-     * @param {string} listaName - Nome da lista.
-     */
-    setLista(listaName) {
-        this.listaAtual = listaName;
-    }
-
-    /**
-     * Cria uma nova instância da API com uma lista específica.
-     * @param {string} listaName - Nome da lista.
-     * @returns {SPRestApi} Nova instância com lista definida.
-     */
-    getLista(listaName) {
-        return new SPRestApi(this.site, listaName);
-    }
-
-    /**
-     * Codifica o nome da lista para o formato esperado pelo SharePoint.
-     * @param {string} lista - Nome da lista.
-     * @returns {string} Tipo de entidade codificado.
-     */
-    encodeEntityType(lista) {
-        return "SP.Data." + lista.replace(/ /g, '_x0020_').replace(/_/g, '_x005f_') + "ListItem";
-    }
-
-    /**
-     * Constrói a URL da API para uma lista.
-     * @param {string} lista - Nome da lista.
-     * @param {string} endpoint - Caminho adicional da API.
-     * @returns {string} URL completa da API.
-     */
-    buildListUrl(lista, endpoint = '') {
-        if (!lista) throw new Error("Lista não definida.");
-        return `${this.site}${ this.site.charAt(this.site.length-1) === '/'? '': '' }_api/web/lists/getbytitle('${lista}')${endpoint}`;
-    }
-
-    /**
-     * Executa uma requisição HTTP genérica.
-     * @param {string} url - URL da requisição.
-     * @param {string} method - Método HTTP.
-     * @param {Object} headers - Cabeçalhos da requisição.
-     * @param {any} body - Corpo da requisição.
-     * @returns {Promise<Object>} Resposta da API.
-     */
-    async request(url, method = 'GET', headers = {}, body = null) {
-        const response = await fetch(url, { method, headers, body });
-        const json = await response.json();
-        return json;
-    }
-
-    /**
-     * Obtém o valor do Form Digest necessário para requisições POST.
-     * @returns {Promise<string>} Valor do Form Digest.
-     */
-    async getFormDigestValue() {
-        try {
-            const url = `${this.site}/_api/contextinfo`;
-            const headers = {
-                "Accept": "application/json;odata=verbose",
-                "Content-Type": "application/json;odata=verbose"
-            };
-            const data = await this.request(url, "POST", headers);
-            return data.d.GetContextWebInformation.FormDigestValue;
-        } catch (error) {
-            console.error("Erro ao obter o Form Digest:", error);
-            return _spPageContextInfo.formDigestValue;
-        }
-    }
-
-    /**
-     * Adiciona um item à lista.
-     * @param {Object} data - Dados do item.
-     * @param {string} [lista=this.listaAtual] - Nome da lista.
-     * @returns {Promise<Object|boolean>} Dados do item criado ou false.
-     */
-    async addItem(data = {}, lista = this.listaAtual) {
-        const formDigest = await this.getFormDigestValue();
-        const url = this.buildListUrl(lista, "/items");
-        const headers = {
-            "Accept": "application/json;odata=verbose",
-            "Content-Type": "application/json;odata=verbose",
-            "X-RequestDigest": formDigest
-        };
-        const payload = JSON.stringify({
-            "__metadata": { "type": this.encodeEntityType(lista) },
-            ...data
-        });
-        const response = await this.request(url, "POST", headers, payload);
-        return response.error ? false : response;
-    }
-
-    /**
-     * Adiciona um anexo a um item da lista.
-     * @param {number} itemId - ID do item.
-     * @param {string} fileName - Nome do arquivo.
-     * @param {Blob|ArrayBuffer} fileContent - Conteúdo do arquivo.
-     * @param {string} [lista=this.listaAtual] - Nome da lista.
-     * @returns {Promise<Object|boolean>} Dados do anexo ou false.
-     */
-    async addAttachment(itemId, fileName, fileContent, lista = this.listaAtual) {
-        const formDigest = await this.getFormDigestValue();
-        const url = this.buildListUrl(lista, `/items(${itemId})/AttachmentFiles/add(FileName='${fileName}')`);
-        const headers = {
-            "Accept": "application/json;odata=verbose",
-            "X-RequestDigest": formDigest,
-            "Content-Type": "application/octet-stream"
-        };
-        const response = await fetch(url, { method: "POST", headers, body: fileContent });
-        if (!response.ok) {
-            const error = await response.json();
-            console.error("Erro ao adicionar anexo:", error);
-            return false;
-        }
-        const result = await response.json();
-        return result.d;
-    }
-
-    /**
-     * Atualiza um item existente na lista.
-     * @param {number} id - ID do item.
-     * @param {Object} data - Dados atualizados.
-     * @param {string} [lista=this.listaAtual] - Nome da lista.
-     * @returns {Promise<Object|boolean>} Confirmação ou false.
-     */
-    async updateItem(id, data = {}, lista = this.listaAtual) {
-        const formDigest = await this.getFormDigestValue();
-        const url = this.buildListUrl(lista, `/items(${id})`);
-        const headers = {
-            "Accept": "application/json;odata=verbose",
-            "Content-Type": "application/json;odata=verbose",
-            "X-RequestDigest": formDigest,
-            "IF-MATCH": "*",
-            "X-HTTP-Method": "MERGE"
-        };
-        const payload = JSON.stringify({
-            "__metadata": { "type": this.encodeEntityType(lista) },
-            ...data
-        });
-        const response = await fetch(url, { method: "POST", headers, body: payload });
-        const text = await response.text();
-        if (!response.ok) {
-            try {
-                const errorData = text ? JSON.parse(text) : {};
-                console.error('Erro detalhado do SharePoint:', errorData.error?.message?.value || errorData);
-            } catch (parseErr) {
-                console.error('Erro ao atualizar item no SharePoint:', text || parseErr);
-            }
-            return false;
-        }
-        if (!text) {
-            return {};
-        }
-        try {
-            return JSON.parse(text);
-        } catch (parseErr) {
-            console.warn('Resposta vazia ou inválida ao atualizar item:', parseErr);
-            return {};
-        }
-    }
-
-    /**
-     * Exclui um item da lista.
-     * @param {number} id - ID do item.
-     * @param {string} [lista=this.listaAtual] - Nome da lista.
-     * @returns {Promise<boolean>} True se sucesso.
-     */
-    async deleteItem(id, lista = this.listaAtual) {
-        const formDigest = await this.getFormDigestValue();
-        const url = this.buildListUrl(lista, `/items(${id})`);
-        const headers = {
-            "Accept": "application/json;odata=verbose",
-            "X-RequestDigest": formDigest,
-            "IF-MATCH": "*",
-            "X-HTTP-Method": "DELETE"
-        };
-        const response = await fetch(url, { method: "POST", headers });
-        if (!response.ok) throw new Error(await response.text());
-        return true;
-    }
-
-    /**
-     * Executa qualquer requisição arbitrária à API do SharePoint.
-     * @param {string} api - Caminho da API.
-     * @param {string} [method="GET"] - Método HTTP.
-     * @param {any} [body=null] - Corpo da requisição.
-     * @param {Object} [headers={}] - Cabeçalhos adicionais.
-     * @returns {Promise<Object>} Resposta da API.
-     */
-    async anyRequest(api, method = "GET", body = null, headers = {}) {
-        const url = `${this.site}/_api/${api}`;
-        const defaultHeaders = {
-            "accept": "application/json;odata=verbose",
-            "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-            "charset": "UTF-8"
-        };
-        return await this.request(url, method, { ...defaultHeaders, ...headers }, body);
-    }
-
-    /**
-     * Obtém itens da lista com parâmetros opcionais de consulta.
-     * @param {Object} [params={}] - Parâmetros de consulta.
-     * @param {string} [lista=this.listaAtual] - Nome da lista.
-     * @returns {Promise<Object>} Lista de itens.
-     */
-    async getItems(params = {}, lista = this.listaAtual) {
-        const url = new URL(this.buildListUrl(lista, "/items"));
-        for (const parameter in params) {
-            url.searchParams.append(`$${parameter}`, params[parameter]);
-        }
-        const headers = { "accept": "application/json;odata=verbose" };
-        const response = await fetch(url.toString(), { method: 'GET', headers });
-        return await response.json();
-    }
-
-    /**
-     * Recupera um item específico da lista pelo ID.
-     * @param {number} id - ID do item.
-     * @param {string} [lista=this.listaAtual] - Nome da lista.
-     * @returns {Promise<Object>} Item recuperado.
-     */
-    async getItemById(id, lista = this.listaAtual) {
-        const url = this.buildListUrl(lista, `/items(${id})`);
-        const headers = { "accept": "application/json;odata=verbose" };
-        const response = await fetch(url, { method: 'GET', headers });
-        const json = await response.json();
-        return json.d;
-    }
-
-    /**
-     * Obtém metadados da lista, como campos e tipos.
-     * @param {string} [lista=this.listaAtual] - Nome da lista.
-     * @returns {Promise<Object[]>} Metadados da lista.
-     */
-    async getListMetadata(lista = this.listaAtual) {
-        const url = this.buildListUrl(lista, "/fields");
-        const headers = { "accept": "application/json;odata=verbose" };
-        const response = await fetch(url, { method: 'GET', headers });
-        const json = await response.json();
-        return json.d.results;
-    }
-
-    /**
-     * Obtém informações do usuário atual logado.
-     * @returns {Promise<Object>} Dados do usuário.
-     */
-    async getUserInfo() {
-        const url = `${this.site}/_api/web/currentuser`;
-        const headers = { "accept": "application/json;odata=verbose" };
-        const response = await fetch(url, { method: 'GET', headers });
-        const json = await response.json();
-        return json.d;
-    }
-
-    /**
-     * Obtém informações gerais do site atual.
-     * @returns {Promise<Object>} Dados do site.
-     */
-    async getSiteInfo() {
-        const url = `${this.site}/_api/web`;
-        const headers = { "accept": "application/json;odata=verbose" };
-        const response = await fetch(url, { method: 'GET', headers });
-        const json = await response.json();
-        return json.d;
-    }
-
-    /**
-     * Pesquisa itens na lista com base em um filtro OData.
-     * @param {string} filtro - Filtro OData.
-     * @param {string} [lista=this.listaAtual] - Nome da lista.
-     * @returns {Promise<Object[]>} Itens filtrados.
-     */
-    async searchItems(filtro, lista = this.listaAtual) {
-        const url = this.buildListUrl(lista, `/items?$filter=${encodeURIComponent(filtro)}`);
-        const headers = { "accept": "application/json;odata=verbose" };
-        const response = await fetch(url, { method: 'GET', headers });
-        const json = await response.json();
-        return json.d.results;
-    }
-}
-
-// ============================================================================
-// Escopo principal: lógica da interface e orquestração dos fluxos
-// ============================================================================
-(function () {
-  // ========================================================================
-  // Utilitários (formatadores, parsers, helpers)
-  // ========================================================================
-  const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-
-  function parseNumberBRL(val) {
-    if (typeof val === 'number') return val;
-    if (!val) return 0;
-    const normalized = String(val).replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
-    return Number(normalized || 0);
+class SharePointService {
+  constructor(siteUrl) {
+    this.siteUrl = siteUrl.replace(/\/$/, '');
   }
 
-  function formatDate(dateStr) {
-    if (!dateStr) return '';
+  encodeEntity(listName) {
+    return `SP.Data.${listName.replace(/ /g, '_x0020_').replace(/_/g, '_x005f_')}ListItem`;
+  }
+
+  buildUrl(listName, path = '/items') {
+    if (!listName) {
+      throw new Error('Lista SharePoint não informada.');
+    }
+    return `${this.siteUrl}/_api/web/lists/getbytitle('${listName}')${path}`;
+  }
+
+  async request(url, options = {}) {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || response.statusText);
+    }
+    if (response.status === 204) {
+      return null;
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  }
+
+  async getFormDigest() {
     try {
-      const d = new Date(dateStr);
-      return isNaN(d) ? '' : d.toLocaleDateString('pt-BR');
-    } catch (e) {
-      return '';
-    }
-  }
-
-  function getStatusColor(status) {
-    switch (status) {
-      case 'Rascunho': return '#414141';
-      case 'Em Aprovação': return '#970886';
-      case 'Reprovado': return '#f83241';
-      case 'Reprovado para Revisão': return '#fe8f46';
-      case 'Aprovado': return '#3d9308';
-      default: return '#414141';
-    }
-  }
-
-  function getValueFromSelector(queryOrId, defaultValue = "", parent = document) {
-    let e = null;
-    try {
-      e = typeof parent.getElementById === "function" ? parent.getElementById(queryOrId) : parent.querySelector('#' + queryOrId);
-    } catch (error) {
-    }
-    if (e === null) e = parent.querySelector(queryOrId);
-    if (e === null) e = { value: defaultValue };
-    return e.value;
-  }
-
-  // ========================================================================
-  // Controle de estado global (referências e variáveis compartilhadas)
-  // ========================================================================
-  const REQ_THRESHOLD = 1000000; // 1 milhão
-  const SharePoint = new SPRestApi('https://arcelormittal.sharepoint.com/sites/controladorialongos/capex/');
-
-  const form = document.getElementById('capexForm');
-  const statusBox = document.getElementById('status');
-  const submitBtn = form.querySelector('button[type="submit"]');
-  const errorsBox = document.getElementById('errors');
-  const milestonesWrap = document.getElementById('milestones');
-  const addMilestoneBtn = document.getElementById('addMilestoneBtn');
-  const projectBudgetInput = document.getElementById('projectBudget');
-  const approvalYearInput = document.getElementById('approvalYear');
-  const capexFlag = document.getElementById('capexFlag');
-  const milestoneSection = document.getElementById('milestoneSection');
-  const pepSection = document.getElementById('pepSection');
-  const pepDropdown = document.getElementById('pepDropdown');
-  const pepValueInput = document.getElementById('pepValue');
-  const projectList = document.getElementById('projectList');
-  const projectDetails = document.getElementById('projectDetails');
-  const appContainer = document.getElementById('app');
-  const newProjectBtn = document.getElementById('newProjectBtn');
-  const saveDraftBtn = document.getElementById('saveDraftBtn');
-  const backBtn = document.getElementById('backBtn');
-  const milestoneTpl = document.getElementById('milestoneTemplate');
-  const activityTpl = document.getElementById('activityTemplate');
-
-  google.charts.load('current', { packages: ['gantt'] });
-
-  const currentYear = new Date().getFullYear();
-  approvalYearInput.max = currentYear;
-  approvalYearInput.placeholder = currentYear;
-
-  let milestoneCount = 0;
-  let currentProjectsId = null;
-  let resetFormWithoutAlert = true;
-  let availablePeps = [];
-
-  // ========================================================================
-  // Manipulação de UI (mostrar/ocultar formulário, detalhes, feedback)
-  // ========================================================================
-  function populatePepSelect(selectEl, preferredValue = '') {
-    if (!selectEl) return;
-    const desiredValue = preferredValue || selectEl.dataset.selectedPep || selectEl.value || '';
-    const currentScroll = selectEl.scrollTop;
-    selectEl.innerHTML = '';
-
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = 'Selecione…';
-    selectEl.appendChild(placeholder);
-
-    availablePeps.forEach((pep) => {
-      const option = document.createElement('option');
-      option.value = pep.code;
-      option.textContent = pep.code;
-      option.dataset.amount = pep.amount;
-      selectEl.appendChild(option);
-    });
-
-    selectEl.value = desiredValue;
-    if (selectEl.value !== desiredValue) {
-      selectEl.value = '';
-    }
-    selectEl.dataset.selectedPep = desiredValue || selectEl.value || '';
-    if (selectEl.value) {
-      selectEl.classList.remove('is-invalid');
-    }
-    selectEl.scrollTop = currentScroll;
-  }
-
-  function updatePepValueDisplay() {
-    if (!pepDropdown || !pepValueInput) return;
-    const selectedCode = pepDropdown.value || '';
-    pepDropdown.dataset.selectedPep = selectedCode;
-    const info = availablePeps.find(pep => pep.code === selectedCode);
-    if (info) {
-      pepValueInput.value = info.amount ?? 0;
-      if (selectedCode) {
-        pepDropdown.classList.remove('is-invalid');
-      }
-    } else {
-      pepValueInput.value = '';
-    }
-  }
-
-  async function loadPepOptions() {
-    if (pepDropdown && pepDropdown.options.length === 0) {
-      populatePepSelect(pepDropdown, pepDropdown.dataset.selectedPep || pepDropdown.value);
-    }
-    try {
-      const PepsList = SharePoint.getLista('Peps');
-      const res = await PepsList.getItems({ select: 'Title,amountBrl' });
-      const items = res.d?.results || [];
-      const unique = new Map();
-      items.forEach(item => {
-        const code = (item.Title || '').trim();
-        if (!code) return;
-        if (!unique.has(code)) {
-          const amount = Number(item.amountBrl ?? 0);
-          unique.set(code, { code, amount: Number.isFinite(amount) ? amount : 0 });
-        }
-      });
-      availablePeps = Array.from(unique.values()).sort((a, b) => a.code.localeCompare(b.code, 'pt-BR'));
-    } catch (error) {
-      availablePeps = [];
-    }
-
-    if (pepDropdown) {
-      populatePepSelect(pepDropdown, pepDropdown.dataset.selectedPep || pepDropdown.value);
-      updatePepValueDisplay();
-    }
-    [...document.querySelectorAll('.act-pep')].forEach(select => {
-      populatePepSelect(select, select.dataset.selectedPep || select.value);
-    });
-  }
-
-  function updateStatus(message = '', type = 'info') {
-    if (!statusBox) return;
-    statusBox.textContent = message;
-    statusBox.className = `status ${type}`;
-  }
-
-  function overThreshold() {
-    return parseNumberBRL(projectBudgetInput.value) >= REQ_THRESHOLD;
-  }
-
-  function updateCapexFlag() {
-    const n = parseNumberBRL(projectBudgetInput.value);
-    if (!n) {
-      capexFlag.textContent = '';
-      return;
-    }
-    capexFlag.innerHTML = n >= REQ_THRESHOLD
-      ? `<span class="ok">Orçamento do Projeto ${BRL.format(n)} &ge; ${BRL.format(REQ_THRESHOLD)} — marcos obrigatórios.</span>`
-      : `Orçamento do Projeto ${BRL.format(n)} &lt; ${BRL.format(REQ_THRESHOLD)} — marcos não necessários.`;
-  }
-
-  function updateMilestoneVisibility() {
-    const budget = parseNumberBRL(projectBudgetInput.value);
-    const showMilestones = budget >= REQ_THRESHOLD;
-    const showPep = budget > 0 && budget < REQ_THRESHOLD;
-
-    milestoneSection.style.display = showMilestones ? 'block' : 'none';
-    if (!showMilestones) {
-      milestonesWrap.innerHTML = '';
-      milestoneCount = 0;
-      refreshGantt();
-    }
-
-    if (pepSection) {
-      pepSection.style.display = showPep ? 'block' : 'none';
-      if (!showPep) {
-        if (pepDropdown) {
-          pepDropdown.value = '';
-          pepDropdown.dataset.selectedPep = '';
-          pepDropdown.classList.remove('is-invalid');
-        }
-        if (pepValueInput) {
-          pepValueInput.value = '';
-        }
-      } else if (pepDropdown) {
-        updatePepValueDisplay();
-      }
-    }
-  }
-
-  function resetForm() {
-    form.reset();
-    currentProjectsId = null;
-    [...form.elements].forEach(el => el.disabled = false);
-    if (saveDraftBtn) saveDraftBtn.style.display = 'inline-flex';
-    submitBtn.style.display = 'inline-flex';
-    if (pepDropdown) {
-      pepDropdown.value = '';
-      pepDropdown.dataset.selectedPep = '';
-      pepDropdown.classList.remove('is-invalid');
-    }
-    if (pepValueInput) {
-      pepValueInput.value = '';
-    }
-    if (pepSection) {
-      pepSection.style.display = 'none';
-    }
-    milestonesWrap.innerHTML = '';
-    milestoneCount = 0;
-    refreshGantt();
-  }
-
-  function showForm() {
-    if (appContainer) appContainer.style.display = 'none';
-    form.style.display = 'block';
-    if (backBtn) backBtn.style.display = 'inline-flex';
-    if (newProjectBtn) newProjectBtn.style.display = 'none';
-    document.body.style.overflow = 'auto';
-  }
-
-  function showProjectList() {
-    form.style.display = 'none';
-    if (appContainer) appContainer.style.display = 'flex';
-    if (backBtn) backBtn.style.display = 'none';
-    if (newProjectBtn) newProjectBtn.style.display = 'inline-block';
-    resetForm();
-    document.body.style.overflow = 'hidden';
-  }
-
-  function showProjectDetails(item) {
-    if (!projectDetails) return;
-
-    projectDetails.innerHTML = '';
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'project-details';
-
-    if (!item) {
-      const empty = document.createElement('div');
-      empty.className = 'empty';
-      const emptyTitle = document.createElement('p');
-      emptyTitle.className = 'empty-title';
-      emptyTitle.textContent = 'Selecione um projeto';
-      const emptyCopy = document.createElement('p');
-      emptyCopy.textContent = 'Clique em um projeto na lista ao lado para ver os detalhes';
-      empty.append(emptyTitle, emptyCopy);
-      wrapper.appendChild(empty);
-      projectDetails.appendChild(wrapper);
-      return;
-    }
-
-    const createDetailCard = (label, value, valueClass = '') => {
-      const card = document.createElement('div');
-      card.className = 'detail-card';
-      const heading = document.createElement('h3');
-      heading.textContent = label;
-      const text = document.createElement('p');
-      if (valueClass) text.className = valueClass;
-      text.textContent = value;
-      card.append(heading, text);
-      return card;
-    };
-
-    const header = document.createElement('div');
-    header.className = 'details-header';
-    const titleEl = document.createElement('h1');
-    titleEl.textContent = item.Title || '';
-    const statusBadge = document.createElement('span');
-    statusBadge.className = 'status-badge';
-    const statusValue = item.status || '';
-    statusBadge.textContent = statusValue;
-    statusBadge.style.background = getStatusColor(statusValue);
-    header.append(titleEl, statusBadge);
-
-    const grid = document.createElement('div');
-    grid.className = 'details-grid';
-
-    const budgetCard = createDetailCard('Orçamento', BRL.format(item.budgetBrl ?? 0), 'budget-value');
-    const responsible = createDetailCard('Responsável', item.projectLeader || item.projectUser || '');
-    const startDate = createDetailCard('Data de Início', formatDate(item.startDate));
-    const endDate = createDetailCard('Data de Conclusão', formatDate(item.endDate));
-
-    const descriptionCard = createDetailCard('Descrição do Projeto', item.businessNeed || item.proposedSolution || '');
-    descriptionCard.classList.add('detail-desc');
-
-    grid.append(budgetCard, responsible, startDate, endDate, descriptionCard);
-
-    const actions = document.createElement('div');
-    actions.className = 'detail-actions';
-
-    const addActionButton = (label, className, handler) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = className;
-      button.textContent = label;
-      if (typeof handler === 'function') {
-        button.addEventListener('click', handler);
-      }
-      actions.appendChild(button);
-      return button;
-    };
-
-    const status = item.status || '';
-
-    switch (status) {
-      case 'Rascunho':
-        addActionButton('Editar Projeto', 'btn secondary action-btn', () => editProject(item.Id));
-        addActionButton('Enviar para Aprovação', 'btn primary action-btn approve');
-        break;
-      case 'Reprovado para Revisão':
-        addActionButton('Editar Projeto', 'btn secondary action-btn', () => editProject(item.Id));
-        break;
-      case 'Aprovado':
-      case 'Em Aprovação':
-        addActionButton('Visualizar Projeto', 'btn secondary action-btn', () => editProject(item.Id));
-        break;
-      case 'Reprovado':
-        break;
-      default:
-        addActionButton('Editar Projeto', 'btn secondary action-btn', () => editProject(item.Id));
-        break;
-    }
-
-    wrapper.append(header, grid);
-    if (actions.childElementCount > 0) {
-      wrapper.appendChild(actions);
-    }
-
-    projectDetails.appendChild(wrapper);
-  }
-
-  // ========================================================================
-  // CRUD de Projetos (create, update, delete, list)
-  // ========================================================================
-  function getProjectData() {
-    return {
-      nome: getValueFromSelector('projectName').trim(),
-      ano_aprovacao: parseInt(getValueFromSelector('approvalYear', 0), 10),
-      capex_budget_brl: parseNumberBRL(getValueFromSelector('projectBudget')),
-      nivel_investimento: getValueFromSelector('investmentLevel').trim(),
-      origem_verba: getValueFromSelector('fundingSource').trim(),
-      project_user: getValueFromSelector('projectUser').trim(),
-      project_leader: getValueFromSelector('projectLeader').trim(),
-      empresa: getValueFromSelector('company').trim(),
-      centro: getValueFromSelector('center').trim(),
-      unidade: getValueFromSelector('unit').trim(),
-      local_implantacao: getValueFromSelector('projectLocation').trim(),
-      ccusto_depreciacao: getValueFromSelector('depreciationCostCenter').trim(),
-      categoria: getValueFromSelector('category').trim(),
-      tipo_investimento: getValueFromSelector('investmentType').trim(),
-      tipo_ativo: getValueFromSelector('assetType').trim(),
-      funcao_projeto: getValueFromSelector('projectFunction').trim(),
-      data_inicio: getValueFromSelector('startDate', '').trim(),
-      data_fim: getValueFromSelector('endDate', '').trim(),
-      sumario: getValueFromSelector('projectSummary', '').trim(),
-      comentario: getValueFromSelector('projectComment', '').trim(),
-      kpi_tipo: getValueFromSelector('kpiType', '').trim(),
-      kpi_nome: getValueFromSelector('kpiName', '').trim(),
-      kpi_descricao: getValueFromSelector('kpiDescription', '').trim(),
-      kpi_atual: parseNumberBRL(getValueFromSelector('kpiCurrent', 0).trim()),
-      kpi_esperado: parseNumberBRL(getValueFromSelector('kpiExpected', 0).trim())
-    };
-  }
-
-  async function loadUserProjects() {
-    if (!projectList) return;
-    projectList.innerHTML = '';
-    const projetos = SharePoint.getLista('Projects');
-    const res = await projetos.getItems({
-      select: 'Id,Title,budgetBrl,status',
-      filter: `AuthorId eq '${_spPageContextInfo.userId}'`
-    });
-    const items = res.d?.results || [];
-
-    items.forEach(item => {
-      const card = document.createElement('div');
-      card.className = 'project-card';
-
-      const statusBadge = document.createElement('span');
-      statusBadge.className = 'status-badge';
-      const statusValue = item.status || '';
-      statusBadge.style.background = getStatusColor(statusValue);
-      statusBadge.textContent = statusValue || '';
-
-      const title = document.createElement('h3');
-      title.textContent = item.Title || '';
-
-      const budget = document.createElement('p');
-      const budgetValue = item.budgetBrl;
-      budget.textContent = BRL.format(budgetValue ?? 0);
-
-      card.append(statusBadge, title, budget);
-      card.addEventListener('click', async () => {
-        const fullItem = await projetos.getItemById(item.Id);
-        showProjectDetails(fullItem);
-        [...projectList.children].forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-      });
-      projectList.appendChild(card);
-    });
-    showProjectList();
-    showProjectDetails(null);
-  }
-
-  function fillForm(item) {
-    document.getElementById('projectName').value = item.Title || '';
-    document.getElementById('approvalYear').value = item.approvalYear ?? '';
-    document.getElementById('projectBudget').value = item.budgetBrl ?? '';
-    document.getElementById('investmentLevel').value = item.investmentLevel ?? '';
-    document.getElementById('fundingSource').value = item.fundingSource ?? '';
-    document.getElementById('unit').value = item.unit ?? '';
-    document.getElementById('center').value = item.center ?? '';
-    document.getElementById('projectLocation').value = item.location ?? '';
-    document.getElementById('projectUser').value = item.projectUser ?? '';
-    document.getElementById('projectLeader').value = item.projectLeader ?? '';
-    document.getElementById('company').value = item.company ?? '';
-    document.getElementById('depreciationCostCenter').value = item.depreciationCostCenter ?? '';
-    document.getElementById('category').value = item.category ?? '';
-    document.getElementById('investmentType').value = item.investmentType ?? '';
-    document.getElementById('assetType').value = item.assetType ?? '';
-    document.getElementById('projectFunction').value = item.projectFunction ?? '';
-    const startVal = item.startDate ?? '';
-    const endVal = item.endDate ?? '';
-    document.getElementById('startDate').value = startVal ? startVal.substring(0, 10) : '';
-    document.getElementById('endDate').value = endVal ? endVal.substring(0, 10) : '';
-    document.getElementById('projectSummary').value = item.businessNeed ?? '';
-    document.getElementById('projectComment').value = item.proposedSolution ?? '';
-    document.getElementById('kpiType').value = item.kpiType ?? '';
-    document.getElementById('kpiName').value = item.kpiName ?? '';
-    document.getElementById('kpiDescription').value = item.kpiDescription ?? '';
-    document.getElementById('kpiCurrent').value = item.kpiCurrent ?? '';
-    document.getElementById('kpiExpected').value = item.kpiExpected ?? '';
-    updateCapexFlag();
-    updateMilestoneVisibility();
-  }
-
-  async function editProject(id) {
-    const item = await SharePoint.getLista('Projects').getItemById(id);
-    currentProjectsId = id;
-    fillForm(item);
-    const msData = await fetchProjectStructure(id);
-    setMilestonesData(msData);
-    const statusValue = item.status || '';
-    const editable = ['Rascunho', 'Reprovado para Revisão'].includes(statusValue);
-    [...form.elements].forEach(el => el.disabled = !editable);
-    if (saveDraftBtn) saveDraftBtn.style.display = editable ? 'inline-flex' : 'none';
-    submitBtn.style.display = editable ? 'inline-flex' : 'none';
-    showForm();
-    updateStatus(`Status atual: ${statusValue}`, 'info');
-  }
-
-  async function saveDraft() {
-    const data = getProjectData();
-    const milestones = getMilestonesData();
-    const payload = {
-      Title: data.nome,
-      approvalYear: data.ano_aprovacao,
-      budgetBrl: data.capex_budget_brl,
-      investmentLevel: data.nivel_investimento,
-      fundingSource: data.origem_verba,
-      projectUser: data.project_user,
-      projectLeader: data.project_leader,
-      company: data.empresa,
-      center: data.centro,
-      unit: data.unidade,
-      location: data.local_implantacao,
-      depreciationCostCenter: data.ccusto_depreciacao,
-      category: data.categoria,
-      investmentType: data.tipo_investimento,
-      assetType: data.tipo_ativo,
-      projectFunction: data.funcao_projeto,
-      startDate: data.data_inicio || null,
-      endDate: data.data_fim || null,
-      businessNeed: data.sumario,
-      proposedSolution: data.comentario,
-      kpiType: data.kpi_tipo,
-      kpiName: data.kpi_nome,
-      kpiDescription: data.kpi_descricao,
-      kpiCurrent: data.kpi_atual,
-      kpiExpected: data.kpi_esperado,
-      status: 'Rascunho'
-    };
-    updateStatus('Salvando rascunho...', 'info');
-    try {
-      let info;
-      const projetos = SharePoint.getLista('Projects');
-      if (currentProjectsId) {
-        info = await projetos.updateItem(currentProjectsId, payload);
-      } else {
-        info = await projetos.addItem(payload);
-        currentProjectsId = info.d?.Id || info.d?.ID;
-      }
-      await clearProjectStructure(currentProjectsId);
-      await saveProjectStructure(currentProjectsId, milestones, data.ano_aprovacao);
-      updateStatus('Rascunho salvo.', 'success');
-      await loadUserProjects();
-    } catch (e) {
-      updateStatus('Erro ao salvar rascunho.', 'error');
-    }
-  }
-
-  async function updateProjectStatus(id, status) {
-    try {
-      await SharePoint.getLista('Projects').updateItem(id, { status });
-      await loadUserProjects();
-      if (currentProjectsId === id) {
-        await editProject(id);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  // ========================================================================
-  // CRUD de Milestones
-  // ========================================================================
-  function addMilestone(nameDefault) {
-    milestoneCount++;
-    const node = milestoneTpl.content.cloneNode(true);
-    const ms = node.querySelector('[data-milestone]');
-    const nameInput = node.querySelector('.milestone-name');
-    const nameSummaryHeader = node.querySelector('summary');
-    const actsWrap = node.querySelector('[data-activities]');
-    const btnAddAct = node.querySelector('[data-add-activity]');
-    const btnRemove = node.querySelector('[data-remove-milestone]');
-
-    nameInput.value = nameDefault || `Milestone ${milestoneCount}`;
-    if (nameSummaryHeader) {
-      nameSummaryHeader.textContent = nameInput.value;
-      nameInput.addEventListener('input', e => (nameSummaryHeader.textContent = e.target.value));
-    }
-
-    btnAddAct.addEventListener('click', () => {
-      addActivity(actsWrap);
-      refreshGantt();
-    });
-    btnRemove.addEventListener('click', () => {
-      ms.remove();
-      renumberMilestones();
-      refreshGantt();
-    });
-
-    milestonesWrap.appendChild(node);
-    const justAdded = milestonesWrap.lastElementChild.querySelector('[data-activities]');
-    addActivity(justAdded);
-    renumberMilestones();
-    refreshGantt();
-  }
-
-  function renumberMilestones() {
-    const all = [...milestonesWrap.querySelectorAll('.milestone-name')];
-    let idx = 1;
-    for (const el of all) {
-      if (!el.value || /^Milestone\s+\d+$/i.test(el.value.trim())) {
-        el.value = `Milestone ${idx}`;
-      }
-      idx++;
-    }
-  }
-
-  function setMilestonesData(milestones) {
-    milestonesWrap.innerHTML = '';
-    milestoneCount = 0;
-    milestones.forEach(ms => {
-      addMilestone(ms.nome);
-      const msNode = milestonesWrap.lastElementChild;
-      const actsWrap = msNode.querySelector('[data-activities]');
-      actsWrap.innerHTML = '';
-      (ms.atividades || []).forEach(act => {
-        addActivity(actsWrap);
-        const actNode = actsWrap.lastElementChild;
-        actNode.querySelector('.act-title').value = act.titulo || '';
-        const start = actNode.querySelector('.act-start');
-        const end = actNode.querySelector('.act-end');
-        if (act.inicio) start.value = act.inicio.substring(0,10);
-        if (act.fim) end.value = act.fim.substring(0,10);
-        start.dispatchEvent(new Event('change'));
-        end.dispatchEvent(new Event('change'));
-        const pepSelect = actNode.querySelector('.act-pep');
-        if (pepSelect) {
-          pepSelect.dataset.selectedPep = act.pep || '';
-          populatePepSelect(pepSelect, act.pep || '');
-          if (act.pep) {
-            pepSelect.classList.remove('is-invalid');
-          }
-        }
-        const overview = actNode.querySelector('.act-overview');
-        if (overview) overview.value = act.descricao || '';
-        (act.anual || []).forEach(a => {
-          const row = actNode.querySelector(`.row[data-year="${a.ano}"]`);
-          if (row) {
-            row.querySelector('.act-capex').value = a.capex_brl;
-          }
-        });
-      });
-    });
-    refreshGantt();
-  }
-
-  // ========================================================================
-  // CRUD de Activities
-  // ========================================================================
-  function addActivity(container) {
-    const node = activityTpl.content.cloneNode(true);
-    const act = node.querySelector('[data-activity]');
-    const btnRemove = node.querySelector('[data-remove-activity]');
-    const start = node.querySelector('.act-start');
-    const end = node.querySelector('.act-end');
-    const yearWrap = node.querySelector('[data-year-fields]');
-    const pepSelect = node.querySelector('.act-pep');
-
-    if (pepSelect) {
-      populatePepSelect(pepSelect, pepSelect.dataset.selectedPep || '');
-      pepSelect.addEventListener('change', () => {
-        pepSelect.dataset.selectedPep = pepSelect.value || '';
-        if (pepSelect.value) {
-          pepSelect.classList.remove('is-invalid');
-        }
-      });
-    }
-
-    function validateDates() {
-      if (start.value && end.value && start.value > end.value) {
-        end.setCustomValidity('A data de fim não pode ser anterior à data de início.');
-      } else {
-        end.setCustomValidity('');
-      }
-    }
-    function updateYearFields() {
-      if (!start.value || !end.value) {
-        refreshGantt();
-        return;
-      }
-      const startYear = new Date(start.value).getFullYear();
-      const endYear = new Date(end.value).getFullYear();
-      const years = [];
-      for (let y = startYear; y <= endYear; y++) {
-        const previousRow = yearWrap.querySelector(`.row[data-year="${y}"]`);
-        years.push(y+'');
-        if(previousRow !== null) continue;
-        const row = document.createElement('div');
-        row.className = 'row act-year';
-        row.dataset.year = y;
-        row.innerHTML = `
-          <div class="act-year-field act-year-value">
-            <label>Valor CAPEX da atividade (BRL) - ${y}</label>
-            <input type="number" class="act-capex" data-year="${y}" min="0" step="0.01" inputmode="decimal" required placeholder="Ex.: 250000,00" />
-          </div>
-        `;
-        yearWrap.appendChild(row);
-      }
-
-      [...yearWrap.querySelectorAll('.row[data-year]')].forEach(ye=>{
-        if(!years.includes(ye.dataset.year)) ye.remove();
-      });
-
-      refreshGantt();
-    }
-    start.addEventListener('change', () => { validateDates(); updateYearFields(); });
-    end.addEventListener('change', () => { validateDates(); updateYearFields(); });
-
-    btnRemove.addEventListener('click', () => {
-      act.remove();
-      refreshGantt();
-    });
-
-    const today = new Date().toISOString().substring(0,10);
-    const tomorrow = new Date( new Date().getTime() + 1000 * 60 * 60 * 24 ).toISOString().substring(0,10);
-    start.value = today;
-    end.value = tomorrow;
-
-    container.appendChild(node);
-    updateYearFields();
-    refreshGantt();
-  }
-
-  function getMilestonesData() {
-    const milestones = [];
-    const msNodes = [...milestonesWrap.querySelectorAll('[data-milestone]')];
-    const today = new Date().toISOString().substring(0,10);
-    msNodes.forEach(ms => {
-      const nome = getValueFromSelector('.milestone-name', "", ms).trim();
-      const acts = [...ms.querySelectorAll('[data-activity]')].map(a => {
-        const anual = [...a.querySelectorAll('.row[data-year]')].map(row => ({
-          ano: parseInt(row.dataset.year, 10),
-          capex_brl: parseNumberBRL(getValueFromSelector('.act-capex', 0, row)),
-        }));
-        const pepSelect = a.querySelector('.act-pep');
-        const pepCode = pepSelect ? (pepSelect.value || '').trim() : '';
-        return {
-          titulo: getValueFromSelector('.act-title', "", a).trim(),
-          inicio: getValueFromSelector('.act-start', today, a),
-          fim: getValueFromSelector('.act-end', today, a),
-          descricao: getValueFromSelector('.act-overview', "", a).trim(),
-          pep: pepCode,
-          anual,
-        };
-      });
-      milestones.push({ nome, atividades: acts });
-    });
-    return milestones;
-  }
-
-  // ========================================================================
-  // CRUD de Peps
-  // ========================================================================
-  async function clearProjectStructure(projectsId) {
-  const Milestones = SharePoint.getLista('Milestones');
-  const Activities = SharePoint.getLista('Activities');
-  const Peps = SharePoint.getLista('Peps');
-
-  const msRes = await Milestones.getItems({ select: 'Id', filter: `projectsId eq ${projectsId}` });
-  const marcos = msRes.d?.results || [];
-  for (const ms of marcos) {
-    const actRes = await Activities.getItems({ select: 'Id', filter: `milestonesId eq ${ms.Id}` });
-    const acts = actRes.d?.results || [];
-    for (const act of acts) {
-      const alRes = await Peps.getItems({ select: 'Id', filter: `activitiesId eq ${act.Id}` });
-      const als = alRes.d?.results || [];
-      for (const al of als) {
-        await Peps.deleteItem(al.Id);
-      }
-      await Activities.deleteItem(act.Id);
-    }
-    await Milestones.deleteItem(ms.Id);
-  }
-}
-
-async function saveProjectStructure(projectsId, milestones, projectApprovalYear) {
-  const Milestones = SharePoint.getLista('Milestones');
-  const Activities = SharePoint.getLista('Activities');
-  const Peps = SharePoint.getLista('Peps');
-  const projectLookupId = Number(projectsId);
-
-  if (!Number.isFinite(projectLookupId)) {
-    throw new Error('Project ID inválido para salvar a estrutura.');
-  }
-
-  const approvalYearNumber = Number(projectApprovalYear);
-  const projectYear = Number.isFinite(approvalYearNumber) ? approvalYearNumber : null;
-
-  const milestonesList = Array.isArray(milestones) ? milestones : [];
-  for (const milestone of milestonesList) {
-    const milestonePayload = {
-      Title: (milestone?.nome || '').trim(),
-      projectsId: projectLookupId
-    };
-
-    const infoMarco = await Milestones.addItem(milestonePayload);
-    const marcoIdRaw = infoMarco?.d?.Id ?? infoMarco?.d?.ID;
-    const marcoId = Number(marcoIdRaw);
-    if (!Number.isFinite(marcoId)) continue;
-
-    const atividades = Array.isArray(milestone?.atividades) ? milestone.atividades : [];
-    for (const atividade of atividades) {
-      const activityPayload = {
-        Title: (atividade?.titulo || '').trim(),
-        startDate: atividade?.inicio || null,
-        endDate: atividade?.fim || null,
-        activityDescription: atividade?.descricao || '',
-        milestonesId: marcoId,
-        projectsId: projectLookupId
+      const url = `${this.siteUrl}/_api/contextinfo`;
+      const headers = {
+        Accept: 'application/json;odata=verbose',
+        'Content-Type': 'application/json;odata=verbose'
       };
-
-      const infoAtv = await Activities.addItem(activityPayload);
-      const atvIdRaw = infoAtv?.d?.Id ?? infoAtv?.d?.ID;
-      const atvId = Number(atvIdRaw);
-
-      const anualEntries = Array.isArray(atividade?.anual) ? atividade.anual : [];
-      for (const anual of anualEntries) {
-        const amountNumber = Number(anual?.capex_brl ?? 0);
-        const annualYearNumber = Number(anual?.ano);
-
-        const pepPayload = {
-          Title: String((atividade?.pep || '') || atividade?.titulo || '').trim(),
-          amountBrl: Number.isFinite(amountNumber) ? amountNumber : 0,
-          year: Number.isFinite(projectYear) ? projectYear : (Number.isFinite(annualYearNumber) ? annualYearNumber : null),
-          projectsId: projectLookupId,
-          activitiesId: atvId
-        };
-
-        await Peps.addItem(pepPayload);
+      const data = await this.request(url, { method: 'POST', headers });
+      return data?.d?.GetContextWebInformation?.FormDigestValue;
+    } catch (error) {
+      if (typeof _spPageContextInfo !== 'undefined') {
+        return _spPageContextInfo.formDigestValue;
       }
+      throw error;
     }
   }
-}
 
-async function fetchProjectStructure(projectsId) {
-  const Milestones = SharePoint.getLista('Milestones');
-  const Activities = SharePoint.getLista('Activities');
-  const Peps = SharePoint.getLista('Peps');
-
-  const msRes = await Milestones.getItems({ select: 'Id,Title', filter: `projectsId eq ${projectsId}` });
-  const result = [];
-
-  for (const ms of msRes.d?.results || []) {
-    const actRes = await Activities.getItems({ select: 'Id,Title,startDate,endDate,activityDescription', filter: `milestonesId eq ${ms.Id}` });
-    const acts = [];
-
-    for (const act of actRes.d?.results || []) {
-      const alRes = await Peps.getItems({ select: 'Id,Title,year,amountBrl', filter: `activitiesId eq ${act.Id}` });
-      const anual = (alRes.d?.results || []).map(a => ({
-        ano: a.year,
-        capex_brl: a.amountBrl,
-        pepTitle: a.Title
-      }));
-
-      acts.push({
-        titulo: act.Title,
-        inicio: act.startDate,
-        fim: act.endDate,
-        descricao: act.activityDescription || '',
-        anual
-      });
-    }
-
-    result.push({ nome: ms.Title, atividades: acts });
-  }
-
-  return result;
-}
-
-  // ========================================================================
-  // Validações do formulário
-  // ========================================================================
-  function validateForm() {
-    const errs = [];
-    const errsEl = [];
-    errorsBox.style.display = 'none';
-    errorsBox.innerHTML = '';
-
-    const reqFields = [
-      { id: 'projectName', label: 'Nome do Projeto' },
-      { id: 'approvalYear', label: 'Ano de Aprovação' },
-      { id: 'projectBudget', label: 'Orçamento do Projeto em R$' },
-      { id: 'investmentLevel', label: 'Nível de Investimento' },
-      { id: 'fundingSource', label: 'Origem da Verba' },
-      { id: 'projectUser', label: 'Project User' },
-      { id: 'projectLeader', label: 'Coordenador do Projeto' },
-      { id: 'company', label: 'Empresa' },
-      { id: 'center', label: 'Centro' },
-      { id: 'unit', label: 'Unidade' },
-      { id: 'projectLocation', label: 'Local de Implantação' },
-      { id: 'depreciationCostCenter', label: 'C Custo Depreciação' },
-      { id: 'category', label: 'Categoria' },
-      { id: 'investmentType', label: 'Tipo de Investimento' },
-      { id: 'assetType', label: 'Tipo de Ativo' },
-      { id: 'projectFunction', label: 'Função do Projeto' },
-      { id: 'startDate', label: 'Data de Início' },
-      { id: 'endDate', label: 'Data de Término' },
-      { id: 'projectSummary', label: 'Sumário do Projeto' },
-      { id: 'projectComment', label: 'Comentário' },
-      { id: 'kpiType', label: 'Tipo de KPI' },
-      { id: 'kpiName', label: 'Nome do KPI' },
-      { id: 'kpiDescription', label: 'Descrição do KPI' },
-      { id: 'kpiCurrent', label: 'KPI Atual' },
-      { id: 'kpiExpected', label: 'KPI Esperado' },
-    ];
-    for (const f of reqFields) {
-      const el = document.getElementById(f.id);
-      if (!el.value || (el.type === 'number' && parseNumberBRL(el.value) < 0)) {
-        errs.push(`Preencha o campo: <strong>${f.label}</strong>.`);
-        errsEl.push(el);
-      } else {
-        el.classList.remove('is-invalid');
+  async getItems(listName, params = {}) {
+    const url = new URL(this.buildUrl(listName));
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        url.searchParams.append(`$${key}`, value);
       }
-    }
-
-    const yearVal = parseInt(approvalYearInput.value, 10);
-    if (isNaN(yearVal) || yearVal > currentYear) {
-      errsEl.push(approvalYearInput);
-      errs.push(`O <strong>ano de aprovação</strong> deve ser menor ou igual a ${currentYear}.`);
-    } else {
-      approvalYearInput.classList.remove('is-invalid');
-    }
-
-    const mustHaveMilestone = overThreshold();
-    const milestones = [...milestonesWrap.querySelectorAll('[data-milestone]')];
-
-    if (mustHaveMilestone && milestones.length === 0) {
-      errs.push('O valor CAPEX é superior ou igual a R$ 1.000.000,00. Adicione pelo menos <strong>1 marco</strong>.');
-    }
-
-    if (!mustHaveMilestone && pepSection && pepSection.style.display !== 'none') {
-      if (pepDropdown) {
-        if (!pepDropdown.value) {
-          errs.push('Selecione um <strong>elemento PEP</strong> na seção Elementos PEP.');
-          errsEl.push(pepDropdown);
-        } else {
-          pepDropdown.classList.remove('is-invalid');
-        }
-      }
-    }
-
-    milestones.forEach((ms, i) => {
-      const idx = i + 1;
-      const name = ms.querySelector('.milestone-name');
-      if (!name.value.trim()) {
-        errs.push(`Informe o <strong>nome do marco ${idx}</strong>.`);
-      }
-      const acts = [...ms.querySelectorAll('[data-activity]')];
-      if (acts.length === 0) {
-        errs.push(`O <strong>marco ${idx}</strong> deve possuir pelo menos 1 atividade.`);
-      }
-      acts.forEach((a, j) => {
-        const jdx = j + 1;
-        const title = a.querySelector('.act-title');
-        const start = a.querySelector('.act-start');
-        const end = a.querySelector('.act-end');
-        const overviewEl = a.querySelector('.act-overview');
-        const pepSelect = a.querySelector('.act-pep');
-        const yearRows = [...a.querySelectorAll('.row[data-year]')];
-
-        if (!title.value.trim()) errs.push(`Atividade ${jdx} do marco ${idx}: informe o <strong>título</strong>.`);
-        if (!start.value) errs.push(`Atividade ${jdx} do marco ${idx}: informe a <strong>data de início</strong>.`);
-        if (!end.value) errs.push(`Atividade ${jdx} do marco ${idx}: informe a <strong>data de fim</strong>.`);
-        if (start.value && end.value && start.value > end.value) {
-          errs.push(`Atividade ${jdx} do marco ${idx}: a <strong>data de início</strong> não pode ser posterior à <strong>data de fim</strong>.`);
-        }
-        if (overviewEl) {
-          if (!overviewEl.value.trim()) {
-            errs.push(`Atividade ${jdx} do marco ${idx}: informe a <strong>descrição da atividade</strong>.`);
-            errsEl.push(overviewEl);
-          }
-        }
-        if (pepSelect) {
-          if (!pepSelect.value) {
-            errs.push(`Atividade ${jdx} do marco ${idx}: selecione o <strong>elemento PEP</strong>.`);
-            errsEl.push(pepSelect);
-          } else {
-            pepSelect.classList.remove('is-invalid');
-          }
-        }
-        if (yearRows.length === 0) {
-          errs.push(`Atividade ${jdx} do marco ${idx}: defina <strong>datas de início e fim</strong> válidas para gerar campos anuais.`);
-        }
-        yearRows.forEach(row => {
-          const ano = row.dataset.year;
-          const cap = parseNumberBRL(getValueFromSelector('.act-capex', 0, row));
-          if (isNaN(cap) || cap < 0) {
-            errs.push(`Atividade ${jdx} do marco ${idx}, ano ${ano}: informe o <strong>valor CAPEX</strong> (BRL) válido (≥ 0).`);
-          }
-        });
-      });
     });
+    const headers = { Accept: 'application/json;odata=verbose' };
+    const data = await this.request(url.toString(), { headers });
+    return data?.d?.results ?? [];
+  }
 
-    if (errs.length) {
-      const ul = document.createElement('ul');
-      errs.forEach(e => {
-        const li = document.createElement('li');
-        li.innerHTML = e;
-        ul.appendChild(li);
-      });
-      errorsBox.appendChild(document.createTextNode('Por favor, corrija os itens abaixo:'));
-      errorsBox.appendChild(ul);
-      errorsBox.style.display = 'block';
-      errsEl.forEach(inel=>inel.classList.add('is-invalid'));
-      try {
-        errsEl[0].scrollIntoView({ behavior: "smooth" });
-        errsEl[0].focus();
-      } catch (error) {
+  async getItem(listName, id) {
+    const url = this.buildUrl(listName, `/items(${id})`);
+    const headers = { Accept: 'application/json;odata=verbose' };
+    const data = await this.request(url, { headers });
+    return data?.d ?? null;
+  }
 
-      }
-      return false;
-    }
+  async createItem(listName, payload) {
+    const digest = await this.getFormDigest();
+    const headers = {
+      Accept: 'application/json;odata=verbose',
+      'Content-Type': 'application/json;odata=verbose',
+      'X-RequestDigest': digest
+    };
+    const body = JSON.stringify({
+      __metadata: { type: this.encodeEntity(listName) },
+      ...payload
+    });
+    const data = await this.request(this.buildUrl(listName), { method: 'POST', headers, body });
+    return data?.d ?? null;
+  }
+
+  async updateItem(listName, id, payload) {
+    const digest = await this.getFormDigest();
+    const headers = {
+      Accept: 'application/json;odata=verbose',
+      'Content-Type': 'application/json;odata=verbose',
+      'X-RequestDigest': digest,
+      'IF-MATCH': '*',
+      'X-HTTP-Method': 'MERGE'
+    };
+    const body = JSON.stringify({
+      __metadata: { type: this.encodeEntity(listName) },
+      ...payload
+    });
+    await this.request(this.buildUrl(listName, `/items(${id})`), { method: 'POST', headers, body });
     return true;
   }
 
-  // ========================================================================
-  // Renderização de Gantt
-  // ========================================================================
-  function drawGantt(milestones) {
-    const chartEl = document.getElementById('ganttChart');
-    const titleEl = document.getElementById('ganttCharTitle');
+  async deleteItem(listName, id) {
+    const digest = await this.getFormDigest();
+    const headers = {
+      Accept: 'application/json;odata=verbose',
+      'X-RequestDigest': digest,
+      'IF-MATCH': '*',
+      'X-HTTP-Method': 'DELETE'
+    };
+    await this.request(this.buildUrl(listName, `/items(${id})`), { method: 'POST', headers });
+    return true;
+  }
+}
 
-    const data = new google.visualization.DataTable();
-    data.addColumn('string', 'Task ID');
-    data.addColumn('string', 'Task Name');
-    data.addColumn('string', 'Resource');
-    data.addColumn('date', 'Start Date');
-    data.addColumn('date', 'End Date');
-    data.addColumn('number', 'Duration');
-    data.addColumn('number', 'Percent Complete');
-    data.addColumn('string', 'Dependencies');
-    data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
+// ============================================================================
+// Estado global e referências da interface
+// ============================================================================
+const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const DATE_FMT = new Intl.DateTimeFormat('pt-BR');
+const BUDGET_THRESHOLD = 1_000_000;
 
-    const rows = [];
-    let idCounter = 0;
-    milestones.forEach((ms) => {
-      idCounter++;
-      let msStart = null;
-      let msEnd = null;
-      const actRows = [];
-      (ms.atividades || []).forEach((act, index) => {
-        const startDate = act.inicio ? new Date(act.inicio) : new Date();
-        const endDate = act.fim ? new Date(act.fim) : new Date(startDate.getTime() + 1000 * 60 * 60 * 24);
-        if (startDate && (!msStart || startDate < msStart)) msStart = startDate;
-        if (endDate && (!msEnd || endDate > msEnd)) msEnd = endDate;
-        const totalCapex = (act.anual || []).reduce((sum, y) => sum + (y.capex_brl || 0), 0);
-        const descTooltip = (act.anual || []).map((y) => `${y.ano}: ${BRL.format(y.capex_brl)}`).join('<br/>');
-        const pepTooltip = act.pep ? `<br/>PEP: ${act.pep}` : '';
-        actRows.push([
-          `ms-${idCounter}-${index}`,
-          act.titulo || `Atividade ${index + 1}`,
-          'Atividade',
-          startDate,
-          endDate,
-          null,
-          0,
-          `ms-${idCounter}`,
-          `CAPEX total: ${BRL.format(totalCapex)}${descTooltip ? '<br/>' + descTooltip : ''}${pepTooltip}`
-        ]);
-      });
+const SITE_URL = window.SHAREPOINT_SITE_URL || 'https://<seu-tenant>.sharepoint.com/sites/<seu-site>';
+const sp = new SharePointService(SITE_URL);
 
-      if (msStart && msEnd) {
-        rows.push([
-          `ms-${idCounter}`,
-          ms.nome,
-          'milestone',
-          msStart,
-          msEnd,
-          null,
-          0,
-          null,
-          ms.nome
-        ]);
-      }
-      rows.push(...actRows);
-    });
+const state = {
+  projects: [],
+  selectedProjectId: null,
+  currentDetails: null,
+  editingSnapshot: {
+    simplePeps: new Set(),
+    milestones: new Set(),
+    activities: new Set(),
+    activityPeps: new Set()
+  }
+};
 
-    if (!rows.length) {
-      chartEl.innerHTML = '';
-      titleEl.style.display = 'none';
+const newProjectBtn = document.getElementById('newProjectBtn');
+const projectSearch = document.getElementById('projectSearch');
+const projectList = document.getElementById('projectList');
+const projectDetails = document.getElementById('projectDetails');
+const overlay = document.getElementById('formOverlay');
+const projectForm = document.getElementById('projectForm');
+const formTitle = document.getElementById('formTitle');
+const closeFormBtn = document.getElementById('closeFormBtn');
+const sendApprovalBtn = document.getElementById('sendApprovalBtn');
+const formStatus = document.getElementById('formStatus');
+const formErrors = document.getElementById('formErrors');
+const statusField = document.getElementById('statusField');
+const budgetHint = document.getElementById('budgetHint');
+const simplePepSection = document.getElementById('simplePepSection');
+const simplePepList = document.getElementById('simplePepList');
+const addSimplePepBtn = document.getElementById('addSimplePepBtn');
+const keyProjectSection = document.getElementById('keyProjectSection');
+const milestoneList = document.getElementById('milestoneList');
+const addMilestoneBtn = document.getElementById('addMilestoneBtn');
+
+const approvalYearInput = document.getElementById('approvalYear');
+const projectBudgetInput = document.getElementById('projectBudget');
+
+const simplePepTemplate = document.getElementById('simplePepTemplate');
+const milestoneTemplate = document.getElementById('milestoneTemplate');
+const activityTemplate = document.getElementById('activityTemplate');
+const activityPepTemplate = document.getElementById('activityPepTemplate');
+
+// ============================================================================
+// Inicialização
+// ============================================================================
+function init() {
+  bindEvents();
+  const currentYear = new Date().getFullYear();
+  approvalYearInput.value = currentYear;
+  approvalYearInput.max = currentYear;
+  loadProjects();
+}
+
+function bindEvents() {
+  newProjectBtn.addEventListener('click', () => openProjectForm('create'));
+  closeFormBtn.addEventListener('click', closeForm);
+  projectSearch.addEventListener('input', () => renderProjectList());
+
+  projectForm.addEventListener('submit', handleFormSubmit);
+  sendApprovalBtn.addEventListener('click', () => {
+    projectForm.dataset.action = 'approval';
+    projectForm.requestSubmit();
+  });
+
+  projectBudgetInput.addEventListener('input', () => updateBudgetSections());
+  approvalYearInput.addEventListener('input', () => updateSimplePepYears());
+
+  addSimplePepBtn.addEventListener('click', () => {
+    ensureSimplePepRow();
+  });
+
+  addMilestoneBtn.addEventListener('click', () => {
+    ensureMilestoneBlock();
+  });
+
+  simplePepList.addEventListener('click', (event) => {
+    if (event.target.classList.contains('remove-row')) {
+      const row = event.target.closest('.pep-row');
+      row?.remove();
+    }
+  });
+
+  milestoneList.addEventListener('click', (event) => {
+    if (event.target.classList.contains('remove-milestone')) {
+      event.target.closest('.milestone')?.remove();
       return;
     }
-
-    titleEl.style.display = 'block';
-
-    data.addRows(rows);
-    const chart = new google.visualization.Gantt(chartEl);
-    chart.draw(data, {
-      height: Math.max(200, rows.length * 40 + 40),
-      tooltip: { isHtml: true },
-      gantt: {
-        criticalPathEnabled: false,
-        arrow: {
-          angle: 0,
-          width: 0,
-          color: '#ffffff',
-          radius: 0
-        },
-        trackHeight: 30,
-        palette: [
-          { color: '#460a78', dark: '#be2846', light: '#e63c41' },
-          { color: '#f58746', dark: '#e63c41', light: '#ffbe6e' }
-        ]
-      }
-    });
-  }
-
-  function refreshGantt() {
-    const milestones = getMilestonesData();
-    const draw = () => drawGantt(milestones);
-    if (google.visualization && google.visualization.Gantt) {
-      draw();
-    } else {
-      google.charts.setOnLoadCallback(draw);
+    if (event.target.classList.contains('add-activity')) {
+      const milestone = event.target.closest('.milestone');
+      addActivityBlock(milestone);
+      return;
     }
+    if (event.target.classList.contains('remove-activity')) {
+      event.target.closest('.activity')?.remove();
+      return;
+    }
+    if (event.target.classList.contains('add-activity-pep')) {
+      const activity = event.target.closest('.activity');
+      addActivityPepRow(activity);
+      return;
+    }
+    if (event.target.classList.contains('remove-activity-pep')) {
+      event.target.closest('.activity-pep')?.remove();
+    }
+  });
+}
+
+// ============================================================================
+// Carregamento e renderização da lista de projetos
+// ============================================================================
+async function loadProjects() {
+  try {
+    const results = await sp.getItems('Projects', { orderby: 'Created desc' });
+    state.projects = results;
+    renderProjectList();
+  } catch (error) {
+    console.error('Erro ao carregar projetos', error);
+  }
+}
+
+function renderProjectList() {
+  const filter = projectSearch.value.toLowerCase();
+  projectList.innerHTML = '';
+
+  const filtered = state.projects.filter((item) =>
+    item.Title?.toLowerCase().includes(filter)
+  );
+
+  if (filtered.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'hint';
+    empty.textContent = 'Nenhum projeto encontrado.';
+    projectList.append(empty);
+    return;
   }
 
-  // ========================================================================
-  // Listeners de eventos (submit, reset, botões, inputs)
-  // ========================================================================
-  if (newProjectBtn) {
-    newProjectBtn.addEventListener('click', () => {
-      resetFormWithoutAlert = true;
-      resetForm();
-      showForm();
-      updateStatus('', 'info');
-      resetFormWithoutAlert = false;
-    });
-  }
+  filtered.forEach((item) => {
+    const card = document.createElement('article');
+    card.className = 'project-card';
+    if (state.selectedProjectId === item.Id) {
+      card.classList.add('selected');
+    }
+    card.dataset.id = item.Id;
 
-  addMilestoneBtn.addEventListener('click', () => addMilestone());
-  milestoneSection.addEventListener('input', refreshGantt);
-  milestoneSection.addEventListener('change', refreshGantt);
-  if (saveDraftBtn) saveDraftBtn.addEventListener('click', saveDraft);
-  if (backBtn) backBtn.addEventListener('click', showProjectList);
+    const title = document.createElement('h3');
+    title.textContent = item.Title || 'Projeto sem título';
 
-  if (projectBudgetInput) {
-    projectBudgetInput.addEventListener('input', () => {
-      updateCapexFlag();
-      updateMilestoneVisibility();
-      refreshGantt();
-    });
-    projectBudgetInput.addEventListener('change', () => {
-      updateCapexFlag();
-      updateMilestoneVisibility();
-      refreshGantt();
-    });
-  }
+    const status = document.createElement('span');
+    status.className = 'status';
+    status.style.background = statusColor(item.status);
+    status.textContent = item.status || 'Sem status';
 
-  if (pepDropdown) {
-    pepDropdown.addEventListener('change', () => {
-      updatePepValueDisplay();
-    });
-  }
+    const info = document.createElement('p');
+    const budget = item.budgetBrl ? ` • ${BRL.format(item.budgetBrl)}` : '';
+    info.textContent = `${item.approvalYear || ''}${budget}`.trim();
 
-  form.addEventListener('submit', async (ev) => {
-    ev.preventDefault();
-    updateCapexFlag();
-    updateMilestoneVisibility();
-    if (!validateForm()) return;
+    card.append(title, status, info);
+    card.addEventListener('click', () => selectProject(item.Id));
+    projectList.append(card);
+  });
+}
 
-    updateStatus('Enviando dados...', 'info');
-    submitBtn.disabled = true;
+async function selectProject(projectId) {
+  state.selectedProjectId = projectId;
+  renderProjectList();
+  await loadProjectDetails(projectId);
+}
 
-    const payload = {
-      projeto: getProjectData(),
-      milestones: getMilestonesData()
+async function loadProjectDetails(projectId) {
+  projectDetails.innerHTML = '';
+  const loader = document.createElement('p');
+  loader.textContent = 'Carregando…';
+  loader.className = 'hint';
+  projectDetails.append(loader);
+
+  try {
+    const project = await sp.getItem('Projects', projectId);
+    const [milestones, activities, peps] = await Promise.all([
+      sp.getItems('Milestones', { filter: `projectsId eq ${projectId}` }),
+      sp.getItems('Activities', { filter: `projectsId eq ${projectId}` }),
+      sp.getItems('Peps', { filter: `projectsId eq ${projectId}` })
+    ]);
+
+    const detail = {
+      project,
+      milestones,
+      activities,
+      peps,
+      simplePeps: peps.filter((pep) => !pep.activitiesId),
+      activityPeps: peps.filter((pep) => pep.activitiesId)
     };
 
-    const Projetos = SharePoint.getLista('Projects');
+    state.currentDetails = detail;
+    renderProjectDetails(detail);
+  } catch (error) {
+    console.error('Erro ao carregar detalhes do projeto', error);
+    projectDetails.innerHTML = '';
+    const errorBox = document.createElement('p');
+    errorBox.className = 'hint';
+    errorBox.textContent = 'Não foi possível carregar os dados do projeto.';
+    projectDetails.append(errorBox);
+  }
+}
 
-    try {
-      const infoProjeto = await Projetos.addItem({
-        Title: payload.projeto.nome,
-        approvalYear: payload.projeto.ano_aprovacao,
-        budgetBrl: payload.projeto.capex_budget_brl,
-        investmentLevel: payload.projeto.nivel_investimento,
-        fundingSource: payload.projeto.origem_verba,
-        projectUser: payload.projeto.project_user,
-        projectLeader: payload.projeto.project_leader,
-        company: payload.projeto.empresa,
-        center: payload.projeto.centro,
-        unit: payload.projeto.unidade,
-        location: payload.projeto.local_implantacao,
-        depreciationCostCenter: payload.projeto.ccusto_depreciacao,
-        category: payload.projeto.categoria,
-        investmentType: payload.projeto.tipo_investimento,
-        assetType: payload.projeto.tipo_ativo,
-        projectFunction: payload.projeto.funcao_projeto,
-        startDate: payload.projeto.data_inicio || null,
-        endDate: payload.projeto.data_fim || null,
-        businessNeed: payload.projeto.sumario,
-        proposedSolution: payload.projeto.comentario,
-        kpiType: payload.projeto.kpi_tipo,
-        kpiName: payload.projeto.kpi_nome,
-        kpiDescription: payload.projeto.kpi_descricao,
-        kpiCurrent: payload.projeto.kpi_atual,
-        kpiExpected: payload.projeto.kpi_esperado
-      });
+function renderProjectDetails(detail) {
+  projectDetails.innerHTML = '';
+  if (!detail?.project) {
+    projectDetails.append(createEmptyState());
+    return;
+  }
 
-      const projectsId = Number(infoProjeto?.d?.Id ?? infoProjeto?.d?.ID);
-      if (!Number.isFinite(projectsId)) {
-        throw new Error('Project ID inválido retornado pelo SharePoint.');
+  const { project, milestones, activities, simplePeps, activityPeps } = detail;
+  if (project.status === 'Reprovado') {
+    return;
+  }
+
+  const wrapper = document.createElement('div');
+
+  const header = document.createElement('div');
+  header.className = 'details-header';
+  const title = document.createElement('h2');
+  title.textContent = project.Title || 'Projeto sem título';
+  const status = document.createElement('span');
+  status.className = 'status';
+  status.style.background = statusColor(project.status);
+  status.textContent = project.status || 'Sem status';
+  header.append(title, status);
+
+  if (['Rascunho', 'Reprovado para Revisão'].includes(project.status)) {
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn primary';
+    editBtn.textContent = 'Editar Projeto';
+    editBtn.addEventListener('click', () => openProjectForm('edit', detail));
+    header.append(editBtn);
+  } else if (project.status === 'Aprovado') {
+    const info = document.createElement('p');
+    info.className = 'hint';
+    info.textContent = 'Projeto aprovado - somente leitura.';
+    header.append(info);
+  }
+
+  wrapper.append(header);
+
+  const overview = document.createElement('div');
+  overview.className = 'details-grid';
+
+  overview.append(
+    createDetailBox('Ano de Aprovação', project.approvalYear),
+    createDetailBox('Orçamento (R$)', project.budgetBrl ? BRL.format(project.budgetBrl) : ''),
+    createDetailBox('Nível de Investimento', project.investmentLevel),
+    createDetailBox('Origem da Verba', project.fundingSource)
+  );
+
+  overview.append(
+    createDetailBox('Empresa', project.company),
+    createDetailBox('Centro', project.center),
+    createDetailBox('Unidade', project.unit),
+    createDetailBox('Local de Implantação', project.location)
+  );
+
+  overview.append(
+    createDetailBox('Project User', project.projectUser),
+    createDetailBox('Coordenador do Projeto', project.projectLeader),
+    createDetailBox('Período', formatPeriod(project.startDate, project.endDate))
+  );
+
+  wrapper.append(overview);
+
+  wrapper.append(createTextSection('Sumário do Projeto', project.businessNeed));
+  wrapper.append(createTextSection('Comentário', project.proposedSolution));
+
+  const kpiSection = document.createElement('div');
+  kpiSection.className = 'detail-box';
+  const kpiTitle = document.createElement('h4');
+  kpiTitle.textContent = 'Indicadores de Desempenho';
+  const kpiContent = document.createElement('p');
+  const pieces = [
+    project.kpiType ? `Tipo: ${project.kpiType}` : '',
+    project.kpiName ? `Nome: ${project.kpiName}` : '',
+    project.kpiDescription ? `Descrição: ${project.kpiDescription}` : '',
+    project.kpiCurrent !== null && project.kpiCurrent !== undefined ? `Atual: ${project.kpiCurrent}` : '',
+    project.kpiExpected !== null && project.kpiExpected !== undefined ? `Esperado: ${project.kpiExpected}` : ''
+  ].filter(Boolean);
+  kpiContent.innerHTML = pieces.join('<br>') || 'Sem indicadores informados.';
+  kpiSection.append(kpiTitle, kpiContent);
+  wrapper.append(kpiSection);
+
+  if (project.budgetBrl < BUDGET_THRESHOLD && simplePeps.length) {
+    wrapper.append(createPepSection(simplePeps));
+  }
+
+  if (project.budgetBrl >= BUDGET_THRESHOLD && milestones.length) {
+    wrapper.append(createKeyProjectsSection(milestones, activities, activityPeps));
+  }
+
+  projectDetails.append(wrapper);
+}
+
+function createEmptyState() {
+  const empty = document.createElement('div');
+  empty.className = 'empty-state';
+  const title = document.createElement('h2');
+  title.textContent = 'Selecione um projeto';
+  const text = document.createElement('p');
+  text.textContent = 'Escolha um item na lista ao lado para visualizar os detalhes.';
+  empty.append(title, text);
+  return empty;
+}
+
+function createDetailBox(label, value) {
+  const box = document.createElement('div');
+  box.className = 'detail-box';
+  const title = document.createElement('h4');
+  title.textContent = label;
+  const text = document.createElement('p');
+  text.textContent = value || '—';
+  box.append(title, text);
+  return box;
+}
+
+function createTextSection(label, content) {
+  const container = document.createElement('section');
+  const title = document.createElement('h3');
+  title.className = 'section-title';
+  title.textContent = label;
+  const box = document.createElement('div');
+  box.className = 'detail-box';
+  const text = document.createElement('p');
+  text.textContent = content || 'Sem informações.';
+  box.append(text);
+  container.append(title, box);
+  return container;
+}
+
+function createPepSection(peps) {
+  const container = document.createElement('section');
+  const title = document.createElement('h3');
+  title.className = 'section-title';
+  title.textContent = 'PEPs do Projeto';
+  const list = document.createElement('div');
+  list.className = 'inline-list';
+  peps.forEach((pep) => {
+    const article = document.createElement('article');
+    const heading = document.createElement('h4');
+    heading.textContent = pep.Title || 'Elemento PEP';
+    const text = document.createElement('p');
+    const amount = pep.amountBrl ? BRL.format(pep.amountBrl) : '—';
+    text.textContent = `Valor: ${amount} • Ano: ${pep.year || '—'}`;
+    article.append(heading, text);
+    list.append(article);
+  });
+  container.append(title, list);
+  return container;
+}
+
+function createKeyProjectsSection(milestones, activities, activityPeps) {
+  const container = document.createElement('section');
+  const title = document.createElement('h3');
+  title.className = 'section-title';
+  title.textContent = 'Key Projects';
+  container.append(title);
+
+  const list = document.createElement('div');
+  list.className = 'inline-list';
+
+  milestones.forEach((milestone) => {
+    const article = document.createElement('article');
+    const heading = document.createElement('h4');
+    heading.textContent = milestone.Title || 'Marco';
+    article.append(heading);
+
+    const milestoneActivities = activities.filter((act) => act.milestonesId === milestone.Id);
+    milestoneActivities.forEach((activity) => {
+      const activityBox = document.createElement('div');
+      activityBox.className = 'detail-box';
+      const activityTitle = document.createElement('strong');
+      activityTitle.textContent = activity.Title || 'Atividade';
+      const description = document.createElement('div');
+      description.innerHTML = [
+        formatPeriod(activity.startDate, activity.endDate),
+        activity.supplier ? `Fornecedor: ${activity.supplier}` : '',
+        activity.activityDescription || ''
+      ].filter(Boolean).join('<br>');
+
+      const pepsForActivity = activityPeps.filter((pep) => pep.activitiesId === activity.Id);
+      if (pepsForActivity.length) {
+        const pepList = document.createElement('ul');
+        pepsForActivity.forEach((pep) => {
+          const li = document.createElement('li');
+          const amount = pep.amountBrl ? BRL.format(pep.amountBrl) : '—';
+          li.textContent = `${pep.Title || 'PEP'} • ${amount} • Ano ${pep.year || '—'}`;
+          pepList.append(li);
+        });
+        description.appendChild(pepList);
       }
 
-      await saveProjectStructure(projectsId, payload.milestones, payload.projeto.ano_aprovacao);
-      updateStatus('Formulário enviado com sucesso!', 'success');
-      refreshGantt();
-      await loadUserProjects();
-    } catch (error) {
-      updateStatus('Ops, algo deu errado.', 'error');
-    } finally {
-      submitBtn.disabled = false;
-    }
+      activityBox.append(activityTitle, description);
+      article.append(activityBox);
+    });
+
+    list.append(article);
   });
 
-  form.addEventListener('reset', ev => {
-    if (resetFormWithoutAlert === false && !confirm('Tem certeza que deseja limpar o formulário?')) {
-      ev.preventDefault();
+  container.append(list);
+  return container;
+}
+
+// ============================================================================
+// Formulário: abertura, preenchimento e coleta dos dados
+// ============================================================================
+function openProjectForm(mode, detail = null) {
+  projectForm.reset();
+  formStatus.classList.remove('show');
+  formErrors.classList.remove('show');
+  formErrors.textContent = '';
+  projectForm.dataset.mode = mode;
+  projectForm.dataset.action = 'save';
+  projectForm.dataset.projectId = detail?.project?.Id || '';
+
+  state.editingSnapshot = {
+    simplePeps: new Set(),
+    milestones: new Set(),
+    activities: new Set(),
+    activityPeps: new Set()
+  };
+
+  simplePepList.innerHTML = '';
+  milestoneList.innerHTML = '';
+
+  if (mode === 'create') {
+    formTitle.textContent = 'Novo Projeto';
+    statusField.value = 'Rascunho';
+    sendApprovalBtn.classList.remove('hidden');
+    updateBudgetSections({ clear: true });
+  } else if (detail) {
+    fillFormWithProject(detail);
+  }
+
+  updateSimplePepYears();
+  overlay.classList.remove('hidden');
+}
+
+function fillFormWithProject(detail) {
+  const { project, simplePeps, milestones, activities, activityPeps } = detail;
+  formTitle.textContent = `Editar Projeto #${project.Id}`;
+  statusField.value = project.status || 'Rascunho';
+  sendApprovalBtn.classList.toggle('hidden', !['Rascunho', 'Reprovado para Revisão'].includes(project.status));
+
+  document.getElementById('projectName').value = project.Title || '';
+  document.getElementById('category').value = project.category || '';
+  document.getElementById('investmentType').value = project.investmentType || '';
+  document.getElementById('assetType').value = project.assetType || '';
+  document.getElementById('projectFunction').value = project.projectFunction || '';
+
+  document.getElementById('approvalYear').value = project.approvalYear || '';
+  document.getElementById('startDate').value = project.startDate ? project.startDate.substring(0, 10) : '';
+  document.getElementById('endDate').value = project.endDate ? project.endDate.substring(0, 10) : '';
+
+  document.getElementById('projectBudget').value = project.budgetBrl ?? '';
+  document.getElementById('investmentLevel').value = project.investmentLevel || '';
+  document.getElementById('fundingSource').value = project.fundingSource || '';
+  document.getElementById('depreciationCostCenter').value = project.depreciationCostCenter || '';
+
+  document.getElementById('company').value = project.company || '';
+  document.getElementById('center').value = project.center || '';
+  document.getElementById('unit').value = project.unit || '';
+  document.getElementById('location').value = project.location || '';
+
+  document.getElementById('projectUser').value = project.projectUser || '';
+  document.getElementById('projectLeader').value = project.projectLeader || '';
+
+  document.getElementById('businessNeed').value = project.businessNeed || '';
+  document.getElementById('proposedSolution').value = project.proposedSolution || '';
+
+  document.getElementById('kpiType').value = project.kpiType || '';
+  document.getElementById('kpiName').value = project.kpiName || '';
+  document.getElementById('kpiDescription').value = project.kpiDescription || '';
+  document.getElementById('kpiCurrent').value = project.kpiCurrent ?? '';
+  document.getElementById('kpiExpected').value = project.kpiExpected ?? '';
+
+  updateBudgetSections({ preserve: true });
+
+  if (project.budgetBrl < BUDGET_THRESHOLD) {
+    simplePeps.forEach((pep) => {
+      const row = createSimplePepRow({
+        id: pep.Id,
+        title: pep.Title,
+        amount: pep.amountBrl,
+        year: pep.year
+      });
+      simplePepList.append(row);
+      state.editingSnapshot.simplePeps.add(Number(pep.Id));
+    });
+    if (!simplePeps.length) {
+      ensureSimplePepRow();
+    }
+  } else {
+    milestones.forEach((milestone) => {
+      const block = createMilestoneBlock({
+        id: milestone.Id,
+        title: milestone.Title
+      });
+      const relatedActivities = activities.filter((act) => act.milestonesId === milestone.Id);
+      relatedActivities.forEach((activity) => {
+        const activityBlock = addActivityBlock(block, {
+          id: activity.Id,
+          title: activity.Title,
+          start: activity.startDate,
+          end: activity.endDate,
+          supplier: activity.supplier,
+          description: activity.activityDescription
+        }, false);
+        const relatedPeps = activityPeps.filter((pep) => pep.activitiesId === activity.Id);
+        relatedPeps.forEach((pep) => {
+          const pepRow = createActivityPepRow({
+            id: pep.Id,
+            title: pep.Title,
+            amount: pep.amountBrl,
+            year: pep.year
+          });
+          activityBlock.querySelector('.activity-pep-list').append(pepRow);
+          state.editingSnapshot.activityPeps.add(Number(pep.Id));
+        });
+        if (!relatedPeps.length) {
+          addActivityPepRow(activityBlock);
+        }
+        state.editingSnapshot.activities.add(Number(activity.Id));
+      });
+      if (!relatedActivities.length) {
+        addActivityBlock(block);
+      }
+      milestoneList.append(block);
+      state.editingSnapshot.milestones.add(Number(milestone.Id));
+    });
+    if (!milestones.length) {
+      ensureMilestoneBlock();
+    }
+  }
+}
+
+function closeForm() {
+  overlay.classList.add('hidden');
+}
+
+function updateBudgetSections(options = {}) {
+  const { preserve = false, clear = false } = options;
+  const value = parseFloat(projectBudgetInput.value.replace(',', '.'));
+  const isNumber = !Number.isNaN(value) && Number.isFinite(value);
+  setSectionInteractive(simplePepSection, false);
+  setSectionInteractive(keyProjectSection, false);
+
+  if (!isNumber) {
+    simplePepSection.classList.add('hidden');
+    keyProjectSection.classList.add('hidden');
+    budgetHint.textContent = '';
+    if (clear) {
+      simplePepList.innerHTML = '';
+      milestoneList.innerHTML = '';
+    }
+    return;
+  }
+
+  if (value >= BUDGET_THRESHOLD) {
+    simplePepSection.classList.add('hidden');
+    keyProjectSection.classList.remove('hidden');
+    setSectionInteractive(keyProjectSection, true);
+    budgetHint.textContent = 'Projeto classificado como KEY Project (>= R$ 1.000.000,00).';
+    if (!preserve) {
+      simplePepList.innerHTML = '';
+    }
+    if (!milestoneList.children.length) {
+      ensureMilestoneBlock();
+    }
+  } else {
+    keyProjectSection.classList.add('hidden');
+    simplePepSection.classList.remove('hidden');
+    setSectionInteractive(simplePepSection, true);
+    budgetHint.textContent = 'Projeto com orçamento inferior a R$ 1.000.000,00.';
+    if (!preserve) {
+      milestoneList.innerHTML = '';
+    }
+    if (!simplePepList.children.length) {
+      ensureSimplePepRow();
+    }
+  }
+}
+
+function setSectionInteractive(section, enabled) {
+  if (!section) return;
+  section.querySelectorAll('input, textarea, button').forEach((element) => {
+    if (element.type === 'hidden') return;
+    element.disabled = !enabled;
+  });
+}
+
+function updateSimplePepYears() {
+  const year = parseInt(approvalYearInput.value, 10) || '';
+  simplePepList.querySelectorAll('.pep-year').forEach((input) => {
+    input.value = year;
+  });
+}
+
+function ensureSimplePepRow() {
+  const row = createSimplePepRow({ year: parseInt(approvalYearInput.value, 10) || '' });
+  simplePepList.append(row);
+}
+
+function ensureMilestoneBlock() {
+  const block = createMilestoneBlock();
+  milestoneList.append(block);
+  addActivityBlock(block, {}, true);
+}
+
+function createSimplePepRow({ id = '', title = '', amount = '', year = '' } = {}) {
+  const fragment = simplePepTemplate.content.cloneNode(true);
+  const row = fragment.querySelector('.pep-row');
+  row.dataset.pepId = id;
+  row.querySelector('.pep-title').value = title || '';
+  row.querySelector('.pep-amount').value = amount ?? '';
+  row.querySelector('.pep-year').value = year ?? '';
+  return row;
+}
+
+function createMilestoneBlock({ id = '', title = '' } = {}) {
+  const fragment = milestoneTemplate.content.cloneNode(true);
+  const block = fragment.querySelector('.milestone');
+  block.dataset.milestoneId = id;
+  block.querySelector('.milestone-title').value = title || '';
+  return block;
+}
+
+function addActivityBlock(milestoneElement, data = {}, addDefaultPep = true) {
+  if (!milestoneElement) return null;
+  const fragment = activityTemplate.content.cloneNode(true);
+  const activity = fragment.querySelector('.activity');
+  activity.dataset.activityId = data.id || '';
+  activity.querySelector('.activity-title').value = data.title || '';
+  activity.querySelector('.activity-start').value = data.start ? data.start.substring(0, 10) : '';
+  activity.querySelector('.activity-end').value = data.end ? data.end.substring(0, 10) : '';
+  activity.querySelector('.activity-supplier').value = data.supplier || '';
+  activity.querySelector('.activity-description').value = data.description || '';
+  milestoneElement.querySelector('.activity-list').append(activity);
+  if (addDefaultPep) {
+    addActivityPepRow(activity);
+  }
+  return activity;
+}
+
+function createActivityPepRow({ id = '', title = '', amount = '', year = '' } = {}) {
+  const fragment = activityPepTemplate.content.cloneNode(true);
+  const row = fragment.querySelector('.activity-pep');
+  row.dataset.pepId = id;
+  row.querySelector('.activity-pep-title').value = title || '';
+  row.querySelector('.activity-pep-amount').value = amount ?? '';
+  row.querySelector('.activity-pep-year').value = year ?? '';
+  return row;
+}
+
+function addActivityPepRow(activityElement, data = {}) {
+  if (!activityElement) return null;
+  const list = activityElement.querySelector('.activity-pep-list');
+  const row = createActivityPepRow(data);
+  list.append(row);
+  return row;
+}
+
+// ============================================================================
+// Envio do formulário e persistência (CRUD)
+// ============================================================================
+async function handleFormSubmit(event) {
+  event.preventDefault();
+  const mode = projectForm.dataset.mode;
+  const action = projectForm.dataset.action || 'save';
+  const projectId = projectForm.dataset.projectId;
+
+  if (!projectForm.reportValidity()) {
+    return;
+  }
+
+  const baseStatus = statusField.value || 'Rascunho';
+  const nextStatus = action === 'approval' ? 'Em Aprovação' : baseStatus;
+  statusField.value = mode === 'create' ? (action === 'approval' ? 'Em Aprovação' : 'Rascunho') : nextStatus;
+  projectForm.dataset.action = 'save';
+
+  const payload = collectProjectData();
+  payload.status = statusField.value;
+
+  showStatus('Salvando projeto…');
+
+  try {
+    let savedProjectId = projectId;
+    if (mode === 'create') {
+      const result = await sp.createItem('Projects', payload);
+      savedProjectId = result?.Id;
     } else {
-      updateStatus('Formulário limpo.', 'info');
+      await sp.updateItem('Projects', Number(projectId), payload);
     }
-  });
 
-  updateCapexFlag();
-  updateMilestoneVisibility();
-  loadPepOptions();
-  refreshGantt();
-  loadUserProjects();
-})();
+    await persistRelatedRecords(Number(savedProjectId || projectId), payload);
+
+    showStatus('Projeto salvo com sucesso.', true);
+    await loadProjects();
+    if (savedProjectId) {
+      await selectProject(Number(savedProjectId));
+    }
+    closeForm();
+  } catch (error) {
+    console.error('Erro ao salvar projeto', error);
+    showError('Não foi possível salvar o projeto. Verifique os dados e tente novamente.');
+  }
+}
+
+function collectProjectData() {
+  const data = {
+    Title: document.getElementById('projectName').value.trim(),
+    category: document.getElementById('category').value.trim(),
+    investmentType: document.getElementById('investmentType').value.trim(),
+    assetType: document.getElementById('assetType').value.trim(),
+    projectFunction: document.getElementById('projectFunction').value.trim(),
+    approvalYear: parseNumber(document.getElementById('approvalYear').value),
+    startDate: document.getElementById('startDate').value || null,
+    endDate: document.getElementById('endDate').value || null,
+    budgetBrl: parseFloat(document.getElementById('projectBudget').value) || 0,
+    investmentLevel: document.getElementById('investmentLevel').value.trim(),
+    fundingSource: document.getElementById('fundingSource').value.trim(),
+    depreciationCostCenter: document.getElementById('depreciationCostCenter').value.trim(),
+    company: document.getElementById('company').value.trim(),
+    center: document.getElementById('center').value.trim(),
+    unit: document.getElementById('unit').value.trim(),
+    location: document.getElementById('location').value.trim(),
+    projectUser: document.getElementById('projectUser').value.trim(),
+    projectLeader: document.getElementById('projectLeader').value.trim(),
+    businessNeed: document.getElementById('businessNeed').value.trim(),
+    proposedSolution: document.getElementById('proposedSolution').value.trim(),
+    kpiType: document.getElementById('kpiType').value.trim(),
+    kpiName: document.getElementById('kpiName').value.trim(),
+    kpiDescription: document.getElementById('kpiDescription').value.trim(),
+    kpiCurrent: parseFloatOrNull(document.getElementById('kpiCurrent').value),
+    kpiExpected: parseFloatOrNull(document.getElementById('kpiExpected').value)
+  };
+  return data;
+}
+
+async function persistRelatedRecords(projectId, projectData) {
+  if (!projectId) return;
+  const approvalYear = projectData.approvalYear;
+  const budget = projectData.budgetBrl;
+
+  if (budget >= BUDGET_THRESHOLD) {
+    await persistKeyProjects(projectId);
+    await cleanupSimplePeps();
+  } else {
+    await persistSimplePeps(projectId, approvalYear);
+    await cleanupKeyProjects();
+  }
+}
+
+async function persistSimplePeps(projectId, approvalYear) {
+  const currentIds = new Set();
+
+  for (const row of simplePepList.querySelectorAll('.pep-row')) {
+    const id = row.dataset.pepId;
+    const title = row.querySelector('.pep-title').value.trim();
+    const amount = parseFloat(row.querySelector('.pep-amount').value) || 0;
+    const year = parseNumber(row.querySelector('.pep-year').value) || approvalYear;
+    const payload = {
+      Title: title,
+      amountBrl: amount,
+      year,
+      projectsId: projectId,
+      activitiesId: null
+    };
+    if (id) {
+      await sp.updateItem('Peps', Number(id), payload);
+      currentIds.add(Number(id));
+    } else {
+      const created = await sp.createItem('Peps', payload);
+      currentIds.add(Number(created.Id));
+    }
+  }
+
+  const toDelete = [...state.editingSnapshot.simplePeps].filter((id) => !currentIds.has(id));
+  for (const id of toDelete) {
+    await sp.deleteItem('Peps', Number(id));
+  }
+}
+
+async function cleanupSimplePeps() {
+  for (const id of state.editingSnapshot.simplePeps) {
+    await sp.deleteItem('Peps', Number(id));
+  }
+  state.editingSnapshot.simplePeps.clear();
+}
+
+async function persistKeyProjects(projectId) {
+  const milestoneIds = new Set();
+  const activityIds = new Set();
+  const activityPepIds = new Set();
+
+  for (const milestone of milestoneList.querySelectorAll('.milestone')) {
+    const id = milestone.dataset.milestoneId;
+    const title = milestone.querySelector('.milestone-title').value.trim();
+    const payload = {
+      Title: title,
+      projectsId: projectId
+    };
+    let milestoneId = Number(id);
+    if (id) {
+      await sp.updateItem('Milestones', milestoneId, payload);
+    } else {
+      const created = await sp.createItem('Milestones', payload);
+      milestoneId = created.Id;
+      milestone.dataset.milestoneId = milestoneId;
+    }
+    milestoneIds.add(Number(milestoneId));
+
+    for (const activity of milestone.querySelectorAll('.activity')) {
+      const activityIdRaw = activity.dataset.activityId;
+      const activityPayload = {
+        Title: activity.querySelector('.activity-title').value.trim(),
+        startDate: activity.querySelector('.activity-start').value || null,
+        endDate: activity.querySelector('.activity-end').value || null,
+        activityDescription: activity.querySelector('.activity-description').value.trim(),
+        supplier: activity.querySelector('.activity-supplier').value.trim(),
+        projectsId: projectId,
+        milestonesId: milestoneId
+      };
+      let activityId = Number(activityIdRaw);
+      if (activityIdRaw) {
+        await sp.updateItem('Activities', activityId, activityPayload);
+      } else {
+        const createdActivity = await sp.createItem('Activities', activityPayload);
+        activityId = createdActivity.Id;
+        activity.dataset.activityId = activityId;
+      }
+      activityIds.add(Number(activityId));
+
+      for (const pepRow of activity.querySelectorAll('.activity-pep')) {
+        const pepIdRaw = pepRow.dataset.pepId;
+        const pepPayload = {
+          Title: pepRow.querySelector('.activity-pep-title').value.trim(),
+          amountBrl: parseFloat(pepRow.querySelector('.activity-pep-amount').value) || 0,
+          year: parseNumber(pepRow.querySelector('.activity-pep-year').value),
+          projectsId: projectId,
+          activitiesId: activityId
+        };
+        let pepId = Number(pepIdRaw);
+        if (pepIdRaw) {
+          await sp.updateItem('Peps', pepId, pepPayload);
+        } else {
+          const createdPep = await sp.createItem('Peps', pepPayload);
+          pepId = createdPep.Id;
+          pepRow.dataset.pepId = pepId;
+        }
+        activityPepIds.add(Number(pepId));
+      }
+    }
+  }
+
+  await deleteMissing('Peps', state.editingSnapshot.activityPeps, activityPepIds);
+  await deleteMissing('Activities', state.editingSnapshot.activities, activityIds);
+  await deleteMissing('Milestones', state.editingSnapshot.milestones, milestoneIds);
+}
+
+async function cleanupKeyProjects() {
+  await deleteMissing('Peps', state.editingSnapshot.activityPeps, new Set());
+  await deleteMissing('Activities', state.editingSnapshot.activities, new Set());
+  await deleteMissing('Milestones', state.editingSnapshot.milestones, new Set());
+}
+
+async function deleteMissing(listName, previousSet, currentSet) {
+  for (const id of previousSet) {
+    if (!currentSet.has(id)) {
+      await sp.deleteItem(listName, Number(id));
+    }
+  }
+  previousSet.clear();
+}
+
+// ============================================================================
+// Utilitários
+// ============================================================================
+function showStatus(message, success = false) {
+  formStatus.textContent = message;
+  formStatus.classList.add('show');
+  formStatus.classList.toggle('error', !success && message.toLowerCase().includes('erro'));
+}
+
+function showError(message) {
+  formErrors.textContent = message;
+  formErrors.classList.add('show');
+}
+
+function formatPeriod(start, end) {
+  if (!start && !end) return 'Sem datas definidas';
+  const startLabel = start ? DATE_FMT.format(new Date(start)) : '—';
+  const endLabel = end ? DATE_FMT.format(new Date(end)) : '—';
+  return `${startLabel} até ${endLabel}`;
+}
+
+function statusColor(status) {
+  switch (status) {
+    case 'Rascunho':
+      return '#414141';
+    case 'Em Aprovação':
+      return '#970886';
+    case 'Reprovado para Revisão':
+      return '#fe8f46';
+    case 'Aprovado':
+      return '#3d9308';
+    case 'Reprovado':
+      return '#f83241';
+    default:
+      return '#414141';
+  }
+}
+
+function parseNumber(value) {
+  const number = parseInt(value, 10);
+  return Number.isFinite(number) ? number : null;
+}
+
+function parseFloatOrNull(value) {
+  const number = parseFloat(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+// ============================================================================
+// Execução
+// ============================================================================
+init();
