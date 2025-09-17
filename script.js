@@ -380,7 +380,9 @@ function init() {
 function bindEvents() {
   newProjectBtn.addEventListener('click', () => openProjectForm('create'));
   closeFormBtn.addEventListener('click', closeForm);
-  projectSearch.addEventListener('input', () => renderProjectList());
+  if (projectSearch) {
+    projectSearch.addEventListener('input', () => renderProjectList());
+  }
 
   projectForm.addEventListener('submit', handleFormSubmit);
   sendApprovalBtn.addEventListener('click', () => {
@@ -454,7 +456,7 @@ async function loadProjects() {
 }
 
 function renderProjectList() {
-  const filter = projectSearch.value.toLowerCase();
+  const filter = (projectSearch?.value || '').toLowerCase();
   projectList.innerHTML = '';
 
   const filtered = state.projects.filter((item) =>
@@ -477,19 +479,42 @@ function renderProjectList() {
     }
     card.dataset.id = item.Id;
 
-    const title = document.createElement('h3');
+    const accent = document.createElement('span');
+    accent.className = 'project-card-accent';
+    accent.style.background = statusColor(item.status);
+
+    const content = document.createElement('div');
+    content.className = 'project-card-content';
+
+    const title = document.createElement('span');
+    title.className = 'project-card-title';
     title.textContent = item.Title || 'Projeto sem título';
 
+    const bottom = document.createElement('div');
+    bottom.className = 'project-card-bottom';
+
     const status = document.createElement('span');
-    status.className = 'status';
-    status.style.background = statusColor(item.status);
+    status.className = 'project-card-status';
     status.textContent = item.status || 'Sem status';
+    status.style.color = statusColor(item.status);
+    bottom.append(status);
 
-    const info = document.createElement('p');
-    const budget = item.budgetBrl ? ` • ${BRL.format(item.budgetBrl)}` : '';
-    info.textContent = `${item.approvalYear || ''}${budget}`.trim();
+    const metaPieces = [];
+    if (item.approvalYear) {
+      metaPieces.push(item.approvalYear);
+    }
+    if (item.budgetBrl) {
+      metaPieces.push(BRL.format(item.budgetBrl));
+    }
+    if (metaPieces.length) {
+      const meta = document.createElement('span');
+      meta.className = 'project-card-meta';
+      meta.textContent = metaPieces.join(' • ');
+      bottom.append(meta);
+    }
 
-    card.append(title, status, info);
+    content.append(title, bottom);
+    card.append(accent, content);
     card.addEventListener('click', () => selectProject(item.Id));
     projectList.append(card);
   });
@@ -544,89 +569,113 @@ function renderProjectDetails(detail) {
     return;
   }
 
-  const { project, milestones, activities, simplePeps, activityPeps } = detail;
+  const { project } = detail;
+
   if (project.status === 'Reprovado') {
+    const message = document.createElement('div');
+    message.className = 'empty-state';
+    const title = document.createElement('h2');
+    title.textContent = project.Title || 'Projeto reprovado';
+    const text = document.createElement('p');
+    text.textContent = 'Este projeto foi reprovado e está disponível apenas para consulta.';
+    message.append(title, text);
+    projectDetails.append(message);
     return;
   }
 
   const wrapper = document.createElement('div');
+  wrapper.className = 'project-overview';
 
   const header = document.createElement('div');
-  header.className = 'details-header';
+  header.className = 'project-overview__header';
   const title = document.createElement('h2');
+  title.className = 'project-overview__title';
   title.textContent = project.Title || 'Projeto sem título';
   const status = document.createElement('span');
-  status.className = 'status';
+  status.className = 'status-pill';
   status.style.background = statusColor(project.status);
   status.textContent = project.status || 'Sem status';
   header.append(title, status);
 
-  if (['Rascunho', 'Reprovado para Revisão'].includes(project.status)) {
-    const editBtn = document.createElement('button');
-    editBtn.type = 'button';
-    editBtn.className = 'btn primary';
-    editBtn.textContent = 'Editar Projeto';
-    editBtn.addEventListener('click', () => openProjectForm('edit', detail));
-    header.append(editBtn);
-  } else if (project.status === 'Aprovado') {
+  if (project.status === 'Aprovado') {
     const info = document.createElement('p');
-    info.className = 'hint';
+    info.className = 'project-overview__hint';
     info.textContent = 'Projeto aprovado - somente leitura.';
     header.append(info);
   }
 
   wrapper.append(header);
 
-  const overview = document.createElement('div');
-  overview.className = 'details-grid';
-
-  overview.append(
-    createDetailBox('Ano de Aprovação', project.approvalYear),
-    createDetailBox('Orçamento (R$)', project.budgetBrl ? BRL.format(project.budgetBrl) : ''),
-    createDetailBox('Nível de Investimento', project.investmentLevel),
-    createDetailBox('Origem da Verba', project.fundingSource)
+  const highlightGrid = document.createElement('div');
+  highlightGrid.className = 'project-overview__grid';
+  highlightGrid.append(
+    createHighlightBox('Orçamento', project.budgetBrl ? BRL.format(project.budgetBrl) : '—', { variant: 'budget' }),
+    createHighlightBox('Responsável', project.projectLeader || project.projectUser || 'Não informado')
   );
+  wrapper.append(highlightGrid);
 
-  overview.append(
-    createDetailBox('Empresa', project.company),
-    createDetailBox('Centro', project.center),
-    createDetailBox('Unidade', project.unit),
-    createDetailBox('Local de Implantação', project.location)
+  const timelineGrid = document.createElement('div');
+  timelineGrid.className = 'project-overview__grid';
+  timelineGrid.append(
+    createHighlightBox('Data de Início', formatDateValue(project.startDate)),
+    createHighlightBox('Data de Conclusão', formatDateValue(project.endDate))
   );
+  wrapper.append(timelineGrid);
 
-  overview.append(
-    createDetailBox('Project User', project.projectUser),
-    createDetailBox('Coordenador do Projeto', project.projectLeader),
-    createDetailBox('Período', formatPeriod(project.startDate, project.endDate))
-  );
+  const descriptionSection = document.createElement('section');
+  descriptionSection.className = 'project-description';
+  const descTitle = document.createElement('h3');
+  descTitle.textContent = 'Descrição do Projeto';
+  const descText = document.createElement('p');
+  descText.className = 'project-description__text';
+  descText.textContent = project.proposedSolution || project.businessNeed || 'Sem descrição informada.';
+  descriptionSection.append(descTitle, descText);
+  wrapper.append(descriptionSection);
 
-  wrapper.append(overview);
+  const actions = document.createElement('div');
+  actions.className = 'project-overview__actions';
 
-  wrapper.append(createTextSection('Sumário do Projeto', project.businessNeed));
-  wrapper.append(createTextSection('Comentário', project.proposedSolution));
+  const canEdit = ['Rascunho', 'Reprovado para Revisão'].includes(project.status);
+  const canSendApproval = ['Rascunho', 'Reprovado para Revisão'].includes(project.status);
+  const canReject = project.status === 'Em Aprovação';
 
-  const kpiSection = document.createElement('div');
-  kpiSection.className = 'detail-box';
-  const kpiTitle = document.createElement('h4');
-  kpiTitle.textContent = 'Indicadores de Desempenho';
-  const kpiContent = document.createElement('p');
-  const pieces = [
-    project.kpiType ? `Tipo: ${project.kpiType}` : '',
-    project.kpiName ? `Nome: ${project.kpiName}` : '',
-    project.kpiDescription ? `Descrição: ${project.kpiDescription}` : '',
-    project.kpiCurrent !== null && project.kpiCurrent !== undefined ? `Atual: ${project.kpiCurrent}` : '',
-    project.kpiExpected !== null && project.kpiExpected !== undefined ? `Esperado: ${project.kpiExpected}` : ''
-  ].filter(Boolean);
-  kpiContent.innerHTML = pieces.join('<br>') || 'Sem indicadores informados.';
-  kpiSection.append(kpiTitle, kpiContent);
-  wrapper.append(kpiSection);
-
-  if (project.budgetBrl < BUDGET_THRESHOLD && simplePeps.length) {
-    wrapper.append(createPepSection(simplePeps));
+  if (canEdit) {
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn primary';
+    editBtn.textContent = 'Editar Projeto';
+    editBtn.addEventListener('click', () => openProjectForm('edit', detail));
+    actions.append(editBtn);
   }
 
-  if (project.budgetBrl >= BUDGET_THRESHOLD && milestones.length) {
-    wrapper.append(createKeyProjectsSection(milestones, activities, activityPeps));
+  if (canReject) {
+    const rejectBtn = document.createElement('button');
+    rejectBtn.type = 'button';
+    rejectBtn.className = 'btn ghost';
+    rejectBtn.textContent = 'Recusar';
+    rejectBtn.addEventListener('click', () => {
+      openProjectForm('edit', detail);
+      statusField.value = 'Reprovado para Revisão';
+    });
+    actions.append(rejectBtn);
+  }
+
+  if (canSendApproval) {
+    const approveBtn = document.createElement('button');
+    approveBtn.type = 'button';
+    approveBtn.className = 'btn accent';
+    approveBtn.textContent = 'Enviar para Aprovação';
+    approveBtn.addEventListener('click', () => {
+      openProjectForm('edit', detail);
+      requestAnimationFrame(() => {
+        sendApprovalBtn?.focus();
+      });
+    });
+    actions.append(approveBtn);
+  }
+
+  if (actions.childElementCount) {
+    wrapper.append(actions);
   }
 
   projectDetails.append(wrapper);
@@ -643,102 +692,40 @@ function createEmptyState() {
   return empty;
 }
 
-function createDetailBox(label, value) {
+function createHighlightBox(label, value, options = {}) {
+  const { variant } = options;
   const box = document.createElement('div');
-  box.className = 'detail-box';
-  const title = document.createElement('h4');
-  title.textContent = label;
-  const text = document.createElement('p');
-  text.textContent = value || '—';
-  box.append(title, text);
+  box.className = 'project-highlight';
+  if (variant) {
+    box.classList.add(`project-highlight--${variant}`);
+  }
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'project-highlight__label';
+  labelEl.textContent = label;
+
+  const valueEl = document.createElement('span');
+  valueEl.className = 'project-highlight__value';
+  valueEl.textContent = value || '—';
+  if (variant === 'budget') {
+    valueEl.classList.add('project-highlight__value--budget');
+  }
+
+  box.append(labelEl, valueEl);
   return box;
 }
 
-function createTextSection(label, content) {
-  const container = document.createElement('section');
-  const title = document.createElement('h3');
-  title.className = 'section-title';
-  title.textContent = label;
-  const box = document.createElement('div');
-  box.className = 'detail-box';
-  const text = document.createElement('p');
-  text.textContent = content || 'Sem informações.';
-  box.append(text);
-  container.append(title, box);
-  return container;
-}
+function formatDateValue(value) {
+  if (!value) {
+    return '—';
+  }
 
-function createPepSection(peps) {
-  const container = document.createElement('section');
-  const title = document.createElement('h3');
-  title.className = 'section-title';
-  title.textContent = 'PEPs do Projeto';
-  const list = document.createElement('div');
-  list.className = 'inline-list';
-  peps.forEach((pep) => {
-    const article = document.createElement('article');
-    const heading = document.createElement('h4');
-    heading.textContent = pep.Title || 'Elemento PEP';
-    const text = document.createElement('p');
-    const amount = pep.amountBrl ? BRL.format(pep.amountBrl) : '—';
-    text.textContent = `Valor: ${amount} • Ano: ${pep.year || '—'}`;
-    article.append(heading, text);
-    list.append(article);
-  });
-  container.append(title, list);
-  return container;
-}
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
 
-function createKeyProjectsSection(milestones, activities, activityPeps) {
-  const container = document.createElement('section');
-  const title = document.createElement('h3');
-  title.className = 'section-title';
-  title.textContent = 'Key Projects';
-  container.append(title);
-
-  const list = document.createElement('div');
-  list.className = 'inline-list';
-
-  milestones.forEach((milestone) => {
-    const article = document.createElement('article');
-    const heading = document.createElement('h4');
-    heading.textContent = milestone.Title || 'Marco';
-    article.append(heading);
-
-    const milestoneActivities = activities.filter((act) => act.milestonesIdId === milestone.Id);
-    milestoneActivities.forEach((activity) => {
-      const activityBox = document.createElement('div');
-      activityBox.className = 'detail-box';
-      const activityTitle = document.createElement('strong');
-      activityTitle.textContent = activity.Title || 'Atividade';
-      const description = document.createElement('div');
-      description.innerHTML = [
-        formatPeriod(activity.startDate, activity.endDate),
-        activity.supplier ? `Fornecedor: ${activity.supplier}` : '',
-        activity.activityDescription || ''
-      ].filter(Boolean).join('<br>');
-
-      const pepsForActivity = activityPeps.filter((pep) => pep.activitiesIdId === activity.Id);
-      if (pepsForActivity.length) {
-        const pepList = document.createElement('ul');
-        pepsForActivity.forEach((pep) => {
-          const li = document.createElement('li');
-          const amount = pep.amountBrl ? BRL.format(pep.amountBrl) : '—';
-          li.textContent = `${pep.Title || 'PEP'} • ${amount} • Ano ${pep.year || '—'}`;
-          pepList.append(li);
-        });
-        description.appendChild(pepList);
-      }
-
-      activityBox.append(activityTitle, description);
-      article.append(activityBox);
-    });
-
-    list.append(article);
-  });
-
-  container.append(list);
-  return container;
+  return DATE_FMT.format(date);
 }
 
 // ============================================================================
@@ -1233,13 +1220,6 @@ function showStatus(message, success = false) {
 function showError(message) {
   formErrors.textContent = message;
   formErrors.classList.add('show');
-}
-
-function formatPeriod(start, end) {
-  if (!start && !end) return 'Sem datas definidas';
-  const startLabel = start ? DATE_FMT.format(new Date(start)) : '—';
-  const endLabel = end ? DATE_FMT.format(new Date(end)) : '—';
-  return `${startLabel} até ${endLabel}`;
 }
 
 function statusColor(status) {
