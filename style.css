@@ -73,6 +73,17 @@ p {
   border-color: rgba(70, 10, 120, 0.42);
 }
 
+.btn.secondary {
+  background: #ffffff;
+  border-color: rgba(70, 10, 120, 0.32);
+  color: var(--purple);
+}
+
+.btn.secondary:hover {
+  background: rgba(70, 10, 120, 0.08);
+  border-color: rgba(70, 10, 120, 0.42);
+}
+
 .btn.accent {
   background: rgba(245, 135, 70, 0.14);
   border-color: rgba(245, 135, 70, 0.32);
@@ -543,24 +554,34 @@ p {
 
 .summary-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px 24px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px 24px;
   margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .summary-list.summary-list--activity {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
-.summary-list dt {
-  font-size: 13px;
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-item--full {
+  grid-column: 1 / -1;
+}
+
+.summary-label {
   font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 14px;
+  color: var(--text);
 }
 
-.summary-list dd {
+.summary-value {
   margin: 0;
   font-size: 15px;
   color: var(--text);
@@ -629,18 +650,17 @@ p {
   color: var(--purple);
 }
 
-.summary-gantt {
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 20px 24px;
-  background: #fafafa;
-  display: flex;
-  flex-direction: column;
+.summary-section.summary-gantt {
   gap: 16px;
+  padding: 24px;
 }
 
 .summary-gantt.hidden {
   display: none;
+}
+
+.summary-gantt .gantt-chart {
+  width: 100%;
 }
 
 .summary-actions {
