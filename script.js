@@ -173,7 +173,6 @@ const overlay = document.getElementById('formOverlay');
 const projectForm = document.getElementById('projectForm');
 const formTitle = document.getElementById('formTitle');
 const closeFormBtn = document.getElementById('closeFormBtn');
-const sendApprovalBtn = document.getElementById('sendApprovalBtn');
 const saveProjectBtn = document.getElementById('saveProjectBtn');
 const formStatus = document.getElementById('formStatus');
 const formErrors = document.getElementById('formErrors');
@@ -521,14 +520,7 @@ function bindEvents() {
   if (saveProjectBtn) {
     saveProjectBtn.addEventListener('click', (event) => {
       event.preventDefault();
-      openSummaryOverlay('save', saveProjectBtn);
-    });
-  }
-
-  if (sendApprovalBtn) {
-    sendApprovalBtn.addEventListener('click', (event) => {
-      event.preventDefault();
-      openSummaryOverlay('approval', sendApprovalBtn);
+      openSummaryOverlay(saveProjectBtn);
     });
   }
 
@@ -816,7 +808,7 @@ function renderProjectDetails(detail) {
   actions.className = 'project-overview__actions';
 
   const statusKey = project.status || '';
-  const canEditAndSend = ['Rascunho', 'Reprovado para Revisão'].includes(statusKey);
+  const canEdit = ['Rascunho', 'Reprovado para Revisão'].includes(statusKey);
   const viewOnlyStatuses = ['Aprovado', 'Reprovado', 'Em Aprovação'];
 
   if (viewOnlyStatuses.includes(statusKey)) {
@@ -826,7 +818,7 @@ function renderProjectDetails(detail) {
     viewBtn.textContent = 'Visualizar Projeto';
     viewBtn.addEventListener('click', () => openProjectForm('edit', detail));
     actions.append(viewBtn);
-  } else if (canEditAndSend) {
+  } else if (canEdit) {
     const editBtn = document.createElement('button');
     editBtn.type = 'button';
     editBtn.className = 'btn primary';
@@ -834,17 +826,16 @@ function renderProjectDetails(detail) {
     editBtn.addEventListener('click', () => openProjectForm('edit', detail));
     actions.append(editBtn);
 
-    const approveBtn = document.createElement('button');
-    approveBtn.type = 'button';
-    approveBtn.className = 'btn accent';
-    approveBtn.textContent = 'Enviar para Aprovação';
-    approveBtn.addEventListener('click', () => {
-      openProjectForm('edit', detail);
-      requestAnimationFrame(() => {
-        sendApprovalBtn?.focus();
+    if (statusKey === 'Rascunho') {
+      const approveBtn = document.createElement('button');
+      approveBtn.type = 'button';
+      approveBtn.className = 'btn accent';
+      approveBtn.textContent = 'Enviar para Aprovação';
+      approveBtn.addEventListener('click', () => {
+        sendProjectForApproval(project.Id, approveBtn);
       });
-    });
-    actions.append(approveBtn);
+      actions.append(approveBtn);
+    }
   } else {
     const fallbackBtn = document.createElement('button');
     fallbackBtn.type = 'button';
@@ -859,6 +850,49 @@ function renderProjectDetails(detail) {
   }
 
   projectDetails.append(wrapper);
+}
+
+async function sendProjectForApproval(projectId, triggerButton) {
+  const id = Number(projectId);
+  if (!id) return;
+
+  const button = triggerButton || null;
+  const originalText = button?.textContent;
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Enviando…';
+  }
+
+  try {
+    await sp.updateItem('Projects', id, { status: 'Em Aprovação' });
+    updateProjectState(id, { status: 'Em Aprovação' });
+    renderProjectList();
+
+    if (state.currentDetails?.project?.Id === id) {
+      state.currentDetails = {
+        ...state.currentDetails,
+        project: {
+          ...state.currentDetails.project,
+          status: 'Em Aprovação'
+        }
+      };
+      renderProjectDetails(state.currentDetails);
+    }
+  } catch (error) {
+    console.error('Erro ao enviar projeto para aprovação', error);
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText || 'Enviar para Aprovação';
+    }
+    window.alert('Não foi possível enviar o projeto para aprovação. Tente novamente.');
+    return;
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText || 'Enviar para Aprovação';
+    }
+  }
 }
 
 function createEmptyState() {
@@ -962,10 +996,10 @@ function updateCompanyDependentFields(companyValue, selectedValues = {}) {
 // ============================================================================
 function openProjectForm(mode, detail = null) {
   projectForm.reset();
-  formStatus.classList.remove('show');
+  formStatus.textContent = '';
+  formStatus.classList.remove('show', 'error');
   resetValidationState();
   projectForm.dataset.mode = mode;
-  projectForm.dataset.action = 'save';
   projectForm.dataset.projectId = detail?.project?.Id || '';
 
   updateInvestmentLevelField();
@@ -988,7 +1022,6 @@ function openProjectForm(mode, detail = null) {
   if (mode === 'create') {
     formTitle.textContent = 'Novo Projeto';
     statusField.value = 'Rascunho';
-    sendApprovalBtn.classList.remove('hidden');
     setApprovalYearToCurrent();
     updateBudgetSections({ clear: true });
   } else if (detail) {
@@ -1005,7 +1038,6 @@ function fillFormWithProject(detail) {
   const { project, simplePeps, milestones, activities, activityPeps } = detail;
   formTitle.textContent = `Editar Projeto #${project.Id}`;
   statusField.value = project.status || 'Rascunho';
-  sendApprovalBtn.classList.toggle('hidden', !['Rascunho', 'Reprovado para Revisão'].includes(project.status));
 
   document.getElementById('projectName').value = project.Title || '';
   document.getElementById('category').value = project.category || '';
@@ -1108,10 +1140,7 @@ function closeForm() {
   closeSummaryOverlay({ restoreFocus: false });
 }
 
-function openSummaryOverlay(action, triggerButton = null) {
-  const normalizedAction = action === 'approval' ? 'approval' : 'save';
-  projectForm.dataset.action = normalizedAction;
-
+function openSummaryOverlay(triggerButton = null) {
   const dateRangesValid = validateAllDateRanges();
   const formValid = projectForm.reportValidity();
   const pepValid = validatePepBudget();
@@ -1122,7 +1151,6 @@ function openSummaryOverlay(action, triggerButton = null) {
   }
 
   if (!summaryOverlay) {
-    projectForm.requestSubmit();
     return;
   }
 
@@ -2175,7 +2203,6 @@ function addActivityBlock(milestoneElement, data = {}) {
 async function handleFormSubmit(event) {
   event.preventDefault();
   const mode = projectForm.dataset.mode;
-  const action = projectForm.dataset.action || 'save';
   const projectId = projectForm.dataset.projectId;
 
   const dateRangesValid = validateAllDateRanges();
@@ -2190,15 +2217,14 @@ async function handleFormSubmit(event) {
     return;
   }
 
-  const baseStatus = statusField.value || 'Rascunho';
-  const nextStatus = action === 'approval' ? 'Em Aprovação' : baseStatus;
-  statusField.value = mode === 'create' ? (action === 'approval' ? 'Em Aprovação' : 'Rascunho') : nextStatus;
-  projectForm.dataset.action = 'save';
+  const normalizedStatus = 'Rascunho';
+  statusField.value = normalizedStatus;
 
   const payload = collectProjectData();
-  payload.status = statusField.value;
+  payload.status = normalizedStatus;
 
-  showStatus('Salvando projeto…');
+  scrollFormToTop();
+  showStatus('Salvando…');
 
   try {
     let savedProjectId = projectId;
@@ -2243,6 +2269,8 @@ async function handleFormSubmit(event) {
     closeForm();
   } catch (error) {
     console.error('Erro ao salvar projeto', error);
+    scrollFormToTop();
+    showStatus('Erro ao salvar projeto.');
     showError('Não foi possível salvar o projeto. Verifique os dados e tente novamente.');
   }
 }
@@ -2445,6 +2473,20 @@ async function deleteMissing(listName, previousSet, currentSet) {
 // ============================================================================
 // Utilitários
 // ============================================================================
+function scrollFormToTop() {
+  const scrollElement = (element) => {
+    if (!element) return;
+    if (typeof element.scrollTo === 'function') {
+      element.scrollTo(0, 0);
+    } else {
+      element.scrollTop = 0;
+    }
+  };
+
+  scrollElement(overlay);
+  scrollElement(projectForm);
+}
+
 function showStatus(message, success = false) {
   formStatus.textContent = message;
   formStatus.classList.add('show');
