@@ -1196,63 +1196,53 @@ function populateSummaryOverlay() {
 
   const sections = [
     {
-      title: 'Dados Gerais',
+      title: 'Sobre o Projeto',
       entries: [
         { label: 'Nome do Projeto', value: getFieldDisplayValue('projectName') },
-        { label: 'Categoria', value: getFieldDisplayValue('category') },
-        { label: 'Tipo de Investimento', value: getFieldDisplayValue('investmentType') },
-        { label: 'Tipo de Ativo', value: getFieldDisplayValue('assetType') },
-        { label: 'Função do Projeto', value: getFieldDisplayValue('projectFunction') }
-      ]
-    },
-    {
-      title: 'Planejamento Temporal',
-      entries: [
+        { label: 'Orçamento do Projeto', value: formatCurrencyField('projectBudget') },
+        { label: 'Nível de Investimento', value: getFieldDisplayValue('investmentLevel') },
         { label: 'Ano de Aprovação', value: getFieldDisplayValue('approvalYear') },
         { label: 'Data de Início', value: formatDateValue(document.getElementById('startDate')?.value) },
         { label: 'Data de Término', value: formatDateValue(document.getElementById('endDate')?.value) }
       ]
     },
     {
-      title: 'Orçamento e Recursos',
+      title: 'Origem e Função',
       entries: [
-        { label: 'Orçamento do Projeto', value: formatCurrencyField('projectBudget') },
-        { label: 'Nível de Investimento', value: getFieldDisplayValue('investmentLevel') },
         { label: 'Origem da Verba', value: getFieldDisplayValue('fundingSource') },
-        { label: 'C. Custo Depreciação', value: getFieldDisplayValue('depreciationCostCenter') }
+        { label: 'Função do Projeto', value: getFieldDisplayValue('projectFunction') },
+        { label: 'Tipo de Investimento', value: getFieldDisplayValue('investmentType') },
+        { label: 'Tipo de Ativo', value: getFieldDisplayValue('assetType') }
       ]
     },
     {
-      title: 'Localização Operacional',
+      title: 'Informações Operacionais',
       entries: [
         { label: 'Empresa', value: getFieldDisplayValue('company') },
         { label: 'Centro', value: getFieldDisplayValue('center') },
         { label: 'Unidade', value: getFieldDisplayValue('unit') },
-        { label: 'Localização', value: getFieldDisplayValue('location') }
+        { label: 'Local de Implantação', value: getFieldDisplayValue('location') },
+        { label: 'C. Custo Depreciação', value: getFieldDisplayValue('depreciationCostCenter') },
+        { label: 'Categoria', value: getFieldDisplayValue('category') },
+        { label: 'Usuário do Projeto', value: getFieldDisplayValue('projectUser') },
+        { label: 'Líder do Projeto', value: getFieldDisplayValue('projectLeader') }
       ]
     },
     {
-      title: 'Pessoas Envolvidas',
+      title: 'Detalhamento Complementar',
       entries: [
-        { label: 'Solicitante', value: getFieldDisplayValue('projectUser') },
-        { label: 'Gestor do Projeto', value: getFieldDisplayValue('projectLeader') }
+        { label: 'Necessidade do Negócio', value: getFieldDisplayValue('businessNeed'), fullWidth: true },
+        { label: 'Solução da Proposta', value: getFieldDisplayValue('proposedSolution'), fullWidth: true }
       ]
     },
     {
-      title: 'Justificativa e Solução',
-      entries: [
-        { label: 'Necessidade do Negócio', value: getFieldDisplayValue('businessNeed') },
-        { label: 'Solução Proposta', value: getFieldDisplayValue('proposedSolution') }
-      ]
-    },
-    {
-      title: 'Indicadores (KPIs)',
+      title: 'Indicadores de Desempenho',
       entries: [
         { label: 'Tipo de KPI', value: getFieldDisplayValue('kpiType') },
         { label: 'Nome do KPI', value: getFieldDisplayValue('kpiName') },
-        { label: 'Descrição do KPI', value: getFieldDisplayValue('kpiDescription') },
-        { label: 'Valor Atual', value: formatNumberField('kpiCurrent') },
-        { label: 'Valor Esperado', value: formatNumberField('kpiExpected') }
+        { label: 'KPI Atual', value: formatNumberField('kpiCurrent') },
+        { label: 'KPI Esperado', value: formatNumberField('kpiExpected') },
+        { label: 'Descrição do KPI', value: getFieldDisplayValue('kpiDescription'), fullWidth: true }
       ]
     }
   ];
@@ -1274,20 +1264,33 @@ function createSummarySection(title, entries = []) {
   heading.textContent = title;
   section.appendChild(heading);
 
-  const list = document.createElement('dl');
+  const list = document.createElement('div');
   list.className = 'summary-list';
 
   entries.forEach((entry) => {
     if (!entry?.label) return;
-    const dt = document.createElement('dt');
-    dt.textContent = entry.label;
-    const dd = document.createElement('dd');
-    dd.textContent = resolveSummaryValue(entry.value);
-    list.append(dt, dd);
+    const item = document.createElement('div');
+    item.className = 'summary-item';
+    if (entry.fullWidth) {
+      item.classList.add('summary-item--full');
+    }
+
+    const label = document.createElement('span');
+    label.className = 'summary-label';
+    label.textContent = entry.label;
+
+    const value = document.createElement('p');
+    value.className = 'summary-value';
+    value.textContent = resolveSummaryValue(entry.value);
+
+    item.append(label, value);
+    list.appendChild(item);
   });
 
-  section.appendChild(list);
-  summarySections.appendChild(section);
+  if (list.children.length) {
+    section.appendChild(list);
+    summarySections.appendChild(section);
+  }
 }
 
 function renderPepSummary() {
@@ -1350,7 +1353,7 @@ function renderPepSummary() {
   section.className = 'summary-section';
 
   const heading = document.createElement('h3');
-  heading.textContent = 'PEPs';
+  heading.textContent = 'Elemento PEP';
   section.appendChild(heading);
 
   const table = document.createElement('table');
@@ -1408,7 +1411,7 @@ function renderMilestoneSummary() {
   section.className = 'summary-section';
 
   const heading = document.createElement('h3');
-  heading.textContent = 'Marcos e Atividades';
+  heading.textContent = 'Key Projects';
   section.appendChild(heading);
 
   const wrapper = document.createElement('div');
@@ -1443,7 +1446,7 @@ function renderMilestoneSummary() {
         headingEl.textContent = activityTitle;
         activityCard.appendChild(headingEl);
 
-        const detailList = document.createElement('dl');
+        const detailList = document.createElement('div');
         detailList.className = 'summary-list summary-list--activity';
 
         const detailItems = [
@@ -1452,15 +1455,27 @@ function renderMilestoneSummary() {
           { label: 'Elemento PEP', value: getSelectOptionText(activity.querySelector('.activity-pep-title')) },
           { label: 'Ano do PEP', value: activity.querySelector('.activity-pep-year')?.value ?? '' },
           { label: 'Fornecedor', value: activity.querySelector('.activity-supplier')?.value ?? '' },
-          { label: 'Descrição', value: activity.querySelector('.activity-description')?.value ?? '' }
+          { label: 'Descrição', value: activity.querySelector('.activity-description')?.value ?? '', fullWidth: true }
         ];
 
         detailItems.forEach((item) => {
-          const dt = document.createElement('dt');
-          dt.textContent = item.label;
-          const dd = document.createElement('dd');
-          dd.textContent = resolveSummaryValue(item.value);
-          detailList.append(dt, dd);
+          if (!item?.label) return;
+          const detailItem = document.createElement('div');
+          detailItem.className = 'summary-item';
+          if (item.fullWidth) {
+            detailItem.classList.add('summary-item--full');
+          }
+
+          const detailLabel = document.createElement('span');
+          detailLabel.className = 'summary-label';
+          detailLabel.textContent = item.label;
+
+          const detailValue = document.createElement('p');
+          detailValue.className = 'summary-value';
+          detailValue.textContent = resolveSummaryValue(item.value);
+
+          detailItem.append(detailLabel, detailValue);
+          detailList.appendChild(detailItem);
         });
 
         activityCard.appendChild(detailList);
