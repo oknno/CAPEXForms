@@ -853,13 +853,21 @@ function closeForm() {
 
 /**
  * Fecha o formulário quando o usuário pressiona ESC.
+ * Ao detectar a tecla, confirma com o usuário antes de fechar o formulário.
  * A verificação garante que a overlay exista e esteja visível,
  * evitando erros quando o formulário já está fechado.
  */
 function handleOverlayEscape(event) {
   if (event.key !== 'Escape') return;
   if (!overlay || overlay.classList.contains('hidden')) return;
-  closeForm();
+
+  const shouldClose = window.confirm(
+    'Tem certeza que deseja fechar o formulário? Suas alterações não salvas serão perdidas.'
+  );
+
+  if (shouldClose) {
+    closeForm();
+  }
 }
 
 function updateBudgetSections(options = {}) {
