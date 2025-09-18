@@ -117,6 +117,7 @@ class SharePointService {
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const DATE_FMT = new Intl.DateTimeFormat('pt-BR');
 const BUDGET_THRESHOLD = 1_000_000;
+const DATE_RANGE_ERROR_MESSAGE = 'A data de término não pode ser anterior à data de início.';
 
 const SITE_URL = window.SHAREPOINT_SITE_URL || 'https://arcelormittal.sharepoint.com/sites/controladorialongos/capex';
 const sp = new SharePointService("https://arcelormittal.sharepoint.com/sites/controladorialongos/capex");
@@ -502,6 +503,7 @@ function bindEvents() {
   closeFormBtn.addEventListener('click', closeForm);
   // Habilita o fechamento do formulário pela tecla ESC.
   document.addEventListener('keydown', handleOverlayEscape);
+  document.addEventListener('input', handleGlobalDateInput);
   if (projectSearch) {
     projectSearch.addEventListener('input', () => renderProjectList());
   }
@@ -590,6 +592,7 @@ function bindEvents() {
       queueGanttRefresh();
       validatePepBudget();
       validateActivityDates();
+      validateAllDateRanges();
       return;
     }
     if (button.classList.contains('add-activity')) {
@@ -604,6 +607,7 @@ function bindEvents() {
       queueGanttRefresh();
       validatePepBudget();
       validateActivityDates();
+      validateAllDateRanges();
     }
   });
 
@@ -983,6 +987,7 @@ function openProjectForm(mode, detail = null) {
   updateSimplePepYears();
   overlay.classList.remove('hidden');
   queueGanttRefresh();
+  validateAllDateRanges();
 }
 
 function fillFormWithProject(detail) {
@@ -1084,6 +1089,7 @@ function fillFormWithProject(detail) {
   queueGanttRefresh();
   validatePepBudget();
   validateActivityDates();
+  validateAllDateRanges();
 }
 
 function closeForm() {
@@ -1095,11 +1101,12 @@ function openSummaryOverlay(action, triggerButton = null) {
   const normalizedAction = action === 'approval' ? 'approval' : 'save';
   projectForm.dataset.action = normalizedAction;
 
+  const dateRangesValid = validateAllDateRanges();
   const formValid = projectForm.reportValidity();
   const pepValid = validatePepBudget();
   const activityValid = validateActivityDates();
 
-  if (!formValid || !pepValid || !activityValid) {
+  if (!dateRangesValid || !formValid || !pepValid || !activityValid) {
     return;
   }
 
@@ -1651,6 +1658,7 @@ function clearFormErrorMessage() {
 function resetValidationState() {
   validationState.pepBudget = null;
   validationState.activityDates = null;
+  clearDateRangeValidity();
   clearFormErrorMessage();
 }
 
@@ -1767,6 +1775,95 @@ function parseDateInputValue(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function getDateRangePairs() {
+  const pairs = [];
+
+  if (projectStartDateInput || projectEndDateInput) {
+    pairs.push({ start: projectStartDateInput, end: projectEndDateInput });
+  }
+
+  if (milestoneList) {
+    milestoneList.querySelectorAll('.milestone').forEach((milestone) => {
+      const milestoneStart = milestone.querySelector('.milestone-start');
+      const milestoneEnd = milestone.querySelector('.milestone-end');
+      if (milestoneStart || milestoneEnd) {
+        pairs.push({ start: milestoneStart, end: milestoneEnd });
+      }
+    });
+
+    milestoneList.querySelectorAll('.activity').forEach((activity) => {
+      const startInput = activity.querySelector('.activity-start');
+      const endInput = activity.querySelector('.activity-end');
+      if (startInput || endInput) {
+        pairs.push({ start: startInput, end: endInput });
+      }
+    });
+  }
+
+  return pairs;
+}
+
+function validateDateRange(startInput, endInput, options = {}) {
+  const { report = false } = options;
+  const relevantInputs = [startInput, endInput].filter(
+    (input) => input && typeof input.setCustomValidity === 'function'
+  );
+
+  if (!relevantInputs.length) {
+    return true;
+  }
+
+  relevantInputs.forEach((input) => input.setCustomValidity(''));
+
+  const startDate = startInput ? parseDateInputValue(startInput.value) : null;
+  const endDate = endInput ? parseDateInputValue(endInput.value) : null;
+
+  if (startDate && endDate && endDate < startDate) {
+    const invalidTarget = endInput && typeof endInput.setCustomValidity === 'function' ? endInput : startInput;
+    if (invalidTarget) {
+      invalidTarget.setCustomValidity(DATE_RANGE_ERROR_MESSAGE);
+      if (report && typeof invalidTarget.reportValidity === 'function') {
+        invalidTarget.reportValidity();
+      }
+    }
+    return false;
+  }
+
+  return true;
+}
+
+function validateAllDateRanges(options = {}) {
+  const { report = false } = options;
+  let firstInvalidField = null;
+
+  getDateRangePairs().forEach(({ start, end }) => {
+    const isValid = validateDateRange(start, end);
+    if (!isValid && !firstInvalidField) {
+      firstInvalidField = (end && typeof end.setCustomValidity === 'function') ? end : start;
+    }
+  });
+
+  if (report && firstInvalidField && typeof firstInvalidField.reportValidity === 'function') {
+    firstInvalidField.reportValidity();
+  }
+
+  return !firstInvalidField;
+}
+
+function clearDateRangeValidity() {
+  const inputs = new Set();
+  getDateRangePairs().forEach(({ start, end }) => {
+    if (start) inputs.add(start);
+    if (end) inputs.add(end);
+  });
+
+  inputs.forEach((input) => {
+    if (input && typeof input.setCustomValidity === 'function') {
+      input.setCustomValidity('');
+    }
+  });
+}
+
 function updateDateHintMessage({
   hasProjectStart = false,
   hasProjectEnd = false,
@@ -1875,6 +1972,33 @@ function validateActivityDates(options = {}) {
     rememberFieldPreviousValue(changedInput);
   }
   return true;
+}
+
+function handleGlobalDateInput(event) {
+  const target = event.target;
+  if (!target || typeof target.matches !== 'function') {
+    return;
+  }
+
+  if (target === projectStartDateInput || target === projectEndDateInput) {
+    validateDateRange(projectStartDateInput, projectEndDateInput, { report: true });
+    return;
+  }
+
+  if (target.classList?.contains('activity-start') || target.classList?.contains('activity-end')) {
+    const activity = target.closest('.activity');
+    const startInput = activity?.querySelector('.activity-start');
+    const endInput = activity?.querySelector('.activity-end');
+    validateDateRange(startInput, endInput, { report: true });
+    return;
+  }
+
+  if (target.classList?.contains('milestone-start') || target.classList?.contains('milestone-end')) {
+    const milestone = target.closest('.milestone');
+    const startInput = milestone?.querySelector('.milestone-start');
+    const endInput = milestone?.querySelector('.milestone-end');
+    validateDateRange(startInput, endInput, { report: true });
+  }
 }
 
 function handleFormFocusCapture(event) {
@@ -1998,6 +2122,7 @@ function addActivityBlock(milestoneElement, data = {}) {
   if (!data.pepYear) {
     updateActivityPepYear(activity);
   }
+  validateDateRange(startInput, endInput);
   queueGanttRefresh();
   return activity;
 }
@@ -2011,7 +2136,9 @@ async function handleFormSubmit(event) {
   const action = projectForm.dataset.action || 'save';
   const projectId = projectForm.dataset.projectId;
 
-  if (!projectForm.reportValidity()) {
+  const dateRangesValid = validateAllDateRanges();
+  const formValid = projectForm.reportValidity();
+  if (!dateRangesValid || !formValid) {
     return;
   }
 
