@@ -117,6 +117,7 @@ class SharePointService {
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const DATE_FMT = new Intl.DateTimeFormat('pt-BR');
 const BUDGET_THRESHOLD = 1_000_000;
+const EXCHANGE_RATE = 5.6; // 1 USD = 5.6 BRL
 const DATE_RANGE_ERROR_MESSAGE = 'A data de término não pode ser anterior à data de início.';
 
 const SITE_URL = window.SHAREPOINT_SITE_URL || 'https://arcelormittal.sharepoint.com/sites/controladorialongos/capex';
@@ -205,6 +206,7 @@ const depreciationSelect = document.getElementById('depreciationCostCenter');
 
 const approvalYearInput = document.getElementById('approvalYear');
 const projectBudgetInput = document.getElementById('projectBudget');
+const investmentLevelSelect = document.getElementById('investmentLevel');
 const projectStartDateInput = document.getElementById('startDate');
 const projectEndDateInput = document.getElementById('endDate');
 
@@ -490,9 +492,15 @@ function setApprovalYearToCurrent() {
 }
 
 function init() {
+  if (investmentLevelSelect) {
+    investmentLevelSelect.disabled = true;
+    investmentLevelSelect.setAttribute('aria-readonly', 'true');
+  }
+
   bindEvents();
   updateCompanyDependentFields(companySelect?.value || '');
   setApprovalYearToCurrent();
+  updateInvestmentLevelField();
   loadProjects();
   initGantt();
   window.addEventListener('load', initGantt, { once: true });
@@ -539,6 +547,7 @@ function bindEvents() {
   }
 
   projectBudgetInput.addEventListener('input', () => {
+    updateInvestmentLevelField();
     updateBudgetSections();
     validatePepBudget();
   });
@@ -959,6 +968,8 @@ function openProjectForm(mode, detail = null) {
   projectForm.dataset.action = 'save';
   projectForm.dataset.projectId = detail?.project?.Id || '';
 
+  updateInvestmentLevelField();
+
   if (companySelect) {
     companySelect.value = '';
   }
@@ -1007,7 +1018,7 @@ function fillFormWithProject(detail) {
   document.getElementById('endDate').value = project.endDate ? project.endDate.substring(0, 10) : '';
 
   document.getElementById('projectBudget').value = project.budgetBrl ?? '';
-  document.getElementById('investmentLevel').value = project.investmentLevel || '';
+  updateInvestmentLevelField();
   document.getElementById('fundingSource').value = project.fundingSource || '';
   const selectedCompany = project.company || '';
   if (companySelect) {
@@ -1690,6 +1701,25 @@ function parseNumericInputValue(source) {
   return Number.isFinite(number) ? number : 0;
 }
 
+function determineInvestmentLevel(budgetBrl) {
+  if (!Number.isFinite(budgetBrl) || budgetBrl < 0) {
+    return '';
+  }
+
+  const budgetUsd = budgetBrl / EXCHANGE_RATE;
+
+  if (budgetUsd >= 150_000_000) {
+    return 'N1';
+  }
+  if (budgetUsd >= 10_000_000) {
+    return 'N2';
+  }
+  if (budgetUsd >= 2_000_000) {
+    return 'N3';
+  }
+  return 'N4';
+}
+
 function getProjectBudgetValue() {
   if (!projectBudgetInput) return NaN;
   const rawValue = projectBudgetInput.value;
@@ -1697,6 +1727,12 @@ function getProjectBudgetValue() {
     return NaN;
   }
   return parseNumericInputValue(projectBudgetInput);
+}
+
+function updateInvestmentLevelField(budgetBrl = getProjectBudgetValue()) {
+  if (!investmentLevelSelect) return;
+  const level = determineInvestmentLevel(budgetBrl);
+  investmentLevelSelect.value = level;
 }
 
 function getPepAmountInputs() {
@@ -2174,7 +2210,8 @@ async function handleFormSubmit(event) {
       updateProjectState(resolvedId, {
         Title: payload.Title,
         status: payload.status,
-        budgetBrl: payload.budgetBrl
+        budgetBrl: payload.budgetBrl,
+        investmentLevel: payload.investmentLevel
       });
       renderProjectList();
       if (state.currentDetails?.project?.Id === resolvedId) {
@@ -2184,7 +2221,8 @@ async function handleFormSubmit(event) {
             ...state.currentDetails.project,
             Title: payload.Title,
             status: payload.status,
-            budgetBrl: payload.budgetBrl
+            budgetBrl: payload.budgetBrl,
+            investmentLevel: payload.investmentLevel
           }
         };
         renderProjectDetails(state.currentDetails);
@@ -2204,6 +2242,10 @@ async function handleFormSubmit(event) {
 }
 
 function collectProjectData() {
+  const budgetValue = getProjectBudgetValue();
+  const budgetBrl = Number.isFinite(budgetValue) ? budgetValue : 0;
+  const investmentLevelValue = determineInvestmentLevel(budgetValue);
+
   const data = {
     Title: document.getElementById('projectName').value.trim(),
     category: document.getElementById('category').value.trim(),
@@ -2213,8 +2255,8 @@ function collectProjectData() {
     approvalYear: parseNumber(document.getElementById('approvalYear').value),
     startDate: document.getElementById('startDate').value || null,
     endDate: document.getElementById('endDate').value || null,
-    budgetBrl: parseFloat(document.getElementById('projectBudget').value) || 0,
-    investmentLevel: document.getElementById('investmentLevel').value.trim(),
+    budgetBrl,
+    investmentLevel: investmentLevelValue,
     fundingSource: document.getElementById('fundingSource').value.trim(),
     depreciationCostCenter: document.getElementById('depreciationCostCenter').value.trim(),
     company: document.getElementById('company').value.trim(),
