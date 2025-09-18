@@ -157,6 +157,7 @@ const projectForm = document.getElementById('projectForm');
 const formTitle = document.getElementById('formTitle');
 const closeFormBtn = document.getElementById('closeFormBtn');
 const sendApprovalBtn = document.getElementById('sendApprovalBtn');
+const saveProjectBtn = document.getElementById('saveProjectBtn');
 const formStatus = document.getElementById('formStatus');
 const formErrors = document.getElementById('formErrors');
 const statusField = document.getElementById('statusField');
@@ -171,6 +172,13 @@ const addMilestoneBtn = document.getElementById('addMilestoneBtn');
 const ganttContainer = document.getElementById('ganttContainer');
 const ganttTitleEl = document.getElementById('ganttChartTitle');
 const ganttChartEl = document.getElementById('ganttChart');
+
+const summaryOverlay = document.getElementById('summaryOverlay');
+const summarySections = document.getElementById('summarySections');
+const summaryGanttSection = document.getElementById('summaryGanttSection');
+const summaryGanttChart = document.getElementById('summaryGanttChart');
+const summaryConfirmBtn = document.getElementById('summaryConfirmBtn');
+const summaryEditBtn = document.getElementById('summaryEditBtn');
 
 const approvalYearInput = document.getElementById('approvalYear');
 const projectBudgetInput = document.getElementById('projectBudget');
@@ -187,6 +195,7 @@ const activityTemplate = document.getElementById('activityTemplate');
 let ganttLoaderStarted = false;
 let ganttReady = false;
 let ganttRefreshScheduled = false;
+let summaryTriggerButton = null;
 
 function initGantt() {
   if (ganttLoaderStarted) return;
@@ -399,10 +408,27 @@ function bindEvents() {
 
   projectForm.addEventListener('submit', handleFormSubmit);
   projectForm.addEventListener('focusin', handleFormFocusCapture);
-  sendApprovalBtn.addEventListener('click', () => {
-    projectForm.dataset.action = 'approval';
-    projectForm.requestSubmit();
-  });
+  if (saveProjectBtn) {
+    saveProjectBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      openSummaryOverlay('save', saveProjectBtn);
+    });
+  }
+
+  if (sendApprovalBtn) {
+    sendApprovalBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      openSummaryOverlay('approval', sendApprovalBtn);
+    });
+  }
+
+  if (summaryConfirmBtn) {
+    summaryConfirmBtn.addEventListener('click', handleSummaryConfirm);
+  }
+
+  if (summaryEditBtn) {
+    summaryEditBtn.addEventListener('click', () => closeSummaryOverlay());
+  }
 
   projectBudgetInput.addEventListener('input', () => {
     updateBudgetSections();
@@ -897,6 +923,470 @@ function fillFormWithProject(detail) {
 
 function closeForm() {
   overlay.classList.add('hidden');
+  closeSummaryOverlay({ restoreFocus: false });
+}
+
+function openSummaryOverlay(action, triggerButton = null) {
+  const normalizedAction = action === 'approval' ? 'approval' : 'save';
+  projectForm.dataset.action = normalizedAction;
+
+  const formValid = projectForm.reportValidity();
+  const pepValid = validatePepBudget();
+  const activityValid = validateActivityDates();
+
+  if (!formValid || !pepValid || !activityValid) {
+    return;
+  }
+
+  if (!summaryOverlay) {
+    projectForm.requestSubmit();
+    return;
+  }
+
+  summaryTriggerButton = triggerButton || null;
+  populateSummaryOverlay();
+  summaryOverlay.classList.remove('hidden');
+  summaryOverlay.scrollTop = 0;
+  if (summaryConfirmBtn) {
+    summaryConfirmBtn.focus();
+  }
+}
+
+function closeSummaryOverlay(options = {}) {
+  const { restoreFocus = true } = options;
+  if (!summaryOverlay || summaryOverlay.classList.contains('hidden')) {
+    summaryTriggerButton = null;
+    return;
+  }
+
+  summaryOverlay.classList.add('hidden');
+  if (summarySections) {
+    summarySections.innerHTML = '';
+  }
+  if (summaryGanttChart) {
+    summaryGanttChart.innerHTML = '';
+  }
+
+  if (restoreFocus && summaryTriggerButton) {
+    summaryTriggerButton.focus();
+  }
+  summaryTriggerButton = null;
+}
+
+function handleSummaryConfirm() {
+  closeSummaryOverlay({ restoreFocus: false });
+  projectForm.requestSubmit();
+}
+
+function populateSummaryOverlay() {
+  if (!summarySections) return;
+
+  summarySections.innerHTML = '';
+
+  const sections = [
+    {
+      title: 'Dados Gerais',
+      entries: [
+        { label: 'Nome do Projeto', value: getFieldDisplayValue('projectName') },
+        { label: 'Categoria', value: getFieldDisplayValue('category') },
+        { label: 'Tipo de Investimento', value: getFieldDisplayValue('investmentType') },
+        { label: 'Tipo de Ativo', value: getFieldDisplayValue('assetType') },
+        { label: 'Função do Projeto', value: getFieldDisplayValue('projectFunction') }
+      ]
+    },
+    {
+      title: 'Planejamento Temporal',
+      entries: [
+        { label: 'Ano de Aprovação', value: getFieldDisplayValue('approvalYear') },
+        { label: 'Data de Início', value: formatDateValue(document.getElementById('startDate')?.value) },
+        { label: 'Data de Término', value: formatDateValue(document.getElementById('endDate')?.value) }
+      ]
+    },
+    {
+      title: 'Orçamento e Recursos',
+      entries: [
+        { label: 'Orçamento do Projeto', value: formatCurrencyField('projectBudget') },
+        { label: 'Nível de Investimento', value: getFieldDisplayValue('investmentLevel') },
+        { label: 'Origem da Verba', value: getFieldDisplayValue('fundingSource') },
+        { label: 'C Custo Depreciação', value: getFieldDisplayValue('depreciationCostCenter') }
+      ]
+    },
+    {
+      title: 'Localização Operacional',
+      entries: [
+        { label: 'Empresa', value: getFieldDisplayValue('company') },
+        { label: 'Centro', value: getFieldDisplayValue('center') },
+        { label: 'Unidade', value: getFieldDisplayValue('unit') },
+        { label: 'Localização', value: getFieldDisplayValue('location') }
+      ]
+    },
+    {
+      title: 'Pessoas Envolvidas',
+      entries: [
+        { label: 'Solicitante', value: getFieldDisplayValue('projectUser') },
+        { label: 'Gestor do Projeto', value: getFieldDisplayValue('projectLeader') }
+      ]
+    },
+    {
+      title: 'Justificativa e Solução',
+      entries: [
+        { label: 'Necessidade do Negócio', value: getFieldDisplayValue('businessNeed') },
+        { label: 'Solução Proposta', value: getFieldDisplayValue('proposedSolution') }
+      ]
+    },
+    {
+      title: 'Indicadores (KPIs)',
+      entries: [
+        { label: 'Tipo de KPI', value: getFieldDisplayValue('kpiType') },
+        { label: 'Nome do KPI', value: getFieldDisplayValue('kpiName') },
+        { label: 'Descrição do KPI', value: getFieldDisplayValue('kpiDescription') },
+        { label: 'Valor Atual', value: formatNumberField('kpiCurrent') },
+        { label: 'Valor Esperado', value: formatNumberField('kpiExpected') }
+      ]
+    }
+  ];
+
+  sections.forEach((section) => createSummarySection(section.title, section.entries));
+
+  renderPepSummary();
+  renderMilestoneSummary();
+  populateSummaryGantt({ refreshFirst: true });
+}
+
+function createSummarySection(title, entries = []) {
+  if (!summarySections || !entries.length) return;
+
+  const section = document.createElement('section');
+  section.className = 'summary-section';
+
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+  section.appendChild(heading);
+
+  const list = document.createElement('dl');
+  list.className = 'summary-list';
+
+  entries.forEach((entry) => {
+    if (!entry?.label) return;
+    const dt = document.createElement('dt');
+    dt.textContent = entry.label;
+    const dd = document.createElement('dd');
+    dd.textContent = resolveSummaryValue(entry.value);
+    list.append(dt, dd);
+  });
+
+  section.appendChild(list);
+  summarySections.appendChild(section);
+}
+
+function renderPepSummary() {
+  if (!summarySections) return;
+  if (!simplePepList || !milestoneList) return;
+
+  const rows = [];
+
+  if (!simplePepSection.classList.contains('hidden')) {
+    simplePepList.querySelectorAll('.pep-row').forEach((row) => {
+      const element = getSelectOptionText(row.querySelector('.pep-title'));
+      const amount = formatCurrencyValueFromElement(row.querySelector('.pep-amount'));
+      const year = row.querySelector('.pep-year')?.value ?? '';
+
+      if (
+        resolveSummaryValue(element) === '—' &&
+        resolveSummaryValue(amount) === '—' &&
+        resolveSummaryValue(year) === '—'
+      ) {
+        return;
+      }
+
+      rows.push({
+        element,
+        amount,
+        year
+      });
+    });
+  } else if (!keyProjectSection.classList.contains('hidden')) {
+    milestoneList.querySelectorAll('.activity').forEach((activity) => {
+      const element = getSelectOptionText(activity.querySelector('.activity-pep-title'));
+      const amount = formatCurrencyValueFromElement(activity.querySelector('.activity-pep-amount'));
+      const year = activity.querySelector('.activity-pep-year')?.value ?? '';
+      const activityTitle = activity.querySelector('.activity-title')?.value ?? '';
+
+      if (
+        resolveSummaryValue(element) === '—' &&
+        resolveSummaryValue(amount) === '—' &&
+        resolveSummaryValue(year) === '—'
+      ) {
+        return;
+      }
+
+      rows.push({
+        element,
+        amount,
+        year,
+        activity: activityTitle
+      });
+    });
+  }
+
+  if (!rows.length) {
+    return;
+  }
+
+  const hasActivityColumn = rows.some((row) => resolveSummaryValue(row.activity) !== '—');
+
+  const section = document.createElement('section');
+  section.className = 'summary-section';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'PEPs';
+  section.appendChild(heading);
+
+  const table = document.createElement('table');
+  table.className = 'summary-table';
+
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  const headers = ['Elemento PEP', 'Valor (R$)', 'Ano'];
+  if (hasActivityColumn) {
+    headers.push('Atividade');
+  }
+  headers.forEach((label) => {
+    const th = document.createElement('th');
+    th.textContent = label;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  rows.forEach((row) => {
+    const tr = document.createElement('tr');
+    const cells = [
+      resolveSummaryValue(row.element),
+      resolveSummaryValue(row.amount),
+      resolveSummaryValue(row.year)
+    ];
+
+    if (hasActivityColumn) {
+      cells.push(resolveSummaryValue(row.activity));
+    }
+
+    cells.forEach((value) => {
+      const td = document.createElement('td');
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  section.appendChild(table);
+  summarySections.appendChild(section);
+}
+
+function renderMilestoneSummary() {
+  if (!summarySections || !milestoneList) return;
+  if (keyProjectSection.classList.contains('hidden')) return;
+
+  const milestones = milestoneList.querySelectorAll('.milestone');
+  if (!milestones.length) return;
+
+  const section = document.createElement('section');
+  section.className = 'summary-section';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Marcos e Atividades';
+  section.appendChild(heading);
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'summary-milestones';
+
+  milestones.forEach((milestone, index) => {
+    const card = document.createElement('article');
+    card.className = 'summary-milestone';
+
+    const titleInput = milestone.querySelector('.milestone-title');
+    const resolvedTitle = resolveSummaryValue(titleInput?.value);
+    const titleText = resolvedTitle === '—' ? `Marco ${index + 1}` : resolvedTitle;
+
+    const title = document.createElement('h4');
+    title.textContent = titleText;
+    card.appendChild(title);
+
+    const activities = milestone.querySelectorAll('.activity');
+    if (activities.length) {
+      const activityContainer = document.createElement('div');
+      activityContainer.className = 'summary-activities';
+
+      activities.forEach((activity, actIndex) => {
+        const activityCard = document.createElement('article');
+        activityCard.className = 'summary-activity';
+
+        const activityTitleInput = activity.querySelector('.activity-title');
+        const resolvedActivityTitle = resolveSummaryValue(activityTitleInput?.value);
+        const activityTitle = resolvedActivityTitle === '—' ? `Atividade ${actIndex + 1}` : resolvedActivityTitle;
+
+        const headingEl = document.createElement('h5');
+        headingEl.textContent = activityTitle;
+        activityCard.appendChild(headingEl);
+
+        const detailList = document.createElement('dl');
+        detailList.className = 'summary-list summary-list--activity';
+
+        const detailItems = [
+          { label: 'Período', value: buildActivityPeriod(activity) },
+          { label: 'Valor da Atividade', value: formatCurrencyValueFromElement(activity.querySelector('.activity-pep-amount')) },
+          { label: 'Elemento PEP', value: getSelectOptionText(activity.querySelector('.activity-pep-title')) },
+          { label: 'Ano do PEP', value: activity.querySelector('.activity-pep-year')?.value ?? '' },
+          { label: 'Fornecedor', value: activity.querySelector('.activity-supplier')?.value ?? '' },
+          { label: 'Descrição', value: activity.querySelector('.activity-description')?.value ?? '' }
+        ];
+
+        detailItems.forEach((item) => {
+          const dt = document.createElement('dt');
+          dt.textContent = item.label;
+          const dd = document.createElement('dd');
+          dd.textContent = resolveSummaryValue(item.value);
+          detailList.append(dt, dd);
+        });
+
+        activityCard.appendChild(detailList);
+        activityContainer.appendChild(activityCard);
+      });
+
+      card.appendChild(activityContainer);
+    }
+
+    wrapper.appendChild(card);
+  });
+
+  section.appendChild(wrapper);
+  summarySections.appendChild(section);
+}
+
+function populateSummaryGantt(options = {}) {
+  const { refreshFirst = false } = options;
+  if (!summaryGanttSection || !summaryGanttChart) return;
+
+  if (refreshFirst) {
+    refreshGantt();
+    requestAnimationFrame(() => populateSummaryGantt());
+    return;
+  }
+
+  if (keyProjectSection.classList.contains('hidden')) {
+    summaryGanttSection.classList.add('hidden');
+    summaryGanttChart.innerHTML = '';
+    return;
+  }
+
+  const chartHtml = ganttChartEl?.innerHTML?.trim();
+  if (!chartHtml) {
+    summaryGanttSection.classList.add('hidden');
+    summaryGanttChart.innerHTML = '';
+    return;
+  }
+
+  summaryGanttSection.classList.remove('hidden');
+  summaryGanttChart.innerHTML = chartHtml;
+}
+
+function buildActivityPeriod(activity) {
+  if (!activity) return '';
+  const startValue = activity.querySelector('.activity-start')?.value;
+  const endValue = activity.querySelector('.activity-end')?.value;
+  const start = formatDateValue(startValue);
+  const end = formatDateValue(endValue);
+
+  const hasStart = start !== '—';
+  const hasEnd = end !== '—';
+
+  if (hasStart && hasEnd) {
+    return `${start} a ${end}`;
+  }
+  if (hasStart) {
+    return `A partir de ${start}`;
+  }
+  if (hasEnd) {
+    return `Até ${end}`;
+  }
+  return '';
+}
+
+function getFieldDisplayValue(fieldId) {
+  const field = document.getElementById(fieldId);
+  if (!field) return '';
+  if (field.tagName === 'SELECT') {
+    return getSelectOptionText(field);
+  }
+  return field.value ?? '';
+}
+
+function getSelectOptionText(selectElement) {
+  if (!selectElement) return '';
+  const option = selectElement.options?.[selectElement.selectedIndex];
+  if (option) {
+    return option.textContent?.trim() ?? '';
+  }
+  return selectElement.value ?? '';
+}
+
+function formatCurrencyField(fieldId) {
+  const field = document.getElementById(fieldId);
+  if (!field) return '';
+  const raw = field.value;
+  if (raw === undefined || raw === null || raw === '') {
+    return '';
+  }
+  const value = parseNumericInputValue(raw);
+  if (!Number.isFinite(value)) {
+    return '';
+  }
+  return BRL.format(value);
+}
+
+function formatNumberField(fieldId) {
+  const field = document.getElementById(fieldId);
+  if (!field) return '';
+  const raw = field.value;
+  if (raw === undefined || raw === null || raw === '') {
+    return '';
+  }
+  const normalized = String(raw).replace(',', '.');
+  const value = Number.parseFloat(normalized);
+  if (!Number.isFinite(value)) {
+    return raw;
+  }
+  return value.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+}
+
+function formatCurrencyValueFromElement(element) {
+  if (!element) return '';
+  const raw = element.value;
+  if (raw === undefined || raw === null || raw === '') {
+    return '';
+  }
+  const value = parseNumericInputValue(element);
+  if (!Number.isFinite(value)) {
+    return '';
+  }
+  return BRL.format(value);
+}
+
+function resolveSummaryValue(value) {
+  if (value === null || value === undefined) {
+    return '—';
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      return '—';
+    }
+    return value.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+  }
+  const text = String(value).trim();
+  return text ? text : '—';
 }
 
 /**
@@ -907,6 +1397,10 @@ function closeForm() {
  */
 function handleOverlayEscape(event) {
   if (event.key !== 'Escape') return;
+  if (summaryOverlay && !summaryOverlay.classList.contains('hidden')) {
+    closeSummaryOverlay();
+    return;
+  }
   if (!overlay || overlay.classList.contains('hidden')) return;
 
   const shouldClose = window.confirm(
