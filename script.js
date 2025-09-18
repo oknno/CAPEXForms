@@ -133,6 +133,11 @@ const state = {
   }
 };
 
+const validationState = {
+  pepBudget: null,
+  activityDates: null
+};
+
 function updateProjectState(projectId, changes = {}) {
   if (!projectId) return;
   const index = state.projects.findIndex((item) => Number(item.Id) === Number(projectId));
@@ -169,6 +174,8 @@ const ganttChartEl = document.getElementById('ganttChart');
 
 const approvalYearInput = document.getElementById('approvalYear');
 const projectBudgetInput = document.getElementById('projectBudget');
+const projectStartDateInput = document.getElementById('startDate');
+const projectEndDateInput = document.getElementById('endDate');
 
 const simplePepTemplate = document.getElementById('simplePepTemplate');
 const milestoneTemplate = document.getElementById('milestoneTemplate');
@@ -391,12 +398,33 @@ function bindEvents() {
   }
 
   projectForm.addEventListener('submit', handleFormSubmit);
+  projectForm.addEventListener('focusin', handleFormFocusCapture);
   sendApprovalBtn.addEventListener('click', () => {
     projectForm.dataset.action = 'approval';
     projectForm.requestSubmit();
   });
 
-  projectBudgetInput.addEventListener('input', () => updateBudgetSections());
+  projectBudgetInput.addEventListener('input', () => {
+    updateBudgetSections();
+    validatePepBudget();
+  });
+
+  if (projectStartDateInput) {
+    const handleProjectStartChange = (event) => {
+      validateActivityDates({ changedInput: event.target });
+    };
+    projectStartDateInput.addEventListener('input', handleProjectStartChange);
+    projectStartDateInput.addEventListener('change', handleProjectStartChange);
+  }
+
+  if (projectEndDateInput) {
+    const handleProjectEndChange = (event) => {
+      validateActivityDates({ changedInput: event.target });
+    };
+    projectEndDateInput.addEventListener('input', handleProjectEndChange);
+    projectEndDateInput.addEventListener('change', handleProjectEndChange);
+  }
+
   approvalYearInput.addEventListener('input', () => updateSimplePepYears());
 
   addSimplePepBtn.addEventListener('click', () => {
@@ -411,6 +439,13 @@ function bindEvents() {
     if (event.target.classList.contains('remove-row')) {
       const row = event.target.closest('.pep-row');
       row?.remove();
+      validatePepBudget();
+    }
+  });
+
+  simplePepList.addEventListener('input', (event) => {
+    if (event.target.classList?.contains('pep-amount')) {
+      validatePepBudget({ changedInput: event.target });
     }
   });
 
@@ -421,6 +456,8 @@ function bindEvents() {
     if (button.classList.contains('remove-milestone')) {
       button.closest('.milestone')?.remove();
       queueGanttRefresh();
+      validatePepBudget();
+      validateActivityDates();
       return;
     }
     if (button.classList.contains('add-activity')) {
@@ -433,13 +470,23 @@ function bindEvents() {
       const activity = button.closest('.activity');
       activity?.remove();
       queueGanttRefresh();
+      validatePepBudget();
+      validateActivityDates();
     }
   });
 
   const handleMilestoneFormChange = (event) => {
+    if (!event.target) return;
     if (event.target.classList?.contains('activity-start')) {
       const activity = event.target.closest('.activity');
       updateActivityPepYear(activity, { force: true });
+      validateActivityDates({ changedInput: event.target });
+    }
+    if (event.target.classList?.contains('activity-end')) {
+      validateActivityDates({ changedInput: event.target });
+    }
+    if (event.target.classList?.contains('activity-pep-amount')) {
+      validatePepBudget({ changedInput: event.target });
     }
     queueGanttRefresh();
   };
@@ -722,8 +769,7 @@ function formatDateValue(value) {
 function openProjectForm(mode, detail = null) {
   projectForm.reset();
   formStatus.classList.remove('show');
-  formErrors.classList.remove('show');
-  formErrors.textContent = '';
+  resetValidationState();
   projectForm.dataset.mode = mode;
   projectForm.dataset.action = 'save';
   projectForm.dataset.projectId = detail?.project?.Id || '';
@@ -845,6 +891,8 @@ function fillFormWithProject(detail) {
   }
 
   queueGanttRefresh();
+  validatePepBudget();
+  validateActivityDates();
 }
 
 function closeForm() {
@@ -921,6 +969,179 @@ function setSectionInteractive(section, enabled) {
     if (element.type === 'hidden') return;
     element.disabled = !enabled;
   });
+}
+
+// ============================================================================
+// Validações de formulário
+// ============================================================================
+function clearFormErrorMessage() {
+  formErrors.textContent = '';
+  formErrors.classList.remove('show');
+  delete formErrors.dataset.validation;
+}
+
+function resetValidationState() {
+  validationState.pepBudget = null;
+  validationState.activityDates = null;
+  clearFormErrorMessage();
+}
+
+function setValidationError(key, message) {
+  validationState[key] = message || null;
+  const firstMessage = validationState.pepBudget || validationState.activityDates;
+  if (firstMessage) {
+    showError(firstMessage);
+    formErrors.dataset.validation = 'true';
+  } else if (formErrors.dataset.validation === 'true') {
+    clearFormErrorMessage();
+  }
+}
+
+function rememberFieldPreviousValue(element) {
+  if (!element || typeof element !== 'object') return;
+  if (!('dataset' in element)) return;
+  element.dataset.previousValue = element.value ?? '';
+}
+
+function parseNumericInputValue(source) {
+  if (!source) return 0;
+  const rawValue = typeof source === 'string' ? source : source.value;
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return 0;
+  }
+  const normalized = String(rawValue).replace(',', '.');
+  const number = Number.parseFloat(normalized);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function getProjectBudgetValue() {
+  if (!projectBudgetInput) return NaN;
+  const rawValue = projectBudgetInput.value;
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return NaN;
+  }
+  return parseNumericInputValue(projectBudgetInput);
+}
+
+function getPepAmountInputs() {
+  const simplePepInputs = Array.from(simplePepList.querySelectorAll('.pep-amount'));
+  const activityPepInputs = Array.from(milestoneList.querySelectorAll('.activity-pep-amount'));
+  return [...simplePepInputs, ...activityPepInputs];
+}
+
+function calculatePepTotal() {
+  return getPepAmountInputs().reduce((sum, input) => sum + parseNumericInputValue(input), 0);
+}
+
+function validatePepBudget(options = {}) {
+  const { changedInput = null } = options;
+  const budget = getProjectBudgetValue();
+
+  if (!Number.isFinite(budget)) {
+    setValidationError('pepBudget', null);
+    return true;
+  }
+
+  const total = calculatePepTotal();
+  if (total - budget > 0.009) {
+    const message = `A soma dos PEPs (${BRL.format(total)}) ultrapassa o orçamento do projeto (${BRL.format(budget)}).`;
+    setValidationError('pepBudget', message);
+
+    if (changedInput) {
+      const previousValue = changedInput.dataset?.previousValue ?? '';
+      if (changedInput.value !== previousValue) {
+        changedInput.value = previousValue;
+      }
+    }
+    return false;
+  }
+
+  setValidationError('pepBudget', null);
+  if (changedInput) {
+    rememberFieldPreviousValue(changedInput);
+  }
+  return true;
+}
+
+function parseDateInputValue(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function validateActivityDates(options = {}) {
+  const { changedInput = null } = options;
+  const projectStart = parseDateInputValue(projectStartDateInput?.value);
+  const projectEnd = parseDateInputValue(projectEndDateInput?.value);
+
+  if (!projectStart && !projectEnd) {
+    setValidationError('activityDates', null);
+    return true;
+  }
+
+  let invalidMessage = null;
+  let invalidField = null;
+
+  const activities = milestoneList.querySelectorAll('.activity');
+  for (const activity of activities) {
+    const startInput = activity.querySelector('.activity-start');
+    const endInput = activity.querySelector('.activity-end');
+    const title = activity.querySelector('.activity-title')?.value?.trim() || 'Atividade';
+    const startDate = parseDateInputValue(startInput?.value);
+    const endDate = parseDateInputValue(endInput?.value);
+
+    if (projectStart && startDate && startDate < projectStart) {
+      invalidMessage = `A data de início da atividade "${title}" não pode ser anterior à data de início do projeto.`;
+      invalidField = changedInput === projectStartDateInput ? projectStartDateInput : startInput;
+      break;
+    }
+
+    if (projectEnd && endDate && endDate > projectEnd) {
+      invalidMessage = `A data de término da atividade "${title}" não pode ser posterior à data de término do projeto.`;
+      invalidField = changedInput === projectEndDateInput ? projectEndDateInput : endInput;
+      break;
+    }
+  }
+
+  if (invalidMessage) {
+    setValidationError('activityDates', invalidMessage);
+    if (invalidField) {
+      const previousValue = invalidField.dataset?.previousValue ?? '';
+      if (invalidField.value !== previousValue) {
+        invalidField.value = previousValue;
+      }
+    }
+    return false;
+  }
+
+  setValidationError('activityDates', null);
+  if (changedInput) {
+    rememberFieldPreviousValue(changedInput);
+  }
+  return true;
+}
+
+function handleFormFocusCapture(event) {
+  const target = event.target;
+  if (!target) return;
+
+  if (target === projectStartDateInput || target === projectEndDateInput) {
+    rememberFieldPreviousValue(target);
+    return;
+  }
+
+  if (target.classList?.contains('pep-amount')) {
+    rememberFieldPreviousValue(target);
+    return;
+  }
+
+  if (
+    target.classList?.contains('activity-pep-amount') ||
+    target.classList?.contains('activity-start') ||
+    target.classList?.contains('activity-end')
+  ) {
+    rememberFieldPreviousValue(target);
+  }
 }
 
 function updateActivityPepYear(activityElement, options = {}) {
@@ -1035,6 +1256,12 @@ async function handleFormSubmit(event) {
   const projectId = projectForm.dataset.projectId;
 
   if (!projectForm.reportValidity()) {
+    return;
+  }
+
+  const pepValid = validatePepBudget();
+  const activityDatesValid = validateActivityDates();
+  if (!pepValid || !activityDatesValid) {
     return;
   }
 
@@ -1296,6 +1523,7 @@ function showStatus(message, success = false) {
 function showError(message) {
   formErrors.textContent = message;
   formErrors.classList.add('show');
+  delete formErrors.dataset.validation;
 }
 
 function statusColor(status) {
