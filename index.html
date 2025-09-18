@@ -54,15 +54,112 @@
       <div id="formErrors" class="feedback error" aria-live="assertive"></div>
 
       <!-- ============================== -->
-      <!-- 1. Informações SAP             -->
+      <!-- 1. Sobre o Projeto             -->
       <!-- ============================== -->
       <fieldset class="form-section">
-        <legend>1. Informações SAP</legend>
+        <legend>1. Sobre o Projeto</legend>
         <div class="field-group">
           <label for="projectName">Nome do Projeto</label>
           <input id="projectName" name="projectName" type="text" required maxlength="255" placeholder="Título do projeto">
         </div>
+        <div class="field-group">
+          <label for="projectBudget">Orçamento do Projeto em R$</label>
+          <input id="projectBudget" name="projectBudget" type="number" min="0" step="0.01" required>
+          <small id="budgetHint" class="hint"></small>
+        </div>
         <div class="field-grid">
+          <div class="field-group">
+            <label for="approvalYear">Ano de Aprovação</label>
+            <input id="approvalYear" name="approvalYear" type="number" min="1900" max="9999" required>
+          </div>
+          <div class="field-group">
+            <label for="investmentLevel">Nível de Investimento</label>
+            <select id="investmentLevel" name="investmentLevel" required>
+              <option value="">Selecione o nível de investimento</option>
+              <option value="N1">N1 ≥ $150m Board of Directors</option>
+              <option value="N2">N2 ≥ $10m X < $150m IAC/Executive Office</option>
+              <option value="N3">N3 ≥ $2m X < $10m Pre-IAC</option>
+              <option value="N4">N4 < $2m Local Segment</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="startDate">Data de Início</label>
+            <input id="startDate" name="startDate" type="date" required>
+          </div>
+          <div class="field-group">
+            <label for="endDate">Data de Término</label>
+            <input id="endDate" name="endDate" type="date" required>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ============================== -->
+      <!-- 2. Origem e Função             -->
+      <!-- ============================== -->
+      <fieldset class="form-section">
+        <legend>2. Origem e Função</legend>
+        <div class="field-grid">
+          <div class="field-group">
+            <label for="fundingSource">Origem da Verba</label>
+          </div>
+          <div class="field-group">
+            <label for="projectFunction">Função do Projeto</label>
+            <input id="projectFunction" name="projectFunction" type="text" required maxlength="160">
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ============================== -->
+      <!-- 3. Informação Operacional      -->
+      <!-- ============================== -->
+      <fieldset class="form-section">
+        <legend>3. Informação Operacional</legend>
+        <div class="field-grid">
+          <div class="field-group">
+            <label for="company">Empresa</label>
+            <select id="company" name="company" required>
+              <option value="">Selecione a empresa</option>
+              <option>BMJF</option>
+              <option>BF00</option>
+              <option>ACBF</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="center">Centro</label>
+            <select id="center" name="center" required>
+              <option value="">Selecione o centro</option>
+              <option>Opção 1</option>
+              <option>Opção 2</option>
+              <option>Opção 3</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="unit">Unidade</label>
+            <select id="unit" name="unit" required>
+              <option value="">Selecione a unidade</option>
+              <option>Opção 1</option>
+              <option>Opção 2</option>
+              <option>Opção 3</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="location">Local de Implantação</label>
+            <select id="location" name="location" required>
+              <option value="">Selecione a localização</option>
+              <option>Opção 1</option>
+              <option>Opção 2</option>
+              <option>Opção 3</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="depreciationCostCenter">C Custo Depreciação</label>
+            <select id="depreciationCostCenter" name="depreciationCostCenter" required>
+              <option value="">Selecione o C. Custo Depreciação</option>
+              <option>Opção 1</option>
+              <option>Opção 2</option>
+              <option>Opção 3</option>
+            </select>
+          </div>
           <div class="field-group">
             <label for="category">Categoria</label>
             <select id="category" name="category" required>
@@ -103,122 +200,6 @@
             </select>
           </div>
           <div class="field-group">
-            <label for="projectFunction">Função do Projeto</label>
-            <input id="projectFunction" name="projectFunction" type="text" required maxlength="160" placeholder="Digite a função do projeto">
-          </div>
-        </div>
-      </fieldset>
-
-      <!-- ============================== -->
-      <!-- 2. Planejamento Temporal       -->
-      <!-- ============================== -->
-      <fieldset class="form-section">
-        <legend>2. Planejamento Temporal</legend>
-        <div class="field-grid three-cols">
-          <div class="field-group">
-            <label for="approvalYear">Ano de Aprovação</label>
-            <input id="approvalYear" name="approvalYear" type="number" min="1900" max="9999" required>
-          </div>
-          <div class="field-group">
-            <label for="startDate">Data de Início</label>
-            <input id="startDate" name="startDate" type="date" required>
-          </div>
-          <div class="field-group">
-            <label for="endDate">Data de Término</label>
-            <input id="endDate" name="endDate" type="date" required>
-          </div>
-        </div>
-      </fieldset>
-
-      <!-- ============================== -->
-      <!-- 3. Orçamento e Recursos        -->
-      <!-- ============================== -->
-      <fieldset class="form-section">
-        <legend>3. Orçamento e Recursos</legend>
-        <div class="field-grid">
-          <div class="field-group">
-            <label for="projectBudget">Orçamento do Projeto em R$</label>
-            <input id="projectBudget" name="projectBudget" type="number" min="0" step="0.01" required placeholder="Digite o orçamento total em R$">
-            <small id="budgetHint" class="hint"></small>
-          </div>
-          <div class="field-group">
-            <label for="investmentLevel">Nível de Investimento</label>
-            <select id="investmentLevel" name="investmentLevel" required>
-              <option value="">Selecione o nível de investimento</option>
-              <option value="N1">N1 ≥ $150m Board of Directors</option>
-              <option value="N2">N2 ≥ $10m X < $150m IAC/Executive Office</option>
-              <option value="N3">N3 ≥ $2m X < $10m Pre-IAC</option>
-              <option value="N4">N4 < $2m Local Segment</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label for="fundingSource">Origem da Verba</label>
-            <input id="fundingSource" name="fundingSource" type="text" required maxlength="120" placeholder="Digite a origem da verba">
-          </div>
-          <div class="field-group">
-            <label for="depreciationCostCenter">C Custo Depreciação</label>
-            <select id="depreciationCostCenter" name="depreciationCostCenter" required>
-              <option value="">Selecione o C. Custo Depreciação</option>
-              <option>Opção 1</option>
-              <option>Opção 2</option>
-              <option>Opção 3</option>
-            </select>
-          </div>
-        </div>
-      </fieldset>
-
-      <!-- ============================== -->
-      <!-- 4. Localização Operacional     -->
-      <!-- ============================== -->
-      <fieldset class="form-section">
-        <legend>4. Localização Operacional</legend>
-        <div class="field-grid">
-          <div class="field-group">
-            <label for="company">Empresa</label>
-            <select id="company" name="company" required>
-              <option value="">Selecione a empresa</option>
-              <option>BMJF</option>
-              <option>BF00</option>
-              <option>ACBF</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label for="center">Centro</label>
-            <select id="center" name="center" required>
-              <option value="">Selecione o centro</option>
-              <option>Opção 1</option>
-              <option>Opção 2</option>
-              <option>Opção 3</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label for="unit">Unidade</label>
-            <select id="unit" name="unit" required>
-              <option value="">Selecione a unidade</option>
-              <option>Opção 1</option>
-              <option>Opção 2</option>
-              <option>Opção 3</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label for="location">Local de Implantação</label>
-            <select id="location" name="location" required>
-              <option value="">Selecione a localização</option>
-              <option>Opção 1</option>
-              <option>Opção 2</option>
-              <option>Opção 3</option>
-            </select>
-          </div>
-        </div>
-      </fieldset>
-
-      <!-- ============================== -->
-      <!-- 5. Responsáveis                -->
-      <!-- ============================== -->
-      <fieldset class="form-section">
-        <legend>5. Responsáveis</legend>
-        <div class="field-grid">
-          <div class="field-group">
             <label for="projectUser">Controller</label>
             <input id="projectUser" name="projectUser" type="text" required maxlength="160" placeholder="Informe o Ponto Focal">
           </div>
@@ -230,10 +211,10 @@
       </fieldset>
 
       <!-- ============================== -->
-      <!-- 6. Detalhamento Complementar   -->
+      <!-- 4. Detalhamento Complementar   -->
       <!-- ============================== -->
       <fieldset class="form-section">
-        <legend>6. Detalhamento Complementar</legend>
+        <legend>4. Detalhamento Complementar</legend>
         <div class="field-group">
           <label for="businessNeed">Necessidade do Negócio</label>
           <textarea id="businessNeed" name="businessNeed" rows="4" required></textarea>
@@ -245,20 +226,20 @@
       </fieldset>
 
       <!-- ============================== -->
-      <!-- 7. Elemento PEP (até 1MM)      -->
+      <!-- 5. Elemento PEP (até 1MM)      -->
       <!-- ============================== -->
       <fieldset id="simplePepSection" class="form-section hidden">
-        <legend>7. Elemento PEP</legend>
+        <legend>5. Elemento PEP</legend>
         <p class="hint">Disponível apenas quando o orçamento é inferior a R$ 1.000.000,00.</p>
         <div id="simplePepList" class="dynamic-list"></div>
         <button type="button" id="addSimplePepBtn" class="btn ghost">Adicionar PEP</button>
       </fieldset>
 
       <!-- ============================== -->
-      <!-- 8. Indicadores de Desempenho   -->
+      <!-- 6. Indicadores de Desempenho   -->
       <!-- ============================== -->
       <fieldset class="form-section">
-        <legend>8. Indicadores de Desempenho</legend>
+        <legend>6. Indicadores de Desempenho</legend>
         <div class="field-grid">
           <div class="field-group">
             <label for="kpiType">Tipo de KPI</label>
@@ -288,10 +269,10 @@
       </fieldset>
 
       <!-- ============================== -->
-      <!-- 9. Key Projects (a partir 1MM) -->
+      <!-- 7. Key Projects (a partir 1MM) -->
       <!-- ============================== -->
       <fieldset id="keyProjectSection" class="form-section hidden">
-        <legend>9. KEY Projects</legend>
+        <legend>7. KEY Projects</legend>
         <p class="hint">Disponível quando o orçamento é igual ou superior a R$ 1.000.000,00.</p>
         <div id="milestoneList" class="dynamic-list"></div>
         <button type="button" id="addMilestoneBtn" class="btn ghost">Adicionar Marco</button>
