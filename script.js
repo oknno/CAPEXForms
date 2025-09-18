@@ -305,8 +305,132 @@ function collectMilestonesForGantt() {
   return milestones;
 }
 
-function drawGantt(milestones) {
-  if (!ganttContainer || !ganttChartEl || !window.google?.visualization) return;
+function drawGantt(milestones, options = {}) {
+  const {
+    container = ganttContainer,
+    chartElement = ganttChartEl,
+    titleElement = ganttTitleEl,
+    emptyMessage = 'Nenhuma atividade para exibir'
+  } = options;
+
+  if (!container || !chartElement) return null;
+  if (!window.google?.visualization?.DataTable || !window.google?.visualization?.Gantt) {
+    return null;
+  }
+
+  const parseDate = (value, { isStart } = {}) => {
+    if (!value) return null;
+    const suffix = isStart ? 'T00:00:00' : 'T23:59:59';
+    const date = new Date(`${value}${suffix}`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const rows = [];
+  let idCounter = 0;
+  let minDate = null;
+  let maxDate = null;
+
+  const safeMilestones = Array.isArray(milestones) ? milestones : [];
+
+  safeMilestones.forEach((milestone) => {
+    if (!milestone) return;
+
+    const activities = Array.isArray(milestone.atividades) ? milestone.atividades : [];
+    const validActivities = [];
+    let milestoneStart = null;
+    let milestoneEnd = null;
+
+    activities.forEach((activity, index) => {
+      if (!activity) return;
+
+      const startDate = parseDate(activity.inicio, { isStart: true });
+      const endDate = parseDate(activity.fim, { isStart: false });
+
+      if (!startDate || !endDate || endDate < startDate) {
+        return;
+      }
+
+      if (!milestoneStart || startDate < milestoneStart) milestoneStart = startDate;
+      if (!milestoneEnd || endDate > milestoneEnd) milestoneEnd = endDate;
+
+      if (!minDate || startDate < minDate) minDate = startDate;
+      if (!maxDate || endDate > maxDate) maxDate = endDate;
+
+      const anualList = Array.isArray(activity.anual) ? activity.anual : [];
+      const totalCapex = anualList.reduce((total, year) => total + (Number(year?.capex_brl) || 0), 0);
+      const tooltipLines = anualList.map((year) => {
+        const yearLabel = year?.ano ?? 'Ano não informado';
+        const description = year?.descricao ? ` - ${year.descricao}` : '';
+        const value = Number(year?.capex_brl) || 0;
+        return `${yearLabel}: ${BRL.format(value)}${description}`;
+      });
+
+      const tooltipParts = [`CAPEX total: ${BRL.format(totalCapex)}`];
+      if (tooltipLines.length) {
+        tooltipParts.push(...tooltipLines);
+      }
+
+      validActivities.push({
+        index,
+        title: activity.titulo || `Atividade ${index + 1}`,
+        startDate,
+        endDate,
+        duration: endDate.getTime() - startDate.getTime(),
+        tooltip: tooltipParts.join('<br/>')
+      });
+    });
+
+    if (!validActivities.length) {
+      return;
+    }
+
+    idCounter += 1;
+    const milestoneId = `ms-${idCounter}`;
+    const milestoneName = milestone.nome || `Marco ${idCounter}`;
+
+    if (milestoneStart && milestoneEnd) {
+      const milestoneDuration = milestoneEnd.getTime() - milestoneStart.getTime();
+      rows.push([
+        milestoneId,
+        milestoneName,
+        'Marco',
+        milestoneStart,
+        milestoneEnd,
+        milestoneDuration,
+        0,
+        null,
+        milestoneName
+      ]);
+
+      if (!minDate || milestoneStart < minDate) minDate = milestoneStart;
+      if (!maxDate || milestoneEnd > maxDate) maxDate = milestoneEnd;
+    }
+
+    validActivities.forEach((activity) => {
+      rows.push([
+        `${milestoneId}-${activity.index}`,
+        activity.title,
+        'Atividade',
+        activity.startDate,
+        activity.endDate,
+        activity.duration,
+        0,
+        milestoneId,
+        activity.tooltip
+      ]);
+    });
+  });
+
+  if (!rows.length || !minDate || !maxDate) {
+    container.classList.remove('hidden');
+    if (titleElement) {
+      titleElement.classList.remove('hidden');
+    }
+    chartElement.innerHTML = `<p class="gantt-empty">${emptyMessage}</p>`;
+    return { minDate: null, maxDate: null, rowCount: 0 };
+  }
+
+  chartElement.innerHTML = '';
 
   const data = new google.visualization.DataTable();
   data.addColumn('string', 'Task ID');
@@ -318,75 +442,10 @@ function drawGantt(milestones) {
   data.addColumn('number', 'Percent Complete');
   data.addColumn('string', 'Dependencies');
   data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
-
-  const rows = [];
-  let idCounter = 0;
-
-  milestones.forEach((milestone) => {
-    if (!milestone) return;
-    idCounter += 1;
-    let msStart = null;
-    let msEnd = null;
-    const activityRows = [];
-    const activities = Array.isArray(milestone.atividades) ? milestone.atividades : [];
-
-    activities.forEach((activity, index) => {
-      const startDate = activity.inicio ? new Date(activity.inicio) : new Date();
-      const endDate = activity.fim ? new Date(activity.fim) : new Date(startDate.getTime() + 1000 * 60 * 60 * 24);
-      if (!msStart || startDate < msStart) msStart = startDate;
-      if (!msEnd || endDate > msEnd) msEnd = endDate;
-
-      const totalCapex = activity.anual.reduce((total, year) => total + (year.capex_brl || 0), 0);
-      const tooltipLines = activity.anual.map((year) => {
-        const yearLabel = year.ano ?? 'Ano não informado';
-        const description = year.descricao ? ` - ${year.descricao}` : '';
-        return `${yearLabel}: ${BRL.format(year.capex_brl || 0)}${description}`;
-      });
-
-      activityRows.push([
-        `ms-${idCounter}-${index}`,
-        activity.titulo || `Atividade ${index + 1}`,
-        'Atividade',
-        startDate,
-        endDate,
-        null,
-        0,
-        `ms-${idCounter}`,
-        `CAPEX total: ${BRL.format(totalCapex)}${tooltipLines.length ? `<br/>${tooltipLines.join('<br/>')}` : ''}`
-      ]);
-    });
-
-    if (msStart && msEnd) {
-      rows.push([
-        `ms-${idCounter}`,
-        milestone.nome,
-        'milestone',
-        msStart,
-        msEnd,
-        null,
-        0,
-        null,
-        milestone.nome
-      ]);
-    }
-
-    rows.push(...activityRows);
-  });
-
-  if (!rows.length) {
-    ganttChartEl.innerHTML = '';
-    ganttContainer.classList.add('hidden');
-    return;
-  }
-
-  ganttContainer.classList.remove('hidden');
-  if (ganttTitleEl) {
-    ganttTitleEl.classList.remove('hidden');
-  }
-
   data.addRows(rows);
-  const chart = new google.visualization.Gantt(ganttChartEl);
-  chart.draw(data, {
+
+  const chart = new google.visualization.Gantt(chartElement);
+  const chartOptions = {
     height: Math.max(200, rows.length * 40 + 40),
     tooltip: { isHtml: true },
     gantt: {
@@ -401,9 +460,20 @@ function drawGantt(milestones) {
       palette: [
         { color: '#460a78', dark: '#be2846', light: '#e63c41' },
         { color: '#f58746', dark: '#e63c41', light: '#ffbe6e' }
-      ]
+      ],
+      minDate,
+      maxDate
     }
-  });
+  };
+
+  chart.draw(data, chartOptions);
+
+  container.classList.remove('hidden');
+  if (titleElement) {
+    titleElement.classList.remove('hidden');
+  }
+
+  return { minDate, maxDate, rowCount: rows.length };
 }
 
 // ============================================================================
@@ -1377,15 +1447,25 @@ function populateSummaryGantt(options = {}) {
     return;
   }
 
-  const chartHtml = ganttChartEl?.innerHTML?.trim();
-  if (!chartHtml) {
-    summaryGanttSection.classList.add('hidden');
-    summaryGanttChart.innerHTML = '';
-    return;
-  }
+  const drawSummary = () =>
+    drawGantt(collectMilestonesForGantt(), {
+      container: summaryGanttSection,
+      chartElement: summaryGanttChart,
+      titleElement: summaryGanttSection.querySelector('h3'),
+      emptyMessage: 'Nenhuma atividade para exibir'
+    });
 
-  summaryGanttSection.classList.remove('hidden');
-  summaryGanttChart.innerHTML = chartHtml;
+  if (ganttReady && window.google?.visualization?.Gantt) {
+    drawSummary();
+  } else if (ganttLoaderStarted && window.google?.charts) {
+    google.charts.setOnLoadCallback(drawSummary);
+  } else if (window.google?.charts) {
+    initGantt();
+    google.charts.setOnLoadCallback(drawSummary);
+  } else {
+    summaryGanttSection.classList.remove('hidden');
+    summaryGanttChart.innerHTML = '<p class="gantt-empty">Nenhuma atividade para exibir</p>';
+  }
 }
 
 function buildActivityPeriod(activity) {
