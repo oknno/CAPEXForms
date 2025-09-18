@@ -384,6 +384,8 @@ function init() {
 function bindEvents() {
   newProjectBtn.addEventListener('click', () => openProjectForm('create'));
   closeFormBtn.addEventListener('click', closeForm);
+  // Habilita o fechamento do formulário pela tecla ESC.
+  document.addEventListener('keydown', handleOverlayEscape);
   if (projectSearch) {
     projectSearch.addEventListener('input', () => renderProjectList());
   }
@@ -847,6 +849,17 @@ function fillFormWithProject(detail) {
 
 function closeForm() {
   overlay.classList.add('hidden');
+}
+
+/**
+ * Fecha o formulário quando o usuário pressiona ESC.
+ * A verificação garante que a overlay exista e esteja visível,
+ * evitando erros quando o formulário já está fechado.
+ */
+function handleOverlayEscape(event) {
+  if (event.key !== 'Escape') return;
+  if (!overlay || overlay.classList.contains('hidden')) return;
+  closeForm();
 }
 
 function updateBudgetSections(options = {}) {
