@@ -2634,8 +2634,8 @@ function collectProjectData() {
     kpiType: document.getElementById('kpiType').value.trim(),
     kpiName: document.getElementById('kpiName').value.trim(),
     kpiDescription: document.getElementById('kpiDescription').value.trim(),
-    kpiCurrent: parseFloatOrNull(document.getElementById('kpiCurrent').value),
-    kpiExpected: parseFloatOrNull(document.getElementById('kpiExpected').value)
+    kpiCurrent: document.getElementById('kpiCurrent').value.trim(),
+    kpiExpected: document.getElementById('kpiExpected').value.trim()
   };
   return data;
 }
@@ -2867,11 +2867,6 @@ function statusColor(status) {
 
 function parseNumber(value) {
   const number = parseInt(value, 10);
-  return Number.isFinite(number) ? number : null;
-}
-
-function parseFloatOrNull(value) {
-  const number = parseFloat(value);
   return Number.isFinite(number) ? number : null;
 }
 
