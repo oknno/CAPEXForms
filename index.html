@@ -50,8 +50,13 @@
 
       <input type="hidden" id="statusField" value="Rascunho">
 
-      <div id="formStatus" class="feedback" aria-live="polite"></div>
-      <div id="formErrors" class="feedback error" aria-live="assertive"></div>
+      <div class="form-feedback">
+        <div id="formStatus" class="feedback" role="alert" aria-live="polite"></div>
+        <div id="formErrors" class="feedback" role="alert" aria-live="assertive">
+          <strong id="formErrorsTitle" class="feedback-title"></strong>
+          <ul id="errorSummaryList" class="error-summary"></ul>
+        </div>
+      </div>
 
       <!-- ============================== -->
       <!-- 1. Sobre o Projeto             -->

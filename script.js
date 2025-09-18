@@ -137,7 +137,9 @@ const state = {
 
 const validationState = {
   pepBudget: null,
-  activityDates: null
+  pepBudgetDetails: null,
+  activityDates: null,
+  activityDateDetails: null
 };
 
 const companyRules = {
@@ -176,6 +178,8 @@ const closeFormBtn = document.getElementById('closeFormBtn');
 const saveProjectBtn = document.getElementById('saveProjectBtn');
 const formStatus = document.getElementById('formStatus');
 const formErrors = document.getElementById('formErrors');
+const formErrorsTitle = document.getElementById('formErrorsTitle');
+const errorSummaryList = document.getElementById('errorSummaryList');
 const statusField = document.getElementById('statusField');
 const budgetHint = document.getElementById('budgetHint');
 const dateHint = document.getElementById('dateHint');
@@ -996,8 +1000,7 @@ function updateCompanyDependentFields(companyValue, selectedValues = {}) {
 // ============================================================================
 function openProjectForm(mode, detail = null) {
   projectForm.reset();
-  formStatus.textContent = '';
-  formStatus.classList.remove('show', 'error');
+  resetFormStatus();
   resetValidationState();
   projectForm.dataset.mode = mode;
   projectForm.dataset.projectId = detail?.project?.Id || '';
@@ -1141,12 +1144,8 @@ function closeForm() {
 }
 
 function openSummaryOverlay(triggerButton = null) {
-  const dateRangesValid = validateAllDateRanges();
-  const formValid = projectForm.reportValidity();
-  const pepValid = validatePepBudget();
-  const activityValid = validateActivityDates();
-
-  if (!dateRangesValid || !formValid || !pepValid || !activityValid) {
+  const validation = runFormValidations({ scrollOnError: true, focusFirstError: true });
+  if (!validation.valid) {
     return;
   }
 
@@ -1709,27 +1708,190 @@ function setSectionInteractive(section, enabled) {
 // ============================================================================
 // Validações de formulário
 // ============================================================================
-function clearFormErrorMessage() {
-  formErrors.textContent = '';
-  formErrors.classList.remove('show');
-  delete formErrors.dataset.validation;
+function resetFormStatus() {
+  if (!formStatus) return;
+  formStatus.textContent = '';
+  formStatus.classList.remove('show', 'feedback--info', 'feedback--success', 'feedback--warning', 'feedback--error');
+}
+
+function clearErrorSummary() {
+  if (!formErrors) return;
+  formErrors.classList.remove('show', 'feedback--info', 'feedback--success', 'feedback--warning', 'feedback--error');
+  if (formErrorsTitle) {
+    formErrorsTitle.textContent = '';
+  }
+  if (errorSummaryList) {
+    errorSummaryList.innerHTML = '';
+  }
+}
+
+function renderErrorSummary(issues = [], options = {}) {
+  if (!formErrors || !errorSummaryList) {
+    return;
+  }
+
+  const entries = Array.isArray(issues) ? issues.filter(Boolean) : [];
+  if (!entries.length) {
+    clearErrorSummary();
+    return;
+  }
+
+  const tone = options.tone || 'error';
+  const titleMessage = options.title || (tone === 'warning'
+    ? 'Alguns campos estão incompletos.'
+    : 'Não foi possível salvar. Verifique os erros abaixo.');
+
+  formErrors.classList.add('show');
+  formErrors.classList.remove('feedback--info', 'feedback--success', 'feedback--warning', 'feedback--error');
+  formErrors.classList.add(`feedback--${tone}`);
+  if (formErrorsTitle) {
+    formErrorsTitle.textContent = titleMessage;
+  }
+
+  errorSummaryList.innerHTML = '';
+  const fragment = document.createDocumentFragment();
+
+  entries.forEach((issue) => {
+    const messages = Array.isArray(issue.items)
+      ? [...new Set(issue.items.filter((item) => Boolean(item && String(item).trim())))]
+      : [];
+    const listItem = document.createElement('li');
+    listItem.className = 'error-summary__item';
+
+    if (issue.title) {
+      const strong = document.createElement('strong');
+      strong.textContent = issue.title;
+      listItem.appendChild(strong);
+    }
+
+    if (messages.length === 1) {
+      const messageText = issue.title ? ` — ${messages[0]}` : messages[0];
+      listItem.appendChild(document.createTextNode(messageText));
+    } else if (messages.length > 1) {
+      if (issue.title) {
+        listItem.appendChild(document.createTextNode(':'));
+      }
+      const nestedList = document.createElement('ul');
+      nestedList.className = 'error-summary__sublist';
+      messages.forEach((message) => {
+        const nestedItem = document.createElement('li');
+        nestedItem.textContent = message;
+        nestedList.appendChild(nestedItem);
+      });
+      listItem.appendChild(nestedList);
+    } else if (issue.message) {
+      const messageText = issue.title ? ` — ${issue.message}` : issue.message;
+      listItem.appendChild(document.createTextNode(messageText));
+    } else if (!issue.title) {
+      return;
+    }
+
+    fragment.appendChild(listItem);
+  });
+
+  errorSummaryList.appendChild(fragment);
+}
+
+function ensureFieldControlWrapper(element) {
+  if (!element) return null;
+  const parent = element.parentElement;
+  if (!parent) return null;
+  if (parent.classList.contains('field-control')) {
+    return parent;
+  }
+  if (parent.classList.contains('field-group')) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field-control';
+    parent.insertBefore(wrapper, element);
+    wrapper.appendChild(element);
+    return wrapper;
+  }
+  return parent;
+}
+
+function clearFieldErrors() {
+  if (!projectForm) return;
+  projectForm.querySelectorAll('.field-error').forEach((node) => node.remove());
+  projectForm.querySelectorAll('.field-group.has-error').forEach((group) => group.classList.remove('has-error'));
+  projectForm.querySelectorAll('.field-invalid').forEach((input) => input.classList.remove('field-invalid'));
+}
+
+function applyFieldError(element, message) {
+  if (!element) return;
+  const group = element.closest('.field-group');
+  if (!group) return;
+  group.classList.add('has-error');
+  element.classList.add('field-invalid');
+  const wrapper = ensureFieldControlWrapper(element);
+  if (!wrapper) return;
+  let feedback = wrapper.querySelector('.field-error');
+  if (!feedback) {
+    feedback = document.createElement('span');
+    feedback.className = 'field-error';
+    wrapper.appendChild(feedback);
+  }
+  feedback.textContent = message;
+}
+
+function getFieldLabel(element) {
+  if (!element) return 'Campo';
+  const group = element.closest('.field-group');
+  const label = group?.querySelector('label');
+  if (label?.textContent) {
+    return label.textContent.trim();
+  }
+  return element.getAttribute('aria-label') || element.name || element.id || 'Campo';
+}
+
+function collectInvalidFields() {
+  if (!projectForm) return [];
+  const invalid = [];
+  const elements = projectForm.querySelectorAll('input, select, textarea');
+
+  elements.forEach((element) => {
+    if (!element?.willValidate) return;
+    if (element.disabled) return;
+    if (element.type === 'hidden') return;
+    if (element.closest('.hidden')) return;
+
+    const validity = element.validity;
+    if (!validity || validity.valid) {
+      return;
+    }
+
+    const label = getFieldLabel(element);
+    let type = 'general';
+    let message = element.validationMessage || `Verifique “${label}”.`;
+
+    if (validity.valueMissing) {
+      type = 'required';
+      message = `Preencha “${label}”.`;
+    } else if (element.dataset?.dateRangeInvalid === 'true' || message === DATE_RANGE_ERROR_MESSAGE) {
+      type = 'date';
+      message = `${label}: ${DATE_RANGE_ERROR_MESSAGE}`;
+    }
+
+    invalid.push({ element, label, message, type });
+  });
+
+  return invalid;
 }
 
 function resetValidationState() {
   validationState.pepBudget = null;
+  validationState.pepBudgetDetails = null;
   validationState.activityDates = null;
+  validationState.activityDateDetails = null;
   clearDateRangeValidity();
-  clearFormErrorMessage();
+  clearFieldErrors();
+  clearErrorSummary();
 }
 
-function setValidationError(key, message) {
+function setValidationError(key, message, details = null) {
   validationState[key] = message || null;
-  const firstMessage = validationState.pepBudget || validationState.activityDates;
-  if (firstMessage) {
-    showError(firstMessage);
-    formErrors.dataset.validation = 'true';
-  } else if (formErrors.dataset.validation === 'true') {
-    clearFormErrorMessage();
+  const detailsKey = `${key}Details`;
+  if (detailsKey in validationState) {
+    validationState[detailsKey] = details || null;
   }
 }
 
@@ -1830,13 +1992,17 @@ function validatePepBudget(options = {}) {
   updateBudgetHintMessage({ budget, total });
 
   if (!Number.isFinite(budget)) {
-    setValidationError('pepBudget', null);
+    setValidationError('pepBudget', null, null);
     return true;
   }
 
-  if (total - budget > 0.009) {
-    const message = `A soma dos PEPs (${BRL.format(total)}) ultrapassa o orçamento do projeto (${BRL.format(budget)}).`;
-    setValidationError('pepBudget', message);
+  const remaining = budget - total;
+  const roundedRemaining = Math.round(remaining * 100) / 100;
+
+  if (remaining < -0.009) {
+    const exceeded = Math.abs(roundedRemaining);
+    const message = `A soma dos PEPs (${BRL.format(total)}) ultrapassa o orçamento do projeto (${BRL.format(budget)}) em ${BRL.format(exceeded)}.`;
+    setValidationError('pepBudget', message, { budget, total, remaining: roundedRemaining });
 
     if (changedInput) {
       const previousValue = changedInput.dataset?.previousValue ?? '';
@@ -1847,7 +2013,7 @@ function validatePepBudget(options = {}) {
     return false;
   }
 
-  setValidationError('pepBudget', null);
+  setValidationError('pepBudget', null, { budget, total, remaining: roundedRemaining });
   if (changedInput) {
     rememberFieldPreviousValue(changedInput);
   }
@@ -1898,7 +2064,12 @@ function validateDateRange(startInput, endInput, options = {}) {
     return true;
   }
 
-  relevantInputs.forEach((input) => input.setCustomValidity(''));
+  relevantInputs.forEach((input) => {
+    input.setCustomValidity('');
+    if (input.dataset) {
+      delete input.dataset.dateRangeInvalid;
+    }
+  });
 
   const startDate = startInput ? parseDateInputValue(startInput.value) : null;
   const endDate = endInput ? parseDateInputValue(endInput.value) : null;
@@ -1907,6 +2078,9 @@ function validateDateRange(startInput, endInput, options = {}) {
     const invalidTarget = endInput && typeof endInput.setCustomValidity === 'function' ? endInput : startInput;
     if (invalidTarget) {
       invalidTarget.setCustomValidity(DATE_RANGE_ERROR_MESSAGE);
+      if (invalidTarget.dataset) {
+        invalidTarget.dataset.dateRangeInvalid = 'true';
+      }
       if (report && typeof invalidTarget.reportValidity === 'function') {
         invalidTarget.reportValidity();
       }
@@ -1945,6 +2119,9 @@ function clearDateRangeValidity() {
   inputs.forEach((input) => {
     if (input && typeof input.setCustomValidity === 'function') {
       input.setCustomValidity('');
+      if (input.dataset) {
+        delete input.dataset.dateRangeInvalid;
+      }
     }
   });
 }
@@ -2001,12 +2178,13 @@ function validateActivityDates(options = {}) {
       hasProjectEnd: Boolean(projectEnd),
       activityCount
     });
-    setValidationError('activityDates', null);
+    setValidationError('activityDates', null, null);
     return true;
   }
 
   let invalidMessage = null;
   let invalidField = null;
+  let invalidTitle = null;
   let hasStartIssue = false;
   let hasEndIssue = false;
   for (const activity of activities) {
@@ -2021,6 +2199,7 @@ function validateActivityDates(options = {}) {
       if (!invalidMessage) {
         invalidMessage = `A data de início da atividade "${title}" não pode ser anterior à data de início do projeto.`;
         invalidField = changedInput === projectStartDateInput ? projectStartDateInput : startInput;
+        invalidTitle = title;
       }
     }
 
@@ -2029,6 +2208,7 @@ function validateActivityDates(options = {}) {
       if (!invalidMessage) {
         invalidMessage = `A data de término da atividade "${title}" não pode ser posterior à data de término do projeto.`;
         invalidField = changedInput === projectEndDateInput ? projectEndDateInput : endInput;
+        invalidTitle = title;
       }
     }
   }
@@ -2042,7 +2222,12 @@ function validateActivityDates(options = {}) {
   });
 
   if (invalidMessage) {
-    setValidationError('activityDates', invalidMessage);
+    setValidationError('activityDates', invalidMessage, {
+      field: invalidField || null,
+      activityTitle: invalidTitle,
+      hasStartIssue,
+      hasEndIssue
+    });
     if (invalidField) {
       const previousValue = invalidField.dataset?.previousValue ?? '';
       if (invalidField.value !== previousValue) {
@@ -2052,11 +2237,138 @@ function validateActivityDates(options = {}) {
     return false;
   }
 
-  setValidationError('activityDates', null);
+  setValidationError('activityDates', null, {
+    field: null,
+    activityTitle: null,
+    hasStartIssue: false,
+    hasEndIssue: false
+  });
   if (changedInput) {
     rememberFieldPreviousValue(changedInput);
   }
   return true;
+}
+
+function runFormValidations(options = {}) {
+  const { scrollOnError = false, focusFirstError = false } = options;
+
+  clearFieldErrors();
+
+  const pepValid = validatePepBudget();
+  const activityValid = validateActivityDates();
+  const dateRangesValid = validateAllDateRanges();
+
+  const invalidFields = collectInvalidFields();
+  invalidFields.forEach((issue) => {
+    applyFieldError(issue.element, issue.message);
+  });
+
+  const issues = [];
+
+  const requiredIssues = invalidFields.filter((issue) => issue.type === 'required');
+  if (requiredIssues.length) {
+    issues.push({
+      title: 'Campos obrigatórios',
+      items: requiredIssues.map((issue) => issue.message),
+      type: 'required',
+      focusElement: requiredIssues[0]?.element || null
+    });
+  }
+
+  const dateFieldIssues = invalidFields.filter((issue) => issue.type === 'date');
+  const dateMessages = dateFieldIssues.map((issue) => issue.message);
+  if (validationState.activityDates) {
+    dateMessages.push(validationState.activityDates);
+  }
+  const uniqueDateMessages = [...new Set(dateMessages.filter(Boolean))];
+  if (uniqueDateMessages.length) {
+    const activityField = validationState.activityDateDetails?.field || null;
+    const isFieldAlreadyHighlighted = activityField
+      ? invalidFields.some((issue) => issue.element === activityField)
+      : false;
+    if (activityField && !isFieldAlreadyHighlighted) {
+      applyFieldError(activityField, validationState.activityDates || uniqueDateMessages[0]);
+    }
+    issues.push({
+      title: 'Datas',
+      items: uniqueDateMessages,
+      type: 'date',
+      focusElement: activityField || dateFieldIssues[0]?.element || null
+    });
+  }
+
+  if (!pepValid && validationState.pepBudgetDetails) {
+    const { budget = 0, total = 0, remaining = 0 } = validationState.pepBudgetDetails;
+    const difference = Math.abs(Math.round(remaining * 100) / 100);
+    const detailMessage = remaining < 0
+      ? `Orçamento: ${BRL.format(budget)} · Soma dos PEPs: ${BRL.format(total)} · Excedente: ${BRL.format(difference)}.`
+      : `Orçamento: ${BRL.format(budget)} · Soma dos PEPs: ${BRL.format(total)} · Restante: ${BRL.format(difference)}.`;
+    const pepInputs = getPepAmountInputs().filter((input) => !input.closest('.hidden'));
+    const pepFocus = pepInputs[0] || projectBudgetInput;
+    if (projectBudgetInput && !invalidFields.some((issue) => issue.element === projectBudgetInput)) {
+      applyFieldError(projectBudgetInput, 'Ajuste o orçamento do projeto ou redistribua os valores de PEP.');
+    }
+    if (pepFocus && pepFocus !== projectBudgetInput && !invalidFields.some((issue) => issue.element === pepFocus)) {
+      applyFieldError(pepFocus, 'Revise os valores dos PEPs para manter o projeto dentro do orçamento.');
+    }
+    issues.push({
+      title: 'Orçamento x PEPs',
+      items: [detailMessage],
+      type: 'pep',
+      focusElement: pepFocus || null
+    });
+  }
+
+  const otherIssues = invalidFields.filter((issue) => issue.type === 'general');
+  if (otherIssues.length) {
+    issues.push({
+      title: 'Validações',
+      items: otherIssues.map((issue) => issue.message),
+      type: 'general',
+      focusElement: otherIssues[0]?.element || null
+    });
+  }
+
+  const isValid = issues.length === 0 && pepValid && activityValid && dateRangesValid;
+
+  if (isValid) {
+    clearErrorSummary();
+    if (formStatus && (formStatus.classList.contains('feedback--warning') || formStatus.classList.contains('feedback--error'))) {
+      resetFormStatus();
+    }
+    return { valid: true, issues: [] };
+  }
+
+  if (scrollOnError) {
+    scrollFormToTop();
+  }
+
+  const hasNonRequiredIssue = issues.some((issue) => issue.type !== 'required');
+  const severity = hasNonRequiredIssue ? 'error' : 'warning';
+  const statusMessage = severity === 'warning'
+    ? 'Alguns campos estão incompletos.'
+    : 'Não foi possível salvar. Verifique os erros abaixo.';
+
+  showStatus(statusMessage, { type: severity });
+  renderErrorSummary(issues, { tone: severity, title: statusMessage });
+
+  if (focusFirstError) {
+    const focusCandidate = issues.find((issue) => issue.focusElement)?.focusElement
+      || invalidFields[0]?.element
+      || validationState.activityDateDetails?.field
+      || null;
+    if (focusCandidate && typeof focusCandidate.focus === 'function') {
+      requestAnimationFrame(() => {
+        try {
+          focusCandidate.focus({ preventScroll: true });
+        } catch (error) {
+          focusCandidate.focus();
+        }
+      });
+    }
+  }
+
+  return { valid: false, issues };
 }
 
 function handleGlobalDateInput(event) {
@@ -2220,15 +2532,8 @@ async function handleFormSubmit(event) {
   const mode = projectForm.dataset.mode;
   const projectId = projectForm.dataset.projectId;
 
-  const dateRangesValid = validateAllDateRanges();
-  const formValid = projectForm.reportValidity();
-  if (!dateRangesValid || !formValid) {
-    return;
-  }
-
-  const pepValid = validatePepBudget();
-  const activityDatesValid = validateActivityDates();
-  if (!pepValid || !activityDatesValid) {
+  const validation = runFormValidations({ scrollOnError: true, focusFirstError: true });
+  if (!validation.valid) {
     return;
   }
 
@@ -2239,7 +2544,7 @@ async function handleFormSubmit(event) {
   payload.status = normalizedStatus;
 
   scrollFormToTop();
-  showStatus('Salvando…');
+  showStatus('Salvando…', { type: 'info' });
 
   try {
     let savedProjectId = projectId;
@@ -2276,7 +2581,7 @@ async function handleFormSubmit(event) {
       }
     }
 
-    showStatus('Projeto salvo com sucesso.', true);
+    showStatus('Projeto salvo com sucesso!', { type: 'success' });
     await loadProjects();
     if (savedProjectId) {
       await selectProject(Number(savedProjectId));
@@ -2285,8 +2590,18 @@ async function handleFormSubmit(event) {
   } catch (error) {
     console.error('Erro ao salvar projeto', error);
     scrollFormToTop();
-    showStatus('Erro ao salvar projeto.');
-    showError('Não foi possível salvar o projeto. Verifique os dados e tente novamente.');
+    const statusMessage = 'Não foi possível salvar. Verifique os erros abaixo.';
+    showStatus(statusMessage, { type: 'error' });
+    renderErrorSummary(
+      [
+        {
+          title: 'Erro ao salvar',
+          items: ['Não foi possível salvar o projeto. Verifique os dados e tente novamente.'],
+          type: 'general'
+        }
+      ],
+      { tone: 'error', title: statusMessage }
+    );
   }
 }
 
@@ -2502,16 +2817,35 @@ function scrollFormToTop() {
   scrollElement(projectForm);
 }
 
-function showStatus(message, success = false) {
+function showStatus(message, options = {}) {
+  if (!formStatus) return;
+  if (message === null || message === undefined || message === '') {
+    resetFormStatus();
+    return;
+  }
+
+  let tone = 'info';
+
+  if (typeof options === 'boolean') {
+    tone = options ? 'success' : 'info';
+  } else if (typeof options === 'string') {
+    tone = options;
+  } else if (typeof options === 'object' && options !== null) {
+    if (options.type) {
+      tone = options.type;
+    } else if (typeof options.success === 'boolean') {
+      tone = options.success ? 'success' : 'info';
+    }
+  }
+
+  if (!['info', 'success', 'warning', 'error'].includes(tone)) {
+    tone = 'info';
+  }
+
   formStatus.textContent = message;
   formStatus.classList.add('show');
-  formStatus.classList.toggle('error', !success && message.toLowerCase().includes('erro'));
-}
-
-function showError(message) {
-  formErrors.textContent = message;
-  formErrors.classList.add('show');
-  delete formErrors.dataset.validation;
+  formStatus.classList.remove('feedback--info', 'feedback--success', 'feedback--warning', 'feedback--error');
+  formStatus.classList.add(`feedback--${tone}`);
 }
 
 function statusColor(status) {
