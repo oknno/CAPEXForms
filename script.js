@@ -138,6 +138,21 @@ const validationState = {
   activityDates: null
 };
 
+const companyRules = {
+  'Empresa 01': {
+    centers: ['Centro 01', 'Centro 02'],
+    units: ['Unidade 01', 'Unidade 02'],
+    locations: ['Local 01', 'Local 02'],
+    depreciation: ['CC-01', 'CC-02']
+  },
+  'Empresa 02': {
+    centers: ['Centro 03'],
+    units: ['Unidade 03', 'Unidade 04'],
+    locations: ['Local 03'],
+    depreciation: ['CC-03']
+  }
+};
+
 function updateProjectState(projectId, changes = {}) {
   if (!projectId) return;
   const index = state.projects.findIndex((item) => Number(item.Id) === Number(projectId));
@@ -179,6 +194,12 @@ const summaryGanttSection = document.getElementById('summaryGanttSection');
 const summaryGanttChart = document.getElementById('summaryGanttChart');
 const summaryConfirmBtn = document.getElementById('summaryConfirmBtn');
 const summaryEditBtn = document.getElementById('summaryEditBtn');
+
+const companySelect = document.getElementById('company');
+const centerSelect = document.getElementById('center');
+const unitSelect = document.getElementById('unit');
+const locationSelect = document.getElementById('location');
+const depreciationSelect = document.getElementById('depreciationCostCenter');
 
 const approvalYearInput = document.getElementById('approvalYear');
 const projectBudgetInput = document.getElementById('projectBudget');
@@ -398,6 +419,7 @@ function setApprovalYearToCurrent() {
 
 function init() {
   bindEvents();
+  updateCompanyDependentFields(companySelect?.value || '');
   setApprovalYearToCurrent();
   loadProjects();
   initGantt();
@@ -435,6 +457,12 @@ function bindEvents() {
 
   if (summaryEditBtn) {
     summaryEditBtn.addEventListener('click', () => closeSummaryOverlay());
+  }
+
+  if (companySelect) {
+    companySelect.addEventListener('change', (event) => {
+      updateCompanyDependentFields(event.target.value);
+    });
   }
 
   projectBudgetInput.addEventListener('input', () => {
@@ -796,6 +824,55 @@ function formatDateValue(value) {
   return DATE_FMT.format(date);
 }
 
+function populateSelectOptions(selectElement, options = [], selectedValue = '') {
+  if (!selectElement) return;
+
+  selectElement.innerHTML = '';
+
+  const placeholderOption = document.createElement('option');
+  placeholderOption.value = '';
+  placeholderOption.textContent = 'Selecione...';
+  if (!selectedValue) {
+    placeholderOption.selected = true;
+  }
+  selectElement.appendChild(placeholderOption);
+
+  let hasSelectedOption = false;
+
+  options.forEach((text) => {
+    const option = document.createElement('option');
+    option.value = text;
+    option.textContent = text;
+    if (selectedValue && text === selectedValue) {
+      option.selected = true;
+      hasSelectedOption = true;
+    }
+    selectElement.appendChild(option);
+  });
+
+  if (selectedValue && !hasSelectedOption) {
+    const fallbackOption = document.createElement('option');
+    fallbackOption.value = selectedValue;
+    fallbackOption.textContent = selectedValue;
+    fallbackOption.selected = true;
+    selectElement.appendChild(fallbackOption);
+  }
+}
+
+function updateCompanyDependentFields(companyValue, selectedValues = {}) {
+  const rules = companyRules[companyValue] || {
+    centers: [],
+    units: [],
+    locations: [],
+    depreciation: []
+  };
+
+  populateSelectOptions(centerSelect, rules.centers, selectedValues.center);
+  populateSelectOptions(unitSelect, rules.units, selectedValues.unit);
+  populateSelectOptions(locationSelect, rules.locations, selectedValues.location);
+  populateSelectOptions(depreciationSelect, rules.depreciation, selectedValues.depreciation);
+}
+
 // ============================================================================
 // Formulário: abertura, preenchimento e coleta dos dados
 // ============================================================================
@@ -806,6 +883,11 @@ function openProjectForm(mode, detail = null) {
   projectForm.dataset.mode = mode;
   projectForm.dataset.action = 'save';
   projectForm.dataset.projectId = detail?.project?.Id || '';
+
+  if (companySelect) {
+    companySelect.value = '';
+  }
+  updateCompanyDependentFields('');
 
   state.editingSnapshot = {
     simplePeps: new Set(),
@@ -851,12 +933,16 @@ function fillFormWithProject(detail) {
   document.getElementById('projectBudget').value = project.budgetBrl ?? '';
   document.getElementById('investmentLevel').value = project.investmentLevel || '';
   document.getElementById('fundingSource').value = project.fundingSource || '';
-  document.getElementById('depreciationCostCenter').value = project.depreciationCostCenter || '';
-
-  document.getElementById('company').value = project.company || '';
-  document.getElementById('center').value = project.center || '';
-  document.getElementById('unit').value = project.unit || '';
-  document.getElementById('location').value = project.location || '';
+  const selectedCompany = project.company || '';
+  if (companySelect) {
+    companySelect.value = selectedCompany;
+  }
+  updateCompanyDependentFields(selectedCompany, {
+    center: project.center || '',
+    unit: project.unit || '',
+    location: project.location || '',
+    depreciation: project.depreciationCostCenter || ''
+  });
 
   document.getElementById('projectUser').value = project.projectUser || '';
   document.getElementById('projectLeader').value = project.projectLeader || '';
@@ -1016,7 +1102,7 @@ function populateSummaryOverlay() {
         { label: 'Orçamento do Projeto', value: formatCurrencyField('projectBudget') },
         { label: 'Nível de Investimento', value: getFieldDisplayValue('investmentLevel') },
         { label: 'Origem da Verba', value: getFieldDisplayValue('fundingSource') },
-        { label: 'C Custo Depreciação', value: getFieldDisplayValue('depreciationCostCenter') }
+        { label: 'C. Custo Depreciação', value: getFieldDisplayValue('depreciationCostCenter') }
       ]
     },
     {
