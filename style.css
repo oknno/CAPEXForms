@@ -349,6 +349,10 @@ p {
   box-shadow: 0 8px 20px rgba(70, 10, 120, 0.25);
 }
 
+.project-overview__header .status-pill {
+  margin-left: auto;
+}
+
 .project-overview {
   display: flex;
   flex-direction: column;
