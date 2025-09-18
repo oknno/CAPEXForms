@@ -513,6 +513,7 @@ p {
 }
 
 .field-group input,
+.field-group select,
 .field-group textarea {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -527,6 +528,7 @@ p {
 }
 
 .field-group input:focus,
+.field-group select:focus,
 .field-group textarea:focus {
   outline: 2px solid rgba(70, 10, 120, 0.35);
   border-color: transparent;
