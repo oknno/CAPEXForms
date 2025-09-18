@@ -177,6 +177,7 @@ const formStatus = document.getElementById('formStatus');
 const formErrors = document.getElementById('formErrors');
 const statusField = document.getElementById('statusField');
 const budgetHint = document.getElementById('budgetHint');
+const dateHint = document.getElementById('dateHint');
 const simplePepSection = document.getElementById('simplePepSection');
 const simplePepList = document.getElementById('simplePepList');
 const addSimplePepBtn = document.getElementById('addSimplePepBtn');
@@ -1516,11 +1517,11 @@ function updateBudgetSections(options = {}) {
   if (!isNumber) {
     simplePepSection.classList.add('hidden');
     keyProjectSection.classList.add('hidden');
-    budgetHint.textContent = '';
     if (clear) {
       simplePepList.innerHTML = '';
       milestoneList.innerHTML = '';
     }
+    updateBudgetHintMessage({ budget: NaN });
     return;
   }
 
@@ -1528,7 +1529,6 @@ function updateBudgetSections(options = {}) {
     simplePepSection.classList.add('hidden');
     keyProjectSection.classList.remove('hidden');
     setSectionInteractive(keyProjectSection, true);
-    budgetHint.textContent = 'Projeto classificado como KEY Project (>= R$ 1.000.000,00).';
     if (!preserve) {
       simplePepList.innerHTML = '';
     }
@@ -1539,7 +1539,6 @@ function updateBudgetSections(options = {}) {
     keyProjectSection.classList.add('hidden');
     simplePepSection.classList.remove('hidden');
     setSectionInteractive(simplePepSection, true);
-    budgetHint.textContent = 'Projeto com orçamento inferior a R$ 1.000.000,00.';
     if (!preserve) {
       milestoneList.innerHTML = '';
     }
@@ -1548,6 +1547,7 @@ function updateBudgetSections(options = {}) {
     }
   }
 
+  updateBudgetHintMessage({ budget: value });
   queueGanttRefresh();
 }
 
@@ -1621,16 +1621,46 @@ function calculatePepTotal() {
   return getPepAmountInputs().reduce((sum, input) => sum + parseNumericInputValue(input), 0);
 }
 
+function updateBudgetHintMessage({ budget = getProjectBudgetValue(), total = calculatePepTotal() } = {}) {
+  if (!budgetHint) return;
+
+  if (!Number.isFinite(budget)) {
+    if (total > 0) {
+      budgetHint.textContent = 'Informe o orçamento do projeto para validar os valores de PEP.';
+      budgetHint.style.color = '#c62828';
+    } else {
+      budgetHint.textContent = '';
+      budgetHint.style.color = '';
+    }
+    return;
+  }
+
+  const remaining = budget - total;
+  const tolerance = 0.009;
+  if (remaining >= -tolerance) {
+    const safeRemaining = Math.max(0, Math.round(remaining * 100) / 100);
+    budgetHint.textContent = `💰 Orçamento restante: ${BRL.format(safeRemaining)} (Total PEPs: ${BRL.format(total)} de ${BRL.format(budget)})`;
+    budgetHint.style.color = '#2e7d32';
+    return;
+  }
+
+  const exceeded = Math.abs(Math.round(remaining * 100) / 100);
+  budgetHint.textContent = `⚠️ Orçamento excedido em ${BRL.format(exceeded)} (Total PEPs: ${BRL.format(total)} de ${BRL.format(budget)})`;
+  budgetHint.style.color = '#c62828';
+}
+
 function validatePepBudget(options = {}) {
   const { changedInput = null } = options;
   const budget = getProjectBudgetValue();
+  const total = calculatePepTotal();
+
+  updateBudgetHintMessage({ budget, total });
 
   if (!Number.isFinite(budget)) {
     setValidationError('pepBudget', null);
     return true;
   }
 
-  const total = calculatePepTotal();
   if (total - budget > 0.009) {
     const message = `A soma dos PEPs (${BRL.format(total)}) ultrapassa o orçamento do projeto (${BRL.format(budget)}).`;
     setValidationError('pepBudget', message);
@@ -1657,20 +1687,66 @@ function parseDateInputValue(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function updateDateHintMessage({
+  hasProjectStart = false,
+  hasProjectEnd = false,
+  hasStartIssue = false,
+  hasEndIssue = false,
+  activityCount = 0
+} = {}) {
+  if (!dateHint) return;
+
+  if (!hasProjectStart || !hasProjectEnd) {
+    dateHint.textContent = '';
+    dateHint.style.color = '';
+    return;
+  }
+
+  if (activityCount === 0) {
+    dateHint.textContent = '✅ Todas as atividades estão dentro do intervalo do projeto.';
+    dateHint.style.color = '#2e7d32';
+    return;
+  }
+
+  if (!hasStartIssue && !hasEndIssue) {
+    dateHint.textContent = '✅ Todas as atividades estão dentro do intervalo do projeto.';
+    dateHint.style.color = '#2e7d32';
+    return;
+  }
+
+  const messages = [];
+  if (hasStartIssue) {
+    messages.push('⚠️ Atividade começa antes da data inicial do projeto.');
+  }
+  if (hasEndIssue) {
+    messages.push('⚠️ Atividade termina depois da data final do projeto.');
+  }
+  dateHint.textContent = messages.join(' ');
+  dateHint.style.color = '#c62828';
+}
+
 function validateActivityDates(options = {}) {
   const { changedInput = null } = options;
   const projectStart = parseDateInputValue(projectStartDateInput?.value);
   const projectEnd = parseDateInputValue(projectEndDateInput?.value);
 
-  if (!projectStart && !projectEnd) {
+  const activities = milestoneList.querySelectorAll('.activity');
+  const activityCount = activities.length;
+
+  if (!projectStart || !projectEnd) {
+    updateDateHintMessage({
+      hasProjectStart: Boolean(projectStart),
+      hasProjectEnd: Boolean(projectEnd),
+      activityCount
+    });
     setValidationError('activityDates', null);
     return true;
   }
 
   let invalidMessage = null;
   let invalidField = null;
-
-  const activities = milestoneList.querySelectorAll('.activity');
+  let hasStartIssue = false;
+  let hasEndIssue = false;
   for (const activity of activities) {
     const startInput = activity.querySelector('.activity-start');
     const endInput = activity.querySelector('.activity-end');
@@ -1678,18 +1754,30 @@ function validateActivityDates(options = {}) {
     const startDate = parseDateInputValue(startInput?.value);
     const endDate = parseDateInputValue(endInput?.value);
 
-    if (projectStart && startDate && startDate < projectStart) {
-      invalidMessage = `A data de início da atividade "${title}" não pode ser anterior à data de início do projeto.`;
-      invalidField = changedInput === projectStartDateInput ? projectStartDateInput : startInput;
-      break;
+    if (startDate && startDate < projectStart) {
+      hasStartIssue = true;
+      if (!invalidMessage) {
+        invalidMessage = `A data de início da atividade "${title}" não pode ser anterior à data de início do projeto.`;
+        invalidField = changedInput === projectStartDateInput ? projectStartDateInput : startInput;
+      }
     }
 
-    if (projectEnd && endDate && endDate > projectEnd) {
-      invalidMessage = `A data de término da atividade "${title}" não pode ser posterior à data de término do projeto.`;
-      invalidField = changedInput === projectEndDateInput ? projectEndDateInput : endInput;
-      break;
+    if (endDate && endDate > projectEnd) {
+      hasEndIssue = true;
+      if (!invalidMessage) {
+        invalidMessage = `A data de término da atividade "${title}" não pode ser posterior à data de término do projeto.`;
+        invalidField = changedInput === projectEndDateInput ? projectEndDateInput : endInput;
+      }
     }
   }
+
+  updateDateHintMessage({
+    hasProjectStart: true,
+    hasProjectEnd: true,
+    hasStartIssue,
+    hasEndIssue,
+    activityCount
+  });
 
   if (invalidMessage) {
     setValidationError('activityDates', invalidMessage);

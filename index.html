@@ -65,7 +65,6 @@
         <div class="field-group">
           <label for="projectBudget">Orçamento do Projeto em R$</label>
           <input id="projectBudget" name="projectBudget" type="number" min="0" step="0.01" required>
-          <small id="budgetHint" class="hint"></small>
         </div>
         <div class="field-grid">
           <div class="field-group">
@@ -269,6 +268,9 @@
           <div id="ganttChart" class="gantt-chart" role="img" aria-label="Gráfico de Gantt do projeto"></div>
         </div>
       </fieldset>
+
+      <p id="budgetHint" class="hint" aria-live="polite"></p>
+      <p id="dateHint" class="hint" aria-live="polite"></p>
 
       <div class="form-actions">
         <button type="button" id="saveProjectBtn" class="btn primary">Salvar</button>
