@@ -358,14 +358,9 @@ p {
 
 .project-overview__header {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: center;
+  gap: 14px;
   flex-wrap: wrap;
-
-}
-
-.project-overview__header > .status-pill {
-  margin-left: auto;
 }
 
 .project-overview__title {
@@ -440,6 +435,13 @@ p {
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.project-overview__actions .btn.primary,
+.project-overview__actions .btn.accent {
+  padding: 14px 34px;
+  font-size: 15px;
+  border-radius: 18px;
 }
 
 /* ============================================================ */

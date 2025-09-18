@@ -502,9 +502,7 @@ function renderProjectList() {
     const title = document.createElement('span');
     title.className = 'project-card-title';
     title.textContent = item.Title || 'Projeto sem título';
-
     content.append(status, title);
-
     if (item.budgetBrl) {
       const budgetRow = document.createElement('div');
       budgetRow.className = 'project-card-bottom';
@@ -514,7 +512,6 @@ function renderProjectList() {
       budgetRow.append(budget);
       content.append(budgetRow);
     }
-    
     card.append(accent, content);
     card.addEventListener('click', () => selectProject(item.Id));
     projectList.append(card);
@@ -577,14 +574,14 @@ function renderProjectDetails(detail) {
 
   const header = document.createElement('div');
   header.className = 'project-overview__header';
-  const title = document.createElement('h2');
-  title.className = 'project-overview__title';
-  title.textContent = project.Title || 'Projeto sem título';
   const status = document.createElement('span');
   status.className = 'status-pill';
   status.style.background = statusColor(project.status);
   status.textContent = project.status || 'Sem status';
-  header.append(title, status);
+  const title = document.createElement('h2');
+  title.className = 'project-overview__title';
+  title.textContent = project.Title || 'Projeto sem título';
+  header.append(status, title);
 
   if (project.status === 'Aprovado') {
     const info = document.createElement('p');
@@ -600,7 +597,6 @@ function renderProjectDetails(detail) {
   highlightGrid.append(
     createHighlightBox('Orçamento', project.budgetBrl ? BRL.format(project.budgetBrl) : '—', { variant: 'budget' }),
     createHighlightBox('Responsável', project.projectLeader || project.projectUser || 'Não informado')
-
   );
   wrapper.append(highlightGrid);
 
@@ -655,7 +651,6 @@ function renderProjectDetails(detail) {
       });
     });
     actions.append(approveBtn);
-
   } else {
     const fallbackBtn = document.createElement('button');
     fallbackBtn.type = 'button';
