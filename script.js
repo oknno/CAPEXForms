@@ -387,11 +387,18 @@ function drawGantt(milestones) {
 // ============================================================================
 // Inicialização
 // ============================================================================
-function init() {
-  bindEvents();
+function setApprovalYearToCurrent() {
+  if (!approvalYearInput) {
+    return;
+  }
   const currentYear = new Date().getFullYear();
   approvalYearInput.value = currentYear;
   approvalYearInput.max = currentYear;
+}
+
+function init() {
+  bindEvents();
+  setApprovalYearToCurrent();
   loadProjects();
   initGantt();
   window.addEventListener('load', initGantt, { once: true });
@@ -814,6 +821,7 @@ function openProjectForm(mode, detail = null) {
     formTitle.textContent = 'Novo Projeto';
     statusField.value = 'Rascunho';
     sendApprovalBtn.classList.remove('hidden');
+    setApprovalYearToCurrent();
     updateBudgetSections({ clear: true });
   } else if (detail) {
     fillFormWithProject(detail);
