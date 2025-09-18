@@ -151,8 +151,29 @@ p {
 
 .logo {
   background: url('Images/logo.png') center/contain no-repeat;
-  width: 200px;
-  height: 48px;
+  width: 240px;
+  height: 60px;
+}
+
+#newProjectBtn {
+  font-size: 16px;
+  padding: 12px 28px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--orange), var(--red));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 10px 24px rgba(230, 60, 65, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+#newProjectBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(230, 60, 65, 0.25);
+}
+
+#newProjectBtn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.65);
+  outline-offset: 3px;
 }
 
 /* ============================================================ */
@@ -208,7 +229,6 @@ p {
   outline-offset: 2px;
   background: #ffffff;
   border-color: rgba(70, 10, 120, 0.35);
-
 }
 
 .project-list {
@@ -341,6 +361,7 @@ p {
   align-items: flex-start;
   gap: 16px;
   flex-wrap: wrap;
+
 }
 
 .project-overview__header > .status-pill {
@@ -396,7 +417,8 @@ p {
 .project-description {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 18px;
+  margin-top: 8px;
 }
 
 .project-description h3 {
@@ -408,8 +430,8 @@ p {
   background: #f8f9fb;
   border: 1px solid #ececf2;
   border-radius: 18px;
-  padding: 28px 32px;
-  line-height: 1.75;
+  padding: 36px 40px;
+  line-height: 1.8;
   color: var(--text);
 }
 

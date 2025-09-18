@@ -494,9 +494,6 @@ function renderProjectList() {
     const content = document.createElement('div');
     content.className = 'project-card-content';
 
-    const bottom = document.createElement('div');
-    bottom.className = 'project-card-bottom';
-
     const status = document.createElement('span');
     status.className = 'project-card-status';
     status.textContent = item.status || 'Sem status';
@@ -517,6 +514,7 @@ function renderProjectList() {
       budgetRow.append(budget);
       content.append(budgetRow);
     }
+    
     card.append(accent, content);
     card.addEventListener('click', () => selectProject(item.Id));
     projectList.append(card);
@@ -645,7 +643,7 @@ function renderProjectDetails(detail) {
     editBtn.textContent = 'Editar Projeto';
     editBtn.addEventListener('click', () => openProjectForm('edit', detail));
     actions.append(editBtn);
-    
+
     const approveBtn = document.createElement('button');
     approveBtn.type = 'button';
     approveBtn.className = 'btn accent';
@@ -665,7 +663,6 @@ function renderProjectDetails(detail) {
     fallbackBtn.textContent = 'Visualizar Projeto';
     fallbackBtn.addEventListener('click', () => openProjectForm('edit', detail));
     actions.append(fallbackBtn);
-
   }
 
   if (actions.childElementCount) {
