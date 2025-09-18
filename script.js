@@ -508,7 +508,7 @@ function init() {
 
 function bindEvents() {
   newProjectBtn.addEventListener('click', () => openProjectForm('create'));
-  closeFormBtn.addEventListener('click', closeForm);
+  closeFormBtn.addEventListener('click', handleCloseFormRequest);
   // Habilita o fechamento do formulário pela tecla ESC.
   document.addEventListener('keydown', handleOverlayEscape);
   document.addEventListener('input', handleGlobalDateInput);
@@ -1583,18 +1583,19 @@ function resolveSummaryValue(value) {
 }
 
 /**
- * Fecha o formulário quando o usuário pressiona ESC.
- * Ao detectar a tecla, confirma com o usuário antes de fechar o formulário.
- * A verificação garante que a overlay exista e esteja visível,
- * evitando erros quando o formulário já está fechado.
+ * Solicita confirmação antes de fechar o formulário.
+ * Usada tanto pelo botão Fechar quanto pela tecla ESC.
+ * Também fecha o resumo, caso esteja aberto, antes de perguntar ao usuário.
  */
-function handleOverlayEscape(event) {
-  if (event.key !== 'Escape') return;
+function handleCloseFormRequest() {
   if (summaryOverlay && !summaryOverlay.classList.contains('hidden')) {
     closeSummaryOverlay();
     return;
   }
-  if (!overlay || overlay.classList.contains('hidden')) return;
+
+  if (!overlay || overlay.classList.contains('hidden')) {
+    return;
+  }
 
   const shouldClose = window.confirm(
     'Tem certeza que deseja fechar o formulário? Suas alterações não salvas serão perdidas.'
@@ -1603,6 +1604,11 @@ function handleOverlayEscape(event) {
   if (shouldClose) {
     closeForm();
   }
+}
+
+function handleOverlayEscape(event) {
+  if (event.key !== 'Escape') return;
+  handleCloseFormRequest();
 }
 
 function updateBudgetSections(options = {}) {
