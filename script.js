@@ -2228,8 +2228,8 @@ async function persistKeyProjects(projectId) {
           Title: pepTitle,
           amountBrl: pepAmount,
           year: pepYear,
-          projectsId: projectId,
-          activitiesId: activityId
+          projectsIdId: projectId,
+          activitiesIdId: activityId
         };
         let pepId = Number(pepIdRaw);
         if (pepIdRaw) {
