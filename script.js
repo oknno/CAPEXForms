@@ -574,14 +574,14 @@ function renderProjectDetails(detail) {
 
   const header = document.createElement('div');
   header.className = 'project-overview__header';
+  const title = document.createElement('h2');
+  title.className = 'project-overview__title';
+  title.textContent = project.Title || 'Projeto sem título';
   const status = document.createElement('span');
   status.className = 'status-pill';
   status.style.background = statusColor(project.status);
   status.textContent = project.status || 'Sem status';
-  const title = document.createElement('h2');
-  title.className = 'project-overview__title';
-  title.textContent = project.Title || 'Projeto sem título';
-  header.append(status, title);
+  header.append(title, status);
 
   if (project.status === 'Aprovado') {
     const info = document.createElement('p');
