@@ -527,23 +527,6 @@ const state = {
   }
 };
 
-let suppressAutoEnsureMilestones = false;
-
-/**
- * Executa uma função com a criação automática de marcos temporariamente desativada.
- * @template T
- * @param {() => T} callback - Função executada com a proteção aplicada.
- * @returns {T|undefined} Retorno da função executada.
- */
-function withMilestoneAutoEnsureSuppressed(callback) {
-  suppressAutoEnsureMilestones = true;
-  try {
-    return typeof callback === 'function' ? callback() : undefined;
-  } finally {
-    suppressAutoEnsureMilestones = false;
-  }
-}
-
 const validationState = {
   pepBudget: null,
   pepBudgetDetails: null,
@@ -1197,7 +1180,7 @@ function bindEvents() {
   });
 
   addMilestoneBtn.addEventListener('click', () => {
-    ensureMilestoneBlock({ force: true });
+    ensureMilestoneBlock();
   });
 
   simplePepList.addEventListener('click', (event) => {
@@ -1924,7 +1907,7 @@ function fillFormWithProject(detail) {
       state.editingSnapshot.milestones.add(Number(milestone.Id));
     });
     if (!milestones.length) {
-      ensureMilestoneBlock({ force: true });
+      ensureMilestoneBlock();
     }
   }
 
@@ -1947,9 +1930,7 @@ function closeForm() {
  * @param {HTMLButtonElement|null} [triggerButton=null] - Botão que acionou o resumo para restaurar foco.
  */
 function openSummaryOverlay(triggerButton = null) {
-  const validation = withMilestoneAutoEnsureSuppressed(() =>
-    runFormValidations({ scrollOnError: true, focusFirstError: true })
-  );
+  const validation = runFormValidations({ scrollOnError: true, focusFirstError: true });
   if (!validation.valid) {
     return;
   }
@@ -3598,13 +3579,6 @@ function updateSimplePepYears() {
  * Garante ao menos uma linha de PEP simples pronta para preenchimento.
  */
 function ensureSimplePepRow() {
-  if (!simplePepList) return;
-  if (simplePepSection?.classList?.contains('hidden')) {
-    return;
-  }
-  if (keyProjectSection && !keyProjectSection.classList.contains('hidden')) {
-    return;
-  }
   const row = createSimplePepRow({ year: parseInt(approvalYearInput.value, 10) || '' });
   simplePepList.append(row);
 }
@@ -3612,18 +3586,7 @@ function ensureSimplePepRow() {
 /**
  * Adiciona bloco de marco padrão e agenda atualização do Gantt.
  */
-function ensureMilestoneBlock(options = {}) {
-  if (!milestoneList) return;
-  const { force = false } = options;
-  if (!force) {
-    if (suppressAutoEnsureMilestones) {
-      return;
-    }
-    if (keyProjectSection?.classList?.contains('hidden')) {
-      return;
-    }
-  }
-
+function ensureMilestoneBlock() {
   const block = createMilestoneBlock();
   milestoneList.append(block);
   addActivityBlock(block);
@@ -3722,9 +3685,7 @@ async function handleFormSubmit(event) {
   const submitIntent = projectForm.dataset.submitIntent || 'save';
   const isApproval = submitIntent === 'approval';
 
-  const validation = withMilestoneAutoEnsureSuppressed(() =>
-    runFormValidations({ scrollOnError: true, focusFirstError: true })
-  );
+  const validation = runFormValidations({ scrollOnError: true, focusFirstError: true });
   if (!validation.valid) {
     return;
   }
