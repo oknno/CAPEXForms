@@ -48,7 +48,7 @@ class SharePointService {
     }
 
     const { overwrite = false, contentType = 'application/octet-stream' } = options;
-    const normalizedFileName = this.sanitizeFileName(fileName || 'anexo.pdf');
+    const normalizedFileName = this.sanitizeFileName(fileName || 'resumo.txt');
 
     if (overwrite) {
       try {
@@ -94,7 +94,7 @@ class SharePointService {
       'IF-MATCH': '*',
       'X-HTTP-Method': 'DELETE'
     };
-    const sanitizedName = this.sanitizeFileName(fileName || '');
+    const sanitizedName = this.sanitizeFileName(fileName || 'resumo.txt');
     const url = this.buildUrl(
       listName,
       `/items(${itemId})/AttachmentFiles/getByFileName('${sanitizedName}')`
@@ -2946,7 +2946,7 @@ async function handleFormSubmit(event) {
       const jsonContent = JSON.stringify(approvalSummary, null, 2);
       const jsonBlob = new Blob([jsonContent], { type: 'application/json' });
 
-      await sp.addAttachment('Projects', resolvedId, 'resumo.json', jsonBlob, {
+      await sp.addAttachment('Projects', resolvedId, 'resumo.txt', jsonBlob, {
         overwrite: true,
         contentType: 'application/json'
       });
