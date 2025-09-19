@@ -1,15 +1,125 @@
+/*!
+ * script.js
+ * Descrição: Gerencia integração com SharePoint, estado do formulário CAPEX e visualizações auxiliares.
+ * Autor: Matheus Okano
+ * Versão: v1.0
+ * Última atualização: 2025-09-19
+ * Nota: Documentação e comentários adicionados sem alterar a lógica do sistema.
+ */
+
+// ============================================================================
+// Tipagens de domínio via JSDoc para melhor leitura e tooling
+// ============================================================================
+
+/**
+ * @typedef {('Rascunho'|'Em Aprovação'|'Aprovado'|'Reprovado'|'Reprovado para Revisão')} ProjectStatus
+ * Representa os status possíveis de um projeto no fluxo CAPEX.
+ */
+
+/**
+ * @typedef {Object} Project
+ * @property {number} Id - Identificador único do item SharePoint.
+ * @property {string} Title - Nome do projeto exibido em cards e resumos.
+ * @property {ProjectStatus} [status] - Situação atual do projeto.
+ * @property {number} [budgetBrl] - Orçamento em reais, utilizado nas validações de PEP.
+ * @property {string} [investmentLevel] - Nível de investimento calculado em função do orçamento.
+ * @property {string} [company]
+ * @property {string} [center]
+ * @property {string} [unit]
+ * @property {string} [location]
+ * @property {string} [depreciationCostCenter]
+ * @property {string} [projectUser]
+ * @property {string} [projectLeader]
+ * @property {string} [businessNeed]
+ * @property {string} [proposedSolution]
+ * @property {string} [kpiType]
+ * @property {string} [kpiName]
+ * @property {string} [kpiDescription]
+ * @property {string|number} [kpiCurrent]
+ * @property {string|number} [kpiExpected]
+ * @property {string} [category]
+ * @property {string} [investmentType]
+ * @property {string} [assetType]
+ * @property {number} [approvalYear]
+ * @property {string} [startDate]
+ * @property {string} [endDate]
+ * @property {string} [fundingSource]
+ */
+
+/**
+ * @typedef {Object} Pep
+ * @property {number|null} id - ID SharePoint do PEP, se existir.
+ * @property {string} title - Nome do PEP selecionado.
+ * @property {string} [titleDisplay] - Texto pronto para exibição.
+ * @property {number} amountBrl - Valor em reais associado ao PEP.
+ * @property {string} [amountText]
+ * @property {number|null} year - Ano de execução do PEP.
+ * @property {string} [yearText]
+ * @property {string} [type] - Identifica se veio de atividade.
+ * @property {number|null} [activityId]
+ * @property {string} [activityTitle]
+ * @property {number|null} [milestoneId]
+ * @property {string} [milestoneTitle]
+ */
+
+/**
+ * @typedef {Object} Activity
+ * @property {number|null} id - ID SharePoint da atividade, quando disponível.
+ * @property {number|null} milestoneId - Referência ao marco pai.
+ * @property {string} title - Nome da atividade.
+ * @property {string|null} startDate - Data inicial no formato ISO.
+ * @property {string|null} endDate - Data final no formato ISO.
+ * @property {string} description - Descrição detalhada.
+ * @property {string} supplier - Fornecedor vinculado.
+ * @property {Pep|null} [pep] - PEP associado à atividade.
+ */
+
+/**
+ * @typedef {Object} Milestone
+ * @property {number|null} id - ID do marco em SharePoint.
+ * @property {string} title - Nome do marco.
+ * @property {Activity[]} activities - Atividades relacionadas ao marco.
+ */
+
+/**
+ * @typedef {Object} SummaryPayload
+ * @property {{id:number|string, displayValues:Object} & Project} project - Dados consolidados do projeto.
+ * @property {Milestone[]} milestones - Marcos coletados do formulário.
+ * @property {Activity[]} activities - Lista linearizada de atividades.
+ * @property {Pep[]} peps - PEPs simples e vinculados às atividades.
+ */
+
 // ============================================================================
 // Integração com SharePoint via REST API
 // ============================================================================
+/**
+ * Serviço dedicado à comunicação com listas do SharePoint usando REST.
+ * Responsável por CRUD de itens e anexos JSON dos resumos.
+ */
 class SharePointService {
+  /**
+   * @param {string} siteUrl - URL base do site SharePoint onde as listas residem.
+   */
   constructor(siteUrl) {
     this.siteUrl = siteUrl.replace(/\/$/, '');
   }
 
+  /**
+   * Constrói o nome da entidade REST conforme convenção SharePoint.
+   * @param {string} listName - Nome amigável da lista.
+   * @returns {string} Nome da entidade REST no formato SP.Data.<List>ListItem.
+   */
   encodeEntity(listName) {
     return `SP.Data.${listName.replace(/ /g, '_x0020_').replace(/_/g, '_x005f_')}ListItem`;
   }
 
+  /**
+   * Monta a URL de acesso à lista e rota desejada.
+   * @param {string} listName - Título da lista no SharePoint.
+   * @param {string} [path='/items'] - Segmento adicional para recursos (ex.: /items(1)).
+   * @returns {string} URL completa pronta para uso em fetch.
+   * @throws {Error} Quando o nome da lista não é informado.
+   */
   buildUrl(listName, path = '/items') {
     if (!listName) {
       throw new Error('Lista SharePoint não informada.');
@@ -18,6 +128,11 @@ class SharePointService {
     return `${this.siteUrl}/_api/web/lists/getbytitle('${safeListName}')${path}`;
   }
 
+  /**
+   * Normaliza nome de arquivo de anexo para evitar caracteres ilegais.
+   * @param {string} fileName - Nome original informado.
+   * @returns {string} Nome sanitizado pronto para upload.
+   */
   sanitizeFileName(fileName) {
     if (typeof fileName !== 'string') {
       return '';
@@ -36,9 +151,17 @@ class SharePointService {
     return collapsedSpaces.replace(/'/g, "''");
   }
 
+  /**
+   * Executa requisição REST com logging e tratamento de erros padrão.
+   * @param {string} url - URL alvo no SharePoint.
+   * @param {RequestInit} [options={}] - Configuração fetch (método, headers, body).
+   * @returns {Promise<null|Object>} Corpo JSON parseado ou null para 204/resposta vazia.
+   * @throws {Error} Para falhas de rede ou respostas não OK.
+   */
   async request(url, options = {}) {
     let response;
     try {
+      // Passo 1: dispara fetch e captura falhas de rede antes da avaliação HTTP
       response = await fetch(url, options);
     } catch (networkError) {
       console.error('Falha na requisição SharePoint', {
@@ -49,6 +172,7 @@ class SharePointService {
     }
 
     if (!response.ok) {
+      // Passo 2: log detalhado para respostas HTTP não bem-sucedidas
       const responseText = await response.text();
       console.error('Erro retornado pela API do SharePoint', {
         url,
@@ -73,6 +197,7 @@ class SharePointService {
     }
 
     try {
+      // Passo 3: parseia JSON e propaga erro contextual caso a resposta seja inválida
       return JSON.parse(text);
     } catch (parseError) {
       console.error('Não foi possível interpretar a resposta do SharePoint como JSON', {
@@ -87,14 +212,26 @@ class SharePointService {
     }
   }
 
+  /**
+   * Envia anexo JSON ao SharePoint garantindo validação de conteúdo e tamanho.
+   * @param {string} listName - Lista onde o item reside.
+   * @param {number|string} itemId - Identificador do item pai.
+   * @param {string} fileName - Nome sugerido do arquivo (forçado para .json).
+   * @param {Blob|Object|string} fileContent - Conteúdo que será persistido.
+   * @param {{overwrite?:boolean}} [options={}] - Controla substituição prévia do arquivo.
+   * @returns {Promise<boolean>} Indica sucesso do upload.
+   * @throws {Error} Quando validações de conteúdo ou tamanho falham.
+   */
 async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
   if (!listName) throw new Error('Lista SharePoint não informada.');
   if (!itemId) throw new Error('ID do item inválido para anexar arquivo.');
 
   // 👉 força sempre extensão .json e content-type correto
   const { overwrite = false } = options;
-  const rawFileName = fileName?.endsWith(".json") ? fileName : `resumo_${itemId}.json`;
+  const rawFileName = fileName?.endsWith('.json') ? fileName : `resumo_${itemId}.json`;
   const sanitizedFileName = this.sanitizeFileName(rawFileName);
+  // encodeURIComponent evita caracteres especiais na rota AttachmentFiles
+  // encodeURIComponent protege a rota getByFileName contra caracteres especiais
   const encodedFileName = encodeURIComponent(sanitizedFileName);
 
   if (!sanitizedFileName) {
@@ -187,6 +324,14 @@ async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
   return true;
 }
 
+  /**
+   * Remove anexo JSON existente, validando presença antes de efetuar POST de exclusão.
+   * @param {string} listName - Lista alvo.
+   * @param {number|string} itemId - ID do item pai.
+   * @param {string} fileName - Nome do arquivo a remover.
+   * @returns {Promise<boolean>} True quando exclusão ocorre ou arquivo não existe.
+   * @throws {Error} Propaga falhas de rede exceto 404 ignorado quando overwrite.
+   */
 async deleteAttachment(listName, itemId, fileName) {
   if (!listName) throw new Error('Lista SharePoint não informada.');
   if (!itemId) throw new Error('ID do item inválido para remover anexo.');
@@ -233,6 +378,11 @@ async deleteAttachment(listName, itemId, fileName) {
   return true;
 }
 
+  /**
+   * Obtém token X-RequestDigest necessário para operações de escrita.
+   * @returns {Promise<string>} Valor do form digest atual.
+   * @throws {Error} Quando SharePoint não retorna digest e _spPageContextInfo não está disponível.
+   */
   async getFormDigest() {
     try {
       const url = `${this.siteUrl}/_api/contextinfo`;
@@ -244,12 +394,19 @@ async deleteAttachment(listName, itemId, fileName) {
       return data?.d?.GetContextWebInformation?.FormDigestValue;
     } catch (error) {
       if (typeof _spPageContextInfo !== 'undefined') {
+        // Fallback SharePoint: reutiliza digest exposto globalmente quando disponível
         return _spPageContextInfo.formDigestValue;
       }
       throw error;
     }
   }
 
+  /**
+   * Lista itens de uma lista SharePoint com parâmetros OData opcionais.
+   * @param {string} listName - Nome da lista.
+   * @param {Object} [params={}] - Parâmetros como select, filter, orderby.
+   * @returns {Promise<Object[]>} Coleção de itens no formato JSON padrão.
+   */
   async getItems(listName, params = {}) {
     const url = new URL(this.buildUrl(listName));
     Object.entries(params).forEach(([key, value]) => {
@@ -262,6 +419,12 @@ async deleteAttachment(listName, itemId, fileName) {
     return data?.d?.results ?? [];
   }
 
+  /**
+   * Recupera um item específico da lista.
+   * @param {string} listName - Lista alvo.
+   * @param {number|string} id - Identificador do item.
+   * @returns {Promise<Object|null>} Item retornado pela API ou null.
+   */
   async getItem(listName, id) {
     const url = this.buildUrl(listName, `/items(${id})`);
     const headers = { Accept: 'application/json;odata=verbose' };
@@ -269,6 +432,12 @@ async deleteAttachment(listName, itemId, fileName) {
     return data?.d ?? null;
   }
 
+  /**
+   * Cria novo item na lista informada.
+   * @param {string} listName - Lista alvo.
+   * @param {Object} payload - Dados do item (campos customizados inclusos).
+   * @returns {Promise<Object|null>} Item criado retornado pelo SharePoint.
+   */
   async createItem(listName, payload) {
     const digest = await this.getFormDigest();
     const headers = {
@@ -284,12 +453,20 @@ async deleteAttachment(listName, itemId, fileName) {
     return data?.d ?? null;
   }
 
+  /**
+   * Atualiza item existente utilizando verbo MERGE e cabeçalho IF-MATCH *.
+   * @param {string} listName - Lista alvo.
+   * @param {number|string} id - ID do item a alterar.
+   * @param {Object} payload - Campos a atualizar.
+   * @returns {Promise<boolean>} True ao concluir sem erros.
+   */
   async updateItem(listName, id, payload) {
     const digest = await this.getFormDigest();
     const headers = {
       Accept: 'application/json;odata=verbose',
       'Content-Type': 'application/json;odata=verbose',
       'X-RequestDigest': digest,
+      // IF-MATCH:* + X-HTTP-Method:MERGE evita conflitos de versão mantendo semântica REST
       'IF-MATCH': '*',
       'X-HTTP-Method': 'MERGE'
     };
@@ -301,11 +478,18 @@ async deleteAttachment(listName, itemId, fileName) {
     return true;
   }
 
+  /**
+   * Exclui item via DELETE lógico no SharePoint (X-HTTP-Method: DELETE).
+   * @param {string} listName - Lista alvo.
+   * @param {number|string} id - ID do item a remover.
+   * @returns {Promise<boolean>} Indica que a operação foi concluída.
+   */
   async deleteItem(listName, id) {
     const digest = await this.getFormDigest();
     const headers = {
       Accept: 'application/json;odata=verbose',
       'X-RequestDigest': digest,
+      // Cabeçalhos padrão SharePoint para exclusão (garantem remoção independente da versão)
       'IF-MATCH': '*',
       'X-HTTP-Method': 'DELETE'
     };
@@ -317,6 +501,11 @@ async deleteAttachment(listName, itemId, fileName) {
 // ============================================================================
 // Estado global e referências da interface
 // ============================================================================
+/*
+ * Mantém formatadores, constantes de negócio e caches utilizados em diferentes fluxos.
+ * Os seletores DOM abaixo são consumidos por handlers espalhados pelo arquivo; evitar
+ * reatribuição desses nós para preservar performance e consistência de estado.
+ */
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const DATE_FMT = new Intl.DateTimeFormat('pt-BR');
 const BUDGET_THRESHOLD = 1_000_000;
@@ -360,6 +549,11 @@ const companyRules = {
   }
 };
 
+/**
+ * Atualiza o estado local de um projeto específico preservando imutabilidade do array.
+ * @param {number|string} projectId - Identificador do projeto a atualizar.
+ * @param {Partial<Project>} [changes={}] - Campos alterados retornados após operações CRUD.
+ */
 function updateProjectState(projectId, changes = {}) {
   if (!projectId) return;
   const index = state.projects.findIndex((item) => Number(item.Id) === Number(projectId));
@@ -443,6 +637,11 @@ const PROJECT_STATUSES = Object.freeze({
   IN_APPROVAL: 'Em Aprovação'
 });
 
+/**
+ * Retorna a cor utilizada para representar o status do projeto em chips e cards.
+ * @param {ProjectStatus|string} status - Status atual do projeto.
+ * @returns {string} Cor em hexadecimal.
+ */
 function statusColor(status) {
   switch (status) {
     case PROJECT_STATUSES.DRAFT:
@@ -484,19 +683,40 @@ let activeSummaryContext = defaultSummaryContext;
 let currentFormMode = null;
 let renderProjectListFrame = null;
 
+/**
+ * Normaliza status removendo espaços extras para comparações simples.
+ * @param {string} status - Status retornado do SharePoint.
+ * @returns {string} Representação simplificada.
+ */
 function normalizeStatusKey(status) {
   return typeof status === 'string' ? status.trim() : '';
 }
 
+/**
+ * Verifica se o status atual deve bloquear edição do formulário.
+ * @param {ProjectStatus|string} status - Status do projeto.
+ * @returns {boolean} True quando o modo leitura deve ser aplicado.
+ */
 function isReadOnlyStatus(status) {
   return STATUS_GROUPS.READ_ONLY.has(normalizeStatusKey(status));
 }
 
+/**
+ * Define se o botão "Enviar para Aprovação" deve estar disponível.
+ * @param {ProjectStatus|string} status - Status atual.
+ * @returns {boolean} True quando envio é permitido.
+ */
 function canSubmitForApproval(status) {
   const key = normalizeStatusKey(status);
   return !key || STATUS_GROUPS.APPROVAL_ALLOWED.has(key);
 }
 
+/**
+ * Utilitário de debounce para evitar múltiplas execuções durante digitação.
+ * @param {Function} fn - Função original a ser adiada.
+ * @param {number} [delay=200] - Janela em milissegundos.
+ * @returns {Function} Função decorada que respeita o intervalo informado.
+ */
 function debounce(fn, delay = 200) {
   let timerId = null;
   return function debouncedFunction(...args) {
@@ -510,6 +730,11 @@ function debounce(fn, delay = 200) {
   };
 }
 
+/**
+ * Executa callback com contexto de resumo temporariamente ajustado.
+ * @param {Object} context - Referências de seções/gráfico a utilizar.
+ * @param {Function} callback - Rotina a executar com o contexto ativo.
+ */
 function withSummaryContext(context, callback) {
   if (typeof callback !== 'function') return;
   const previousContext = activeSummaryContext;
@@ -521,6 +746,10 @@ function withSummaryContext(context, callback) {
   }
 }
 
+/**
+ * Limpa áreas de resumo (seções e gráfico) antes de nova renderização.
+ * @param {Object} context - Referências de DOM do resumo.
+ */
 function clearSummaryContent(context) {
   if (!context) return;
   if (context.sections) {
@@ -542,6 +771,10 @@ let ganttReady = false;
 let ganttRefreshScheduled = false;
 let summaryTriggerButton = null;
 
+/**
+ * Inicializa carregamento do pacote Google Charts para o gráfico de Gantt.
+ * Evita requisições duplicadas utilizando flags locais.
+ */
 function initGantt() {
   if (ganttLoaderStarted) return;
   if (!window.google || !google.charts) return;
@@ -553,6 +786,9 @@ function initGantt() {
   });
 }
 
+/**
+ * Agenda atualização do Gantt usando requestAnimationFrame para otimizar repaints.
+ */
 function queueGanttRefresh() {
   if (ganttRefreshScheduled) return;
   ganttRefreshScheduled = true;
@@ -562,6 +798,10 @@ function queueGanttRefresh() {
   });
 }
 
+/**
+ * Atualiza visualização do gráfico de Gantt com base nas atividades cadastradas.
+ * Oculta o container quando não há dados válidos.
+ */
 function refreshGantt() {
   if (!ganttContainer) return;
   if (keyProjectSection.classList.contains('hidden')) {
@@ -584,6 +824,10 @@ function refreshGantt() {
   }
 }
 
+/**
+ * Varre o DOM para construir estrutura mínima de marcos e atividades usada pelo Gantt.
+ * @returns {Array<{nome:string, atividades:Array}>} Lista de marcos com atividades.
+ */
 function collectMilestonesForGantt() {
   const milestones = [];
   if (!milestoneList) return milestones;
@@ -628,6 +872,12 @@ function collectMilestonesForGantt() {
   return milestones;
 }
 
+/**
+ * Renderiza gráfico de Gantt no container informado.
+ * @param {Array} milestones - Estrutura gerada por collectMilestonesForGantt.
+ * @param {Object} [options={}] - Permite customizar elementos e mensagens.
+ * @returns {Object|null} Informações sobre datas e linhas renderizadas.
+ */
 function drawGantt(milestones, options = {}) {
   const {
     container = ganttContainer,
@@ -802,6 +1052,9 @@ function drawGantt(milestones, options = {}) {
 // ============================================================================
 // Inicialização
 // ============================================================================
+/**
+ * Define o ano de aprovação padrão igual ao ano corrente e protege campo contra valores futuros.
+ */
 function setApprovalYearToCurrent() {
   if (!approvalYearInput) {
     return;
@@ -811,6 +1064,9 @@ function setApprovalYearToCurrent() {
   approvalYearInput.max = currentYear;
 }
 
+/**
+ * Fluxo principal de inicialização: prepara selects, registra eventos e carrega dados iniciais.
+ */
 function init() {
   if (investmentLevelSelect) {
     investmentLevelSelect.disabled = true;
@@ -826,6 +1082,9 @@ function init() {
   window.addEventListener('load', initGantt, { once: true });
 }
 
+/**
+ * Centraliza o registro de listeners de interface, garantindo foco e acessibilidade.
+ */
 function bindEvents() {
   newProjectBtn.addEventListener('click', () => openProjectForm('create'));
   closeFormBtn.addEventListener('click', handleCloseFormRequest);
@@ -989,10 +1248,14 @@ function bindEvents() {
 // ============================================================================
 // Carregamento e renderização da lista de projetos
 // ============================================================================
+/**
+ * Recupera projetos do SharePoint filtrando pelo autor logado e atualiza o estado local.
+ * @returns {Promise<void>} Promessa resolvida após renderizar lista.
+ */
 async function loadProjects() {
   try {
     const currentUserId = _spPageContextInfo.userId; // pega o ID do usuário logado
-    const results = await sp.getItems('Projects', { 
+    const results = await sp.getItems('Projects', {
       orderby: 'Created desc',
       filter: `AuthorId eq ${currentUserId}`
     });
@@ -1003,6 +1266,10 @@ async function loadProjects() {
   }
 }
 
+/**
+ * Renderiza cards de projetos no painel lateral, com filtro opcional e defer.
+ * @param {{defer?:boolean}} [options={}] - Quando defer é true, usa requestAnimationFrame.
+ */
 function renderProjectList(options = {}) {
   const filter = (projectSearch?.value || '').toLowerCase();
 
@@ -1078,6 +1345,11 @@ function renderProjectList(options = {}) {
   drawList();
 }
 
+/**
+ * Seleciona projeto na lista, busca detalhes completos e atualiza painel principal.
+ * @param {number|string} projectId - Identificador do projeto selecionado.
+ * @returns {Promise<void>} Promessa concluída após renderizar detalhes.
+ */
 async function selectProject(projectId) {
   if (renderProjectListFrame) {
     cancelAnimationFrame(renderProjectListFrame);
@@ -1124,6 +1396,10 @@ async function loadProjectDetails(projectId) {
   }
 }
 
+/**
+ * Atualiza painel principal com dados ricos do projeto (cards, ações e descrição).
+ * @param {{project?: Project}} detail - Objeto completo retornado pela API.
+ */
 function renderProjectDetails(detail) {
   projectDetails.innerHTML = '';
   if (!detail?.project) {
@@ -1234,6 +1510,10 @@ function renderProjectDetails(detail) {
   projectDetails.append(wrapper);
 }
 
+/**
+ * Produz conteúdo padrão quando nenhum projeto está selecionado.
+ * @returns {HTMLDivElement} Elemento com mensagem de orientação.
+ */
 function createEmptyState() {
   const empty = document.createElement('div');
   empty.className = 'empty-state';
@@ -1245,6 +1525,13 @@ function createEmptyState() {
   return empty;
 }
 
+/**
+ * Monta card compacto exibindo meta-informações do projeto (orçamento, datas).
+ * @param {string} label - Rótulo apresentado no topo do card.
+ * @param {string} value - Valor formatado a exibir.
+ * @param {{variant?:string}} [options={}] - Permite aplicar estilos específicos.
+ * @returns {HTMLDivElement} Elemento configurado.
+ */
 function createHighlightBox(label, value, options = {}) {
   const { variant } = options;
   const box = document.createElement('div');
@@ -1268,6 +1555,11 @@ function createHighlightBox(label, value, options = {}) {
   return box;
 }
 
+/**
+ * Converte string de data em formato local pt-BR ou retorna traço quando inválido.
+ * @param {string|null|undefined} value - Data em formato ISO.
+ * @returns {string} Data formatada ou '—'.
+ */
 function formatDateValue(value) {
   if (!value) {
     return '—';
@@ -1281,6 +1573,12 @@ function formatDateValue(value) {
   return DATE_FMT.format(date);
 }
 
+/**
+ * Repopula options de um select conforme regras de negócio, preservando valor selecionado.
+ * @param {HTMLSelectElement|null} selectElement - Select alvo.
+ * @param {string[]} [options=[]] - Valores disponíveis.
+ * @param {string} [selectedValue=''] - Valor que deve permanecer selecionado.
+ */
 function populateSelectOptions(selectElement, options = [], selectedValue = '') {
   if (!selectElement) return;
 
@@ -1316,6 +1614,11 @@ function populateSelectOptions(selectElement, options = [], selectedValue = '') 
   }
 }
 
+/**
+ * Atualiza selects dependentes (centro, unidade etc.) conforme empresa escolhida.
+ * @param {string} companyValue - Empresa selecionada.
+ * @param {{center?:string, unit?:string, location?:string, depreciation?:string}} [selectedValues={}] - Valores previamente gravados.
+ */
 function updateCompanyDependentFields(companyValue, selectedValues = {}) {
   const rules = companyRules[companyValue] || {
     centers: [],
@@ -1332,6 +1635,10 @@ function updateCompanyDependentFields(companyValue, selectedValues = {}) {
 
 // ============================================================================
 // Formulário: abertura, preenchimento e coleta dos dados
+/**
+ * Alterna habilitação dos controles do formulário respeitando estados originais.
+ * @param {boolean} disabled - Indica se campos devem ser bloqueados.
+ */
 function setFormFieldsDisabled(disabled) {
   if (!projectForm) return;
   const elements = projectForm.querySelectorAll('input, textarea, select, button');
@@ -1374,6 +1681,11 @@ function setFormFieldsDisabled(disabled) {
   });
 }
 
+/**
+ * Aplica modo de formulário (edição ou leitura) ajustando visibilidade de seções.
+ * @param {'edit'|'readonly'} mode - Modo desejado.
+ * @param {{showApprovalButton?:boolean, refreshSummary?:boolean}} [options={}] - Ajustes complementares.
+ */
 function setFormMode(mode, options = {}) {
   if (!projectForm) return;
   const { showApprovalButton = false, refreshSummary = false } = options;
@@ -1424,6 +1736,10 @@ function setFormMode(mode, options = {}) {
   }
 }
 
+/**
+ * Ajusta fluxo de exibição com base no status do projeto (ex.: somente leitura quando aprovado).
+ * @param {ProjectStatus|string} status - Status em avaliação.
+ */
 function applyStatusBehavior(status) {
   const statusKey = normalizeStatusKey(status);
   if (isReadOnlyStatus(statusKey)) {
@@ -1445,6 +1761,11 @@ function applyStatusBehavior(status) {
 }
 
 // ============================================================================
+/**
+ * Prepara overlay para criação/edição populando campos e aplicando regras iniciais.
+ * @param {'create'|'edit'} mode - Contexto do formulário.
+ * @param {{project?: Project}} [detail=null] - Dados carregados quando em edição.
+ */
 function openProjectForm(mode, detail = null) {
   projectForm.reset();
   resetFormStatus();
@@ -1491,6 +1812,10 @@ function openProjectForm(mode, detail = null) {
   validateAllDateRanges();
 }
 
+/**
+ * Preenche o formulário com dados existentes de um projeto selecionado para edição.
+ * @param {{project: Project, simplePeps:Array, milestones:Array, activities:Array, activityPeps:Array}} detail - Pacote de dados relacionado ao projeto.
+ */
 function fillFormWithProject(detail) {
   const { project, simplePeps, milestones, activities, activityPeps } = detail;
   formTitle.textContent = `Editar Projeto #${project.Id}`;
@@ -1592,11 +1917,18 @@ function fillFormWithProject(detail) {
   validateAllDateRanges();
 }
 
+/**
+ * Fecha overlay de formulário e garante fechamento do resumo embutido.
+ */
 function closeForm() {
   overlay.classList.add('hidden');
   closeSummaryOverlay({ restoreFocus: false });
 }
 
+/**
+ * Exibe overlay de resumo para revisão final, após validar campos obrigatórios.
+ * @param {HTMLButtonElement|null} [triggerButton=null] - Botão que acionou o resumo para restaurar foco.
+ */
 function openSummaryOverlay(triggerButton = null) {
   const validation = runFormValidations({ scrollOnError: true, focusFirstError: true });
   if (!validation.valid) {
@@ -1622,6 +1954,10 @@ function openSummaryOverlay(triggerButton = null) {
   }
 }
 
+/**
+ * Oculta overlay de resumo e limpa conteúdo, restaurando foco se necessário.
+ * @param {{restoreFocus?:boolean}} [options={}] - Controla retorno do foco ao botão acionador.
+ */
 function closeSummaryOverlay(options = {}) {
   const { restoreFocus = true } = options;
   if (!summaryOverlay || summaryOverlay.classList.contains('hidden')) {
@@ -1643,16 +1979,26 @@ function closeSummaryOverlay(options = {}) {
   summaryTriggerButton = null;
 }
 
+/**
+ * Confirmador do overlay: fecha modal e dispara submit programático.
+ */
 function handleSummaryConfirm() {
   closeSummaryOverlay({ restoreFocus: false });
   projectForm.requestSubmit();
 }
 
+/**
+ * Atualiza overlay principal de resumo preenchendo seções e Gantt.
+ */
 function populateSummaryOverlay() {
   if (!summarySections) return;
   populateSummaryContent({ context: defaultSummaryContext, refreshGantt: true });
 }
 
+/**
+ * Agrupa dados do formulário em estrutura declarativa para renderização no resumo.
+ * @returns {Array<{title:string, entries:Array}>} Conjunto de seções e campos.
+ */
 function getSummarySectionsData() {
   return [
     {
@@ -1708,6 +2054,10 @@ function getSummarySectionsData() {
   ];
 }
 
+/**
+ * Renderiza seções e gráficos do resumo conforme contexto ativo (overlay ou formulário).
+ * @param {{context?:Object, refreshGantt?:boolean}} [options={}] - Define destino e necessidade de atualizar o Gantt.
+ */
 function populateSummaryContent(options = {}) {
   const { context = defaultSummaryContext, refreshGantt = false } = options;
   const sections = context?.sections;
@@ -1724,6 +2074,11 @@ function populateSummaryContent(options = {}) {
   });
 }
 
+/**
+ * Cria uma seção de resumo com base nos pares label/valor fornecidos.
+ * @param {string} title - Título da seção.
+ * @param {Array<{label:string, value:*, fullWidth?:boolean}>} entries - Campos exibidos na seção.
+ */
 function createSummarySection(title, entries = []) {
   const sections = activeSummaryContext?.sections;
   if (!sections || !entries.length) return;
@@ -1764,6 +2119,9 @@ function createSummarySection(title, entries = []) {
   }
 }
 
+/**
+ * Consolida dados de PEPs simples ou vinculados a atividades para exibição no resumo.
+ */
 function renderPepSummary() {
   const sections = activeSummaryContext?.sections;
   if (!sections) return;
@@ -1872,6 +2230,9 @@ function renderPepSummary() {
   sections.appendChild(section);
 }
 
+/**
+ * Exibe marcos e atividades no resumo final quando Key Projects está habilitado.
+ */
 function renderMilestoneSummary() {
   const sections = activeSummaryContext?.sections;
   if (!sections || !milestoneList) return;
@@ -1965,6 +2326,10 @@ function renderMilestoneSummary() {
   sections.appendChild(section);
 }
 
+/**
+ * Alimenta gráfico Gantt no resumo, respeitando disponibilidade do Google Charts.
+ * @param {{refreshFirst?:boolean}} [options={}] - Quando true, força refresh antes da captura.
+ */
 function populateSummaryGantt(options = {}) {
   const { refreshFirst = false } = options;
   const context = activeSummaryContext;
@@ -2024,6 +2389,12 @@ function populateSummaryGantt(options = {}) {
   }
 }
 
+/**
+ * Aguarda renderização completa do Gantt para garantir captura ou navegação suave.
+ * @param {Object} context - Contexto ativo do resumo.
+ * @param {{timeout?:number}} [options={}] - Tempo máximo de espera em milissegundos.
+ * @returns {Promise<void>} Resolve após gráfico disparar evento 'ready' ou timeout.
+ */
 async function waitForSummaryRender(context, options = {}) {
   if (!context) return;
   const { timeout = 2000 } = options;
@@ -2046,6 +2417,11 @@ async function waitForSummaryRender(context, options = {}) {
   await new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
+/**
+ * Monta string amigável representando período de uma atividade.
+ * @param {Element} activity - Elemento DOM da atividade.
+ * @returns {string} Intervalo formatado ou vazio quando não informado.
+ */
 function buildActivityPeriod(activity) {
   if (!activity) return '';
   const startValue = activity.querySelector('.activity-start')?.value;
@@ -2068,6 +2444,11 @@ function buildActivityPeriod(activity) {
   return '';
 }
 
+/**
+ * Recupera valor textual exibível de campos do formulário, respeitando selects.
+ * @param {string} fieldId - ID do elemento.
+ * @returns {string} Texto puro ou vazio.
+ */
 function getFieldDisplayValue(fieldId) {
   const field = document.getElementById(fieldId);
   if (!field) return '';
@@ -2077,6 +2458,11 @@ function getFieldDisplayValue(fieldId) {
   return field.value ?? '';
 }
 
+/**
+ * Extrai texto da option selecionada ou retorna valor direto do select.
+ * @param {HTMLSelectElement|null} selectElement - Elemento alvo.
+ * @returns {string} Texto amigável.
+ */
 function getSelectOptionText(selectElement) {
   if (!selectElement) return '';
   const option = selectElement.options?.[selectElement.selectedIndex];
@@ -2086,6 +2472,16 @@ function getSelectOptionText(selectElement) {
   return selectElement.value ?? '';
 }
 
+/**
+ * Converte valor numérico de um campo para moeda brasileira.
+ * @param {string} fieldId - ID do input.
+ * @returns {string} Valor formatado ou vazio.
+ */
+/**
+ * Converte valor numérico de input para moeda brasileira.
+ * @param {string} fieldId - ID do campo.
+ * @returns {string} Valor formatado ou string vazia.
+ */
 function formatCurrencyField(fieldId) {
   const field = document.getElementById(fieldId);
   if (!field) return '';
@@ -2100,6 +2496,11 @@ function formatCurrencyField(fieldId) {
   return BRL.format(value);
 }
 
+/**
+ * Converte campo numérico para string localizada, mantendo fallback em caso de parsing inválido.
+ * @param {string} fieldId - ID do input.
+ * @returns {string} Valor formatado ou original.
+ */
 function formatNumberField(fieldId) {
   const field = document.getElementById(fieldId);
   if (!field) return '';
@@ -2115,6 +2516,11 @@ function formatNumberField(fieldId) {
   return value.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 }
 
+/**
+ * Lê valor numérico de um input e devolve formato monetário pt-BR.
+ * @param {HTMLInputElement|null} element - Campo de origem.
+ * @returns {string} Valor formatado ou string vazia.
+ */
 function formatCurrencyValueFromElement(element) {
   if (!element) return '';
   const raw = element.value;
@@ -2128,6 +2534,11 @@ function formatCurrencyValueFromElement(element) {
   return BRL.format(value);
 }
 
+/**
+ * Normaliza valores exibidos no resumo, retornando '—' quando não informado.
+ * @param {*} value - Valor bruto.
+ * @returns {string} Texto pronto para exibição.
+ */
 function resolveSummaryValue(value) {
   if (value === null || value === undefined) {
     return '—';
@@ -2143,9 +2554,7 @@ function resolveSummaryValue(value) {
 }
 
 /**
- * Solicita confirmação antes de fechar o formulário.
- * Usada tanto pelo botão Fechar quanto pela tecla ESC.
- * Também fecha o resumo, caso esteja aberto, antes de perguntar ao usuário.
+ * Solicita confirmação antes de fechar o formulário e garante fechamento do resumo ativo.
  */
 function handleCloseFormRequest() {
   if (summaryOverlay && !summaryOverlay.classList.contains('hidden')) {
@@ -2166,11 +2575,19 @@ function handleCloseFormRequest() {
   }
 }
 
+/**
+ * Intercepta tecla ESC para iniciar fluxo de fechamento controlado do formulário.
+ * @param {KeyboardEvent} event - Evento de teclado.
+ */
 function handleOverlayEscape(event) {
   if (event.key !== 'Escape') return;
   handleCloseFormRequest();
 }
 
+/**
+ * Alterna visibilidade entre seção de PEP simples e Key Projects com base no orçamento.
+ * @param {{preserve?:boolean, clear?:boolean}} [options={}] - Controla limpeza de listas dinâmicas.
+ */
 function updateBudgetSections(options = {}) {
   const { preserve = false, clear = false } = options;
   const value = getProjectBudgetValue();
@@ -2215,6 +2632,11 @@ function updateBudgetSections(options = {}) {
   queueGanttRefresh();
 }
 
+/**
+ * Habilita ou desabilita interações dentro de uma seção específica.
+ * @param {HTMLElement|null} section - Fieldset alvo.
+ * @param {boolean} enabled - Indica se inputs permanecem ativos.
+ */
 function setSectionInteractive(section, enabled) {
   if (!section) return;
   section.querySelectorAll('input, textarea, button').forEach((element) => {
@@ -2361,6 +2783,10 @@ function getFieldLabel(element) {
   return element.getAttribute('aria-label') || element.name || element.id || 'Campo';
 }
 
+/**
+ * Executa validações nativas HTML5 e retorna lista estruturada de problemas.
+ * @returns {Array<{element:HTMLElement, label:string, message:string, type:string}>} Erros detectados.
+ */
 function collectInvalidFields() {
   if (!projectForm) return [];
   const invalid = [];
@@ -2395,6 +2821,9 @@ function collectInvalidFields() {
   return invalid;
 }
 
+/**
+ * Reestabelece o estado das validações customizadas e limpa mensagens auxiliares.
+ */
 function resetValidationState() {
   validationState.pepBudget = null;
   validationState.pepBudgetDetails = null;
@@ -2405,6 +2834,12 @@ function resetValidationState() {
   clearErrorSummary();
 }
 
+/**
+ * Atualiza caches de mensagens e detalhes usados pelos validadores personalizados.
+ * @param {string} key - Nome da propriedade em validationState.
+ * @param {string|null} message - Mensagem registrada.
+ * @param {*} [details=null] - Metadados adicionais.
+ */
 function setValidationError(key, message, details = null) {
   validationState[key] = message || null;
   const detailsKey = `${key}Details`;
@@ -2413,12 +2848,21 @@ function setValidationError(key, message, details = null) {
   }
 }
 
+/**
+ * Memoriza valor anterior de um campo para restauração em validações corretivas.
+ * @param {HTMLElement|null} element - Campo monitorado.
+ */
 function rememberFieldPreviousValue(element) {
   if (!element || typeof element !== 'object') return;
   if (!('dataset' in element)) return;
   element.dataset.previousValue = element.value ?? '';
 }
 
+/**
+ * Normaliza strings numéricas aceitando formatos com vírgula/ponto.
+ * @param {*} value - Valor bruto informado pelo usuário.
+ * @returns {string} Representação normalizada.
+ */
 function normalizeNumericString(value) {
   if (value === null || value === undefined) {
     return '';
@@ -2486,6 +2930,11 @@ function normalizeNumericString(value) {
   return `${sign}${integerPart}.${fractionalPart}`;
 }
 
+/**
+ * Converte valores variados em número de ponto flutuante, respeitando normalização.
+ * @param {*} value - Valor a converter.
+ * @returns {number} Número coerente ou NaN.
+ */
 function coerceNumericValue(value) {
   const normalized = normalizeNumericString(value);
   if (!normalized) {
@@ -2495,11 +2944,21 @@ function coerceNumericValue(value) {
   return Number.isFinite(number) ? number : NaN;
 }
 
+/**
+ * Gera string numérica pronta para setar em inputs tipo number/text.
+ * @param {*} value - Valor de origem.
+ * @returns {string} Valor sanitizado ou vazio.
+ */
 function sanitizeNumericInputValue(value) {
   const number = coerceNumericValue(value);
   return Number.isFinite(number) ? number.toString() : '';
 }
 
+/**
+ * Interpreta valor numérico a partir de input ou string.
+ * @param {HTMLInputElement|number|string} source - Fonte do valor.
+ * @returns {number} Número válido ou 0.
+ */
 function parseNumericInputValue(source) {
   if (!source) return 0;
 
@@ -2515,6 +2974,11 @@ function parseNumericInputValue(source) {
   return Number.isFinite(numericValue) ? numericValue : 0;
 }
 
+/**
+ * Calcula nível de investimento com base no orçamento convertido para USD.
+ * @param {number} budgetBrl - Orçamento em reais.
+ * @returns {string} Código N1..N4 ou vazio.
+ */
 function determineInvestmentLevel(budgetBrl) {
   if (!Number.isFinite(budgetBrl) || budgetBrl < 0) {
     return '';
@@ -2534,6 +2998,10 @@ function determineInvestmentLevel(budgetBrl) {
   return 'N4';
 }
 
+/**
+ * Recupera valor numérico do orçamento informado no formulário.
+ * @returns {number} Valor em reais ou NaN se inválido.
+ */
 function getProjectBudgetValue() {
   if (!projectBudgetInput) return NaN;
   const rawValue = projectBudgetInput.value;
@@ -2543,22 +3011,38 @@ function getProjectBudgetValue() {
   return parseNumericInputValue(projectBudgetInput);
 }
 
+/**
+ * Atualiza select de nível de investimento conforme valor do orçamento.
+ * @param {number} [budgetBrl=getProjectBudgetValue()] - Valor base para cálculo.
+ */
 function updateInvestmentLevelField(budgetBrl = getProjectBudgetValue()) {
   if (!investmentLevelSelect) return;
   const level = determineInvestmentLevel(budgetBrl);
   investmentLevelSelect.value = level;
 }
 
+/**
+ * Retorna lista de inputs que compõem o somatório de PEP.
+ * @returns {HTMLInputElement[]} Inputs de valores PEP.
+ */
 function getPepAmountInputs() {
   const simplePepInputs = Array.from(simplePepList.querySelectorAll('.pep-amount'));
   const activityPepInputs = Array.from(milestoneList.querySelectorAll('.activity-pep-amount'));
   return [...simplePepInputs, ...activityPepInputs];
 }
 
+/**
+ * Soma todos os valores de PEP considerando listas simples e atividades.
+ * @returns {number} Total em reais.
+ */
 function calculatePepTotal() {
   return getPepAmountInputs().reduce((sum, input) => sum + parseNumericInputValue(input), 0);
 }
 
+/**
+ * Atualiza mensagem informativa abaixo do formulário com saldo/ excedente de orçamento.
+ * @param {{budget?:number,total?:number}} [param0={}] - Valores utilizados no cálculo.
+ */
 function updateBudgetHintMessage({ budget = getProjectBudgetValue(), total = calculatePepTotal() } = {}) {
   if (!budgetHint) return;
 
@@ -2587,6 +3071,11 @@ function updateBudgetHintMessage({ budget = getProjectBudgetValue(), total = cal
   budgetHint.style.color = '#c62828';
 }
 
+/**
+ * Valida se somatório de PEP está dentro do orçamento informado.
+ * @param {{changedInput?:HTMLInputElement}} [options={}] - Campo modificado recentemente.
+ * @returns {boolean} True quando orçamento e PEP estão consistentes.
+ */
 function validatePepBudget(options = {}) {
   const { changedInput = null } = options;
   const budget = getProjectBudgetValue();
@@ -2694,6 +3183,11 @@ function validateDateRange(startInput, endInput, options = {}) {
   return true;
 }
 
+/**
+ * Executa validação em todos os pares de datas, reportando o primeiro inválido.
+ * @param {{report?:boolean}} [options={}] - Quando true, chama reportValidity no primeiro campo inválido.
+ * @returns {boolean} True se nenhum intervalo estiver inconsistente.
+ */
 function validateAllDateRanges(options = {}) {
   const { report = false } = options;
   let firstInvalidField = null;
@@ -2712,6 +3206,9 @@ function validateAllDateRanges(options = {}) {
   return !firstInvalidField;
 }
 
+/**
+ * Limpa customValidity aplicado em todos os campos de data do formulário.
+ */
 function clearDateRangeValidity() {
   const inputs = new Set();
   getDateRangePairs().forEach(({ start, end }) => {
@@ -2729,6 +3226,10 @@ function clearDateRangeValidity() {
   });
 }
 
+/**
+ * Atualiza mensagem informativa relacionada às datas do projeto e atividades.
+ * @param {{hasProjectStart?:boolean,hasProjectEnd?:boolean,hasStartIssue?:boolean,hasEndIssue?:boolean,activityCount?:number}} [param0={}] - Indicadores para montagem do texto.
+ */
 function updateDateHintMessage({
   hasProjectStart = false,
   hasProjectEnd = false,
@@ -2852,6 +3353,11 @@ function validateActivityDates(options = {}) {
   return true;
 }
 
+/**
+ * Coordena validações customizadas e nativas retornando resumo das inconsistências.
+ * @param {{scrollOnError?:boolean, focusFirstError?:boolean}} [options={}] - Comportamento pós-validação.
+ * @returns {{valid:boolean, issues:Array}} Resultado consolidado.
+ */
 function runFormValidations(options = {}) {
   const { scrollOnError = false, focusFirstError = false } = options;
 
@@ -2974,6 +3480,10 @@ function runFormValidations(options = {}) {
   return { valid: false, issues };
 }
 
+/**
+ * Escuta eventos de input em campos de data para aplicar validações contextuais.
+ * @param {Event} event - Evento disparado no formulário.
+ */
 function handleGlobalDateInput(event) {
   const target = event.target;
   if (!target || typeof target.matches !== 'function') {
@@ -3001,6 +3511,10 @@ function handleGlobalDateInput(event) {
   }
 }
 
+/**
+ * Armazena valor atual de campos sensíveis antes da edição para suportar rollback.
+ * @param {FocusEvent} event - Evento focusin delegado do formulário.
+ */
 function handleFormFocusCapture(event) {
   const target = event.target;
   if (!target) return;
@@ -3024,6 +3538,11 @@ function handleFormFocusCapture(event) {
   }
 }
 
+/**
+ * Ajusta ano do PEP de uma atividade considerando data de início ou ano de aprovação.
+ * @param {HTMLElement|null} activityElement - Container da atividade.
+ * @param {{fallbackYear?:number|null, force?:boolean}} [options={}] - Estratégia de atualização.
+ */
 function updateActivityPepYear(activityElement, options = {}) {
   if (!activityElement) return;
   const pepYearInput = activityElement.querySelector('.activity-pep-year');
@@ -3039,6 +3558,9 @@ function updateActivityPepYear(activityElement, options = {}) {
   }
 }
 
+/**
+ * Propaga ano padrão para PEPs simples e atividades quando o campo principal muda.
+ */
 function updateSimplePepYears() {
   const year = parseInt(approvalYearInput.value, 10) || '';
   simplePepList.querySelectorAll('.pep-year').forEach((input) => {
@@ -3053,11 +3575,17 @@ function updateSimplePepYears() {
   }
 }
 
+/**
+ * Garante ao menos uma linha de PEP simples pronta para preenchimento.
+ */
 function ensureSimplePepRow() {
   const row = createSimplePepRow({ year: parseInt(approvalYearInput.value, 10) || '' });
   simplePepList.append(row);
 }
 
+/**
+ * Adiciona bloco de marco padrão e agenda atualização do Gantt.
+ */
 function ensureMilestoneBlock() {
   const block = createMilestoneBlock();
   milestoneList.append(block);
@@ -3065,6 +3593,11 @@ function ensureMilestoneBlock() {
   queueGanttRefresh();
 }
 
+/**
+ * Cria linha PEP a partir do template aplicando dados já salvos, quando houver.
+ * @param {{id?:string|number,title?:string,amount?:number|string,year?:number|string}} [param0={}] - Dados iniciais.
+ * @returns {HTMLElement} Linha gerada.
+ */
 function createSimplePepRow({ id = '', title = '', amount = '', year = '' } = {}) {
   const fragment = simplePepTemplate.content.cloneNode(true);
   const row = fragment.querySelector('.pep-row');
@@ -3075,6 +3608,11 @@ function createSimplePepRow({ id = '', title = '', amount = '', year = '' } = {}
   return row;
 }
 
+/**
+ * Cria bloco de marco a partir do template e aplica identificadores existentes.
+ * @param {{id?:string|number,title?:string}} [param0={}] - Dados iniciais.
+ * @returns {HTMLElement} Bloco de marco.
+ */
 function createMilestoneBlock({ id = '', title = '' } = {}) {
   const fragment = milestoneTemplate.content.cloneNode(true);
   const block = fragment.querySelector('.milestone');
@@ -3083,6 +3621,12 @@ function createMilestoneBlock({ id = '', title = '' } = {}) {
   return block;
 }
 
+/**
+ * Cria atividade dentro de um marco, preenchendo campos quando dados são fornecidos.
+ * @param {HTMLElement|null} milestoneElement - Container do marco.
+ * @param {Object} [data={}] - Valores opcionais (id, datas, PEP etc.).
+ * @returns {HTMLElement|null} Atividade recém criada.
+ */
 function addActivityBlock(milestoneElement, data = {}) {
   if (!milestoneElement) return null;
   const fragment = activityTemplate.content.cloneNode(true);
@@ -3130,6 +3674,10 @@ function addActivityBlock(milestoneElement, data = {}) {
 // ============================================================================
 // Envio do formulário e persistência (CRUD)
 // ============================================================================
+/**
+ * Trata submissão do formulário executando persistência no SharePoint e anexos JSON.
+ * @param {Event} event - Evento submit interceptado.
+ */
 async function handleFormSubmit(event) {
   event.preventDefault();
   const mode = projectForm.dataset.mode;
@@ -3266,6 +3814,10 @@ async function handleFormSubmit(event) {
   }
 }
 
+/**
+ * Extrai dados do formulário para montar payload a ser enviado à lista Projects.
+ * @returns {Project} Objeto com campos normalizados.
+ */
 function collectProjectData() {
   const budgetValue = getProjectBudgetValue();
   const budgetBrl = Number.isFinite(budgetValue) ? budgetValue : 0;
@@ -3301,6 +3853,11 @@ function collectProjectData() {
   return data;
 }
 
+/**
+ * Decide entre persistir PEPs simples ou estrutura Key Projects de acordo com o orçamento.
+ * @param {number} projectId - ID do projeto salvo.
+ * @param {Project} projectData - Dados coletados do formulário.
+ */
 async function persistRelatedRecords(projectId, projectData) {
   if (!projectId) return;
   const approvalYear = projectData.approvalYear;
@@ -3315,6 +3872,10 @@ async function persistRelatedRecords(projectId, projectData) {
   }
 }
 
+/**
+ * Extrai PEPs simples do formulário para uso em resumos e persistência.
+ * @returns {Pep[]} Lista de PEPs simples.
+ */
 function collectSimplePepDataForSummary() {
   if (!simplePepList) return [];
 
@@ -3353,6 +3914,10 @@ function collectSimplePepDataForSummary() {
   return peps;
 }
 
+/**
+ * Consolida dados de marcos e atividades presentes no formulário para resumos e anexos.
+ * @returns {Milestone[]} Estrutura normalizada.
+ */
 function collectMilestonesForSummary() {
   if (!milestoneList) return [];
 
@@ -3438,6 +4003,11 @@ function collectMilestonesForSummary() {
   return milestones;
 }
 
+/**
+ * Lineariza atividades associadas aos marcos para facilitar exportação.
+ * @param {Milestone[]} milestones - Marcos coletados previamente.
+ * @returns {Activity[]} Lista de atividades enriquecida com referência ao marco.
+ */
 function collectActivitiesForSummary(milestones) {
   const activities = [];
   const safeMilestones = Array.isArray(milestones) ? milestones : [];
@@ -3460,6 +4030,12 @@ function collectActivitiesForSummary(milestones) {
   return activities;
 }
 
+/**
+ * Agrupa PEPs simples e vinculados às atividades para compor anexos e resumos.
+ * @param {Pep[]} simplePeps - PEPs independentes coletados.
+ * @param {Activity[]} activities - Atividades com eventual PEP.
+ * @returns {Pep[]} Conjunto consolidado.
+ */
 function collectPepEntriesForSummary(simplePeps, activities) {
   const peps = Array.isArray(simplePeps)
     ? simplePeps.map((pep) => ({ ...pep }))
@@ -3481,6 +4057,10 @@ function collectPepEntriesForSummary(simplePeps, activities) {
   return peps;
 }
 
+/**
+ * Reúne rótulos amigáveis de selects para compor anexos e resumos.
+ * @returns {Object} Mapa de valores exibidos ao usuário.
+ */
 function collectProjectDisplayValues() {
   return {
     investmentLevel: getSelectOptionText(investmentLevelSelect),
@@ -3496,6 +4076,12 @@ function collectProjectDisplayValues() {
   };
 }
 
+/**
+ * Estrutura payload resumido do projeto utilizado em anexos JSON.
+ * @param {number|string} projectId - Identificador do projeto.
+ * @param {Project} [projectData={}] - Dados coletados do formulário.
+ * @returns {SummaryPayload} Resumo consolidado.
+ */
 function buildApprovalSummary(projectId, projectData = {}) {
   const simplePeps = collectSimplePepDataForSummary();
   const milestones = collectMilestonesForSummary();
@@ -3518,6 +4104,11 @@ function buildApprovalSummary(projectId, projectData = {}) {
   };
 }
 
+/**
+ * Sincroniza PEPs simples com a lista SharePoint, criando, atualizando e removendo conforme necessário.
+ * @param {number} projectId - ID do projeto pai.
+ * @param {number} approvalYear - Ano de aprovação usado como fallback.
+ */
 async function persistSimplePeps(projectId, approvalYear) {
   const currentIds = new Set();
 
@@ -3547,6 +4138,9 @@ async function persistSimplePeps(projectId, approvalYear) {
   }
 }
 
+/**
+ * Remove PEPs previamente associados quando projeto migra para modo Key Projects.
+ */
 async function cleanupSimplePeps() {
   for (const id of state.editingSnapshot.simplePeps) {
     await sp.deleteItem('Peps', Number(id));
@@ -3554,6 +4148,10 @@ async function cleanupSimplePeps() {
   state.editingSnapshot.simplePeps.clear();
 }
 
+/**
+ * Sincroniza marcos, atividades e PEPs vinculados com suas respectivas listas SharePoint.
+ * @param {number} projectId - ID do projeto pai.
+ */
 async function persistKeyProjects(projectId) {
   const milestoneIds = new Set();
   const activityIds = new Set();
@@ -3649,12 +4247,21 @@ async function persistKeyProjects(projectId) {
   await deleteMissing('Milestones', state.editingSnapshot.milestones, milestoneIds);
 }
 
+/**
+ * Remove registros de Key Projects associados ao projeto quando orçamento cai abaixo do limiar.
+ */
 async function cleanupKeyProjects() {
   await deleteMissing('Peps', state.editingSnapshot.activityPeps, new Set());
   await deleteMissing('Activities', state.editingSnapshot.activities, new Set());
   await deleteMissing('Milestones', state.editingSnapshot.milestones, new Set());
 }
 
+/**
+ * Remove itens SharePoint que estavam relacionados anteriormente mas não existem mais localmente.
+ * @param {string} listName - Nome da lista alvo.
+ * @param {Set<number>} previousSet - IDs conhecidos antes da edição.
+ * @param {Set<number>} currentSet - IDs que permanecem após edição.
+ */
 async function deleteMissing(listName, previousSet, currentSet) {
   for (const id of previousSet) {
     if (!currentSet.has(id)) {
@@ -3667,6 +4274,9 @@ async function deleteMissing(listName, previousSet, currentSet) {
 // ============================================================================
 // Utilitários
 // ============================================================================
+/**
+ * Faz scroll para o topo do overlay e do formulário, garantindo visibilidade das mensagens.
+ */
 function scrollFormToTop() {
   const scrollElement = (element) => {
     if (!element) return;
@@ -3681,6 +4291,11 @@ function scrollFormToTop() {
   scrollElement(projectForm);
 }
 
+/**
+ * Atualiza componente de status com mensagem contextual e tom visual.
+ * @param {string} message - Texto apresentado.
+ * @param {Object|string|boolean} [options={}] - Configuração de tom.
+ */
 function showStatus(message, options = {}) {
   if (!formStatus) return;
   if (message === null || message === undefined || message === '') {
@@ -3712,6 +4327,11 @@ function showStatus(message, options = {}) {
   formStatus.classList.add(`feedback--${tone}`);
 }
 
+/**
+ * Converte string em inteiro seguro ou retorna null.
+ * @param {*} value - Valor de origem.
+ * @returns {number|null} Inteiro válido.
+ */
 function parseNumber(value) {
   const number = parseInt(value, 10);
   return Number.isFinite(number) ? number : null;

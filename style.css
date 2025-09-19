@@ -1,4 +1,24 @@
+/*!
+ * style.css
+ * Descrição: Consolida tokens visuais e estilos de layout para a aplicação CAPEX.
+ * Autor: Matheus Okano
+ * Versão: v1.0
+ * Última atualização: 2025-09-19
+ * Nota: Documentação e comentários adicionados sem alterar a lógica do sistema.
+ */
+
+/* ======================================================================= */
+/* Guia de design                                                          */
+/* ======================================================================= */
+/*
+ * Filosofia: estrutura orientada a tokens de cor, sombras suaves e espaçamento generoso
+ * para reforçar hierarquia visual. Componentes utilizam bordas arredondadas e foco visível
+ * para acessibilidade. Layout principal em grid flexível para suportar monitores amplos e
+ * responsividade até mobile. Tipografia padrão do Microsoft 365 para coerência com SharePoint.
+ */
+
 :root {
+  /* Paleta base e transparências reutilizadas entre botões, cards e overlays */
   --purple: #460a78;
   --violet: #be2846;
   --orange: #f58746;
@@ -50,6 +70,11 @@ p {
 /* ============================================================ */
 /* Botões reutilizáveis                                          */
 /* ============================================================ */
+/*
+ * Define estilos padrão para botões e suas variantes (primary, secondary, ghost, accent, danger).
+ * A transição suave reforça feedback visual imediato. Estados :focus-visible garantem indicador
+ * claro de foco para navegação por teclado, e :disabled bloqueia interação mantendo contraste.
+ */
 .btn {
   border-radius: 12px;
   font-weight: 600;
@@ -151,6 +176,7 @@ p {
   outline-offset: 2px;
 }
 
+/* Ícones padronizados para botões de remover/adicionar em listas dinâmicas */
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   font-size: 22px;
@@ -161,6 +187,7 @@ p {
 /* Cabeçalho                                                     */
 /* ============================================================ */
 .main-header {
+  /* Cabeçalho fixo mantém acesso constante ao CTA e cria separação visual do conteúdo */
   background: #fff;
   border-bottom: 1px solid var(--border);
   padding: 16px 40px;
@@ -203,6 +230,7 @@ p {
 /* Layout principal                                              */
 /* ============================================================ */
 .app-layout {
+  /* Grid principal organiza sidebar e painel de detalhes com espaçamento generoso */
   display: grid;
   grid-template-columns: 360px 1fr;
   gap: 32px;
@@ -211,6 +239,7 @@ p {
 }
 
 .sidebar {
+  /* Sidebar fixa mantém filtros visíveis durante rolagem do painel central */
   background: var(--card);
   border-radius: 18px;
   border: 1px solid var(--purple-rgba-08);
@@ -255,6 +284,7 @@ p {
 }
 
 .project-list {
+  /* Lista rolável com barra discreta; role=list em HTML auxilia leitores de tela */
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -278,6 +308,7 @@ p {
 }
 
 .project-card {
+  /* Cartão clicável com sombra suave; estado hover reforça affordance */
   background: #fff;
   border-radius: 16px;
   border: 1px solid transparent;
@@ -298,6 +329,7 @@ p {
 }
 
 .project-card.selected {
+  /* Realça card ativo mantendo contraste elevado para indicar seleção atual */
   border-color: var(--purple);
   box-shadow: 0 18px 36px rgba(38, 16, 70, 0.22);
 }
@@ -409,6 +441,7 @@ p {
 }
 
 .project-highlight {
+  /* Caixa de resumo com contraste sutil para valores financeiros e datas */
   background: #f8f9fb;
   border: 1px solid #ececf2;
   border-radius: 16px;
@@ -437,6 +470,7 @@ p {
 }
 
 .project-description {
+  /* Seção textual para contextualização do projeto selecionado */
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -458,6 +492,7 @@ p {
 }
 
 .project-overview__actions {
+  /* Agrupa botões contextuais (editar, aprovar, visualizar) alinhados à direita */
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
@@ -475,6 +510,7 @@ p {
 /* Formulário                                                    */
 /* ============================================================ */
 .overlay {
+  /* Layer modal cobre toda a viewport e permite rolagem interna controlada */
   position: fixed;
   inset: 0;
   background: rgba(20, 20, 35, 0.55);
@@ -524,6 +560,7 @@ p {
 }
 
 .project-form {
+  /* Estrutura do formulário principal; espaçamento interno mantém legibilidade dos fieldsets */
   background: #fff;
   border-radius: 20px;
   max-width: 1024px;
@@ -566,6 +603,7 @@ p {
 }
 
 .project-form--readonly {
+  /* Quando em modo leitura, remove seções editáveis mantendo apenas resumo */
   padding: 32px 36px;
   gap: 0;
 }
@@ -584,6 +622,7 @@ p {
 }
 
 .overlay-summary {
+  /* Overlay secundário para revisão final; z-index maior evita sobreposição com formulário */
   align-items: center;
   z-index: 20;
 }
@@ -665,6 +704,7 @@ p {
 }
 
 .summary-section {
+  /* Agrupador do resumo final; borda clara para diferenciar blocos temáticos */
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 20px 24px;
@@ -716,6 +756,7 @@ p {
 }
 
 .summary-table {
+  /* Tabela utilizada para consolidar dados de PEPs; mantém bordas visíveis para leitura */
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
@@ -735,6 +776,7 @@ p {
 }
 
 .summary-milestones {
+  /* Lista hierárquica de marcos exibidos apenas quando Key Projects está habilitado */
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -831,6 +873,7 @@ p {
 }
 
 .form-section {
+  /* Fieldsets com borda neutra organizam etapas e mantêm consistência visual */
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 20px 24px;
@@ -845,6 +888,7 @@ p {
 }
 
 .field-group {
+  /* Agrupa label e controle garantindo alinhamento vertical uniforme */
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -858,6 +902,7 @@ p {
 .field-group input,
 .field-group select,
 .field-group textarea {
+  /* Controles com raio suave; foco roxo proporciona feedback visível para teclado */
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
@@ -908,6 +953,7 @@ p {
 }
 
 .feedback {
+  /* Área de mensagens do formulário; visibilidade controlada via classe .show */
   border-radius: 12px;
   padding: 12px 16px;
   display: none;
@@ -921,24 +967,28 @@ p {
 }
 
 .feedback--info {
+  /* Tons frios para mensagens informativas ou estados intermediários */
   background: var(--purple-rgba-08);
   color: var(--purple);
   border-color: var(--purple-rgba-15);
 }
 
 .feedback--success {
+  /* Verde suave comunica sucesso mantendo contraste com texto */
   background: #e6f4ea;
   color: #1b5e20;
   border-color: #b7dfb9;
 }
 
 .feedback--warning {
+  /* Amarelo sinaliza atenção sem sugerir erro crítico */
   background: #fff8e1;
   color: #a15c0c;
   border-color: #ffe0a3;
 }
 
 .feedback--error {
+  /* Vermelho de alto contraste destaca falhas de validação */
   background: #fdecea;
   color: #c62828;
   border-color: #f4b4b4;
@@ -964,6 +1014,7 @@ p {
 }
 
 .error-summary ul {
+  /* Sublista exibida quando um grupo de erros reúne múltiplos detalhes */
   margin: 6px 0 0;
   padding-left: 18px;
   list-style: disc;
@@ -1001,10 +1052,12 @@ p {
 }
 
 .field-group.has-error label {
+  /* Label em vermelho reforça associação com aria-invalid aplicado via JS */
   color: #c62828;
 }
 
 .field-group.has-error .field-control {
+  /* Wrapper garante posicionamento correto das mensagens auxiliares */
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1043,6 +1096,7 @@ p {
 }
 
 .field-error::before {
+  /* Ícone textual comunica erro também para leitores sem suporte a cor */
   content: '⚠️';
 }
 
@@ -1119,6 +1173,7 @@ p {
 }
 
 .gantt-container {
+  /* Moldura do gráfico Gantt exibida quando há atividades válidas */
   margin-top: 12px;
   padding: 18px;
   border-radius: 14px;
@@ -1135,6 +1190,7 @@ p {
 }
 
 .gantt-chart {
+  /* Área onde Google Charts renderiza o Gantt; overflow-x permite navegação em cronogramas longos */
   width: 100%;
   overflow-x: auto;
   border-radius: 8px;
@@ -1148,6 +1204,7 @@ p {
 }
 
 @media (max-width: 1080px) {
+  /* Ajustes para telas intermediárias: sidebar deixa de ser fixa e layout vira coluna única */
   .app-layout {
     grid-template-columns: 1fr;
   }
@@ -1159,6 +1216,7 @@ p {
 }
 
 @media (max-width: 768px) {
+  /* Mobile: reduz padding geral e reorganiza header e grids em coluna única */
   .main-header {
     flex-direction: column;
     align-items: flex-start;
