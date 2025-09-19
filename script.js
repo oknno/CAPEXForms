@@ -3643,6 +3643,8 @@ function addActivityBlock(milestoneElement, data = {}) {
 
   activity.querySelector('.activity-title').value = data.title || '';
   if (amountInput) {
+    amountInput.type = 'text';
+    amountInput.setAttribute('inputmode', 'decimal');
     amountInput.value = sanitizeNumericInputValue(data.pepAmount);
   }
   if (startInput) {
@@ -3685,6 +3687,10 @@ async function handleFormSubmit(event) {
   const projectId = projectForm.dataset.projectId;
   const submitIntent = projectForm.dataset.submitIntent || 'save';
   const isApproval = submitIntent === 'approval';
+
+  document.querySelectorAll('.activity-pep-amount').forEach((inp) => {
+    inp.value = sanitizeNumericInputValue(inp.value);
+  });
 
   const validation = runFormValidations({ scrollOnError: true, focusFirstError: true });
   if (!validation.valid) {
