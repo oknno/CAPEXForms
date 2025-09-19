@@ -25,18 +25,54 @@ class SharePointService {
   }
 
   async request(url, options = {}) {
-    const response = await fetch(url, options);
+    let response;
+    try {
+      response = await fetch(url, options);
+    } catch (networkError) {
+      console.error('Falha na requisição SharePoint', {
+        url,
+        error: networkError
+      });
+      throw new Error('Não foi possível conectar ao SharePoint. Tente novamente mais tarde.');
+    }
+
     if (!response.ok) {
-      const text = await response.text();
-      const error = new Error(text || response.statusText);
+      const responseText = await response.text();
+      console.error('Erro retornado pela API do SharePoint', {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        responseText
+      });
+      const message = responseText || response.statusText || 'Erro desconhecido na API do SharePoint.';
+      const error = new Error(message);
       error.status = response.status;
+      error.url = url;
       throw error;
     }
+
     if (response.status === 204) {
       return null;
     }
+
     const text = await response.text();
-    return text ? JSON.parse(text) : null;
+    if (!text) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch (parseError) {
+      console.error('Não foi possível interpretar a resposta do SharePoint como JSON', {
+        url,
+        status: response.status,
+        rawBody: text
+      });
+      const error = new Error('Resposta inválida recebida do SharePoint.');
+      error.status = response.status;
+      error.url = url;
+      throw error;
+    }
   }
 
 async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
@@ -63,10 +99,28 @@ async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
     }
   }
 
-  // 🔑 Sempre serializa objeto para JSON formatado
+  const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB
+
+  // 🔑 Sempre serializa objeto para JSON formatado e valida conteúdo
   let bodyContent = fileContent;
   if (typeof fileContent === 'object' && !(fileContent instanceof Blob)) {
-    bodyContent = JSON.stringify(fileContent, null, 2);
+    try {
+      bodyContent = JSON.stringify(fileContent, null, 2);
+    } catch (serializationError) {
+      console.error('Falha ao serializar o conteúdo do anexo em JSON.', serializationError);
+      throw new Error('Não foi possível preparar o anexo JSON.');
+    }
+  } else if (typeof fileContent === 'string') {
+    const trimmed = fileContent.trim();
+    if (trimmed) {
+      try {
+        JSON.parse(trimmed);
+      } catch (jsonError) {
+        console.error('Conteúdo do anexo não é um JSON válido.', jsonError);
+        throw new Error('O conteúdo do anexo não é um JSON válido.');
+      }
+    }
+    bodyContent = trimmed;
   }
 
   const digest = await this.getFormDigest();
@@ -84,6 +138,10 @@ async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
   const body = bodyContent instanceof Blob
     ? bodyContent
     : new Blob([bodyContent], { type: 'application/json' });
+
+  if (body.size > MAX_ATTACHMENT_SIZE) {
+    throw new Error('O anexo excede o tamanho máximo permitido de 10MB.');
+  }
 
   console.log("🔎 Salvando anexo em:", url, "Arquivo:", sanitizedFileName);
 
@@ -282,6 +340,7 @@ const overlay = document.getElementById('formOverlay');
 const projectForm = document.getElementById('projectForm');
 const formTitle = document.getElementById('formTitle');
 const closeFormBtn = document.getElementById('closeFormBtn');
+const floatingCloseBtn = document.querySelector('.form-close-btn');
 const saveProjectBtn = document.getElementById('saveProjectBtn');
 const submitForApprovalBtn = document.getElementById('submitForApprovalBtn');
 const formActions = projectForm?.querySelector('.form-actions') || null;
@@ -332,8 +391,22 @@ const simplePepTemplate = document.getElementById('simplePepTemplate');
 const milestoneTemplate = document.getElementById('milestoneTemplate');
 const activityTemplate = document.getElementById('activityTemplate');
 
-const READ_ONLY_STATUSES = new Set(['Aprovado', 'Em Aprovação']);
-const APPROVAL_ALLOWED_STATUSES = new Set(['Rascunho', 'Reprovado', 'Reprovado para Revisão']);
+const PROJECT_STATUSES = Object.freeze({
+  APPROVED: 'Aprovado',
+  DRAFT: 'Rascunho',
+  REJECTED: 'Reprovado',
+  REJECTED_FOR_REVIEW: 'Reprovado para Revisão',
+  IN_APPROVAL: 'Em Aprovação'
+});
+
+const STATUS_GROUPS = Object.freeze({
+  READ_ONLY: new Set([PROJECT_STATUSES.APPROVED, PROJECT_STATUSES.IN_APPROVAL]),
+  APPROVAL_ALLOWED: new Set([
+    PROJECT_STATUSES.DRAFT,
+    PROJECT_STATUSES.REJECTED,
+    PROJECT_STATUSES.REJECTED_FOR_REVIEW
+  ])
+});
 const defaultSummaryContext = {
   sections: summarySections,
   ganttSection: summaryGanttSection,
@@ -348,18 +421,32 @@ const formSummaryContext = {
 
 let activeSummaryContext = defaultSummaryContext;
 let currentFormMode = null;
+let renderProjectListFrame = null;
 
 function normalizeStatusKey(status) {
   return typeof status === 'string' ? status.trim() : '';
 }
 
 function isReadOnlyStatus(status) {
-  return READ_ONLY_STATUSES.has(normalizeStatusKey(status));
+  return STATUS_GROUPS.READ_ONLY.has(normalizeStatusKey(status));
 }
 
 function canSubmitForApproval(status) {
   const key = normalizeStatusKey(status);
-  return !key || APPROVAL_ALLOWED_STATUSES.has(key);
+  return !key || STATUS_GROUPS.APPROVAL_ALLOWED.has(key);
+}
+
+function debounce(fn, delay = 200) {
+  let timerId = null;
+  return function debouncedFunction(...args) {
+    if (timerId) {
+      clearTimeout(timerId);
+    }
+    timerId = setTimeout(() => {
+      timerId = null;
+      fn.apply(this, args);
+    }, delay);
+  };
 }
 
 function withSummaryContext(context, callback) {
@@ -681,11 +768,14 @@ function init() {
 function bindEvents() {
   newProjectBtn.addEventListener('click', () => openProjectForm('create'));
   closeFormBtn.addEventListener('click', handleCloseFormRequest);
+  if (floatingCloseBtn) {
+    floatingCloseBtn.addEventListener('click', handleCloseFormRequest);
+  }
   // Habilita o fechamento do formulário pela tecla ESC.
   document.addEventListener('keydown', handleOverlayEscape);
   document.addEventListener('input', handleGlobalDateInput);
   if (projectSearch) {
-    projectSearch.addEventListener('input', () => renderProjectList());
+    projectSearch.addEventListener('input', () => renderProjectList({ defer: true }));
   }
 
   projectForm.addEventListener('submit', handleFormSubmit);
@@ -724,15 +814,32 @@ function bindEvents() {
     });
   }
 
-  projectBudgetInput.addEventListener('input', () => {
+  const debouncedBudgetRecalculation = debounce(() => {
     updateInvestmentLevelField();
     updateBudgetSections();
     validatePepBudget();
-  });
+  }, 180);
+  projectBudgetInput.addEventListener('input', debouncedBudgetRecalculation);
+
+  const scheduleActivityDateValidation = debounce((input) => {
+    if (input) {
+      validateActivityDates({ changedInput: input });
+    } else {
+      validateActivityDates();
+    }
+  }, 180);
+
+  const schedulePepBudgetValidation = debounce((input) => {
+    if (input) {
+      validatePepBudget({ changedInput: input });
+    } else {
+      validatePepBudget();
+    }
+  }, 180);
 
   if (projectStartDateInput) {
     const handleProjectStartChange = (event) => {
-      validateActivityDates({ changedInput: event.target });
+      scheduleActivityDateValidation(event.target);
     };
     projectStartDateInput.addEventListener('input', handleProjectStartChange);
     projectStartDateInput.addEventListener('change', handleProjectStartChange);
@@ -740,7 +847,7 @@ function bindEvents() {
 
   if (projectEndDateInput) {
     const handleProjectEndChange = (event) => {
-      validateActivityDates({ changedInput: event.target });
+      scheduleActivityDateValidation(event.target);
     };
     projectEndDateInput.addEventListener('input', handleProjectEndChange);
     projectEndDateInput.addEventListener('change', handleProjectEndChange);
@@ -766,7 +873,7 @@ function bindEvents() {
 
   simplePepList.addEventListener('input', (event) => {
     if (event.target.classList?.contains('pep-amount')) {
-      validatePepBudget({ changedInput: event.target });
+      schedulePepBudgetValidation(event.target);
     }
   });
 
@@ -803,13 +910,13 @@ function bindEvents() {
     if (event.target.classList?.contains('activity-start')) {
       const activity = event.target.closest('.activity');
       updateActivityPepYear(activity, { force: true });
-      validateActivityDates({ changedInput: event.target });
+      scheduleActivityDateValidation(event.target);
     }
     if (event.target.classList?.contains('activity-end')) {
-      validateActivityDates({ changedInput: event.target });
+      scheduleActivityDateValidation(event.target);
     }
     if (event.target.classList?.contains('activity-pep-amount')) {
-      validatePepBudget({ changedInput: event.target });
+      schedulePepBudgetValidation(event.target);
     }
     queueGanttRefresh();
   };
@@ -835,59 +942,79 @@ async function loadProjects() {
   }
 }
 
-function renderProjectList() {
+function renderProjectList(options = {}) {
   const filter = (projectSearch?.value || '').toLowerCase();
-  projectList.innerHTML = '';
 
-  const filtered = state.projects.filter((item) =>
-    item.Title?.toLowerCase().includes(filter)
-  );
+  const drawList = () => {
+    projectList.innerHTML = '';
 
-  if (filtered.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'hint';
-    empty.textContent = 'Nenhum projeto encontrado.';
-    projectList.append(empty);
+    const filtered = state.projects.filter((item) =>
+      item.Title?.toLowerCase().includes(filter)
+    );
+
+    if (filtered.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'hint';
+      empty.textContent = 'Nenhum projeto encontrado.';
+      projectList.append(empty);
+      return;
+    }
+
+    filtered.forEach((item) => {
+      const card = document.createElement('article');
+      card.className = 'project-card';
+      if (state.selectedProjectId === item.Id) {
+        card.classList.add('selected');
+      }
+      card.dataset.id = item.Id;
+
+      const accent = document.createElement('span');
+      accent.className = 'project-card-accent';
+      accent.style.background = statusColor(item.status);
+
+      const content = document.createElement('div');
+      content.className = 'project-card-content';
+
+      const status = document.createElement('span');
+      status.className = 'project-card-status';
+      status.textContent = item.status || 'Sem status';
+      status.style.color = statusColor(item.status);
+
+      const title = document.createElement('span');
+      title.className = 'project-card-title';
+      title.textContent = item.Title || 'Projeto sem título';
+      content.append(status, title);
+      if (item.budgetBrl) {
+        const budgetRow = document.createElement('div');
+        budgetRow.className = 'project-card-bottom';
+        const budget = document.createElement('span');
+        budget.className = 'project-card-meta';
+        budget.textContent = BRL.format(item.budgetBrl);
+        budgetRow.append(budget);
+        content.append(budgetRow);
+      }
+      card.append(accent, content);
+      card.addEventListener('click', () => selectProject(item.Id));
+      projectList.append(card);
+    });
+  };
+
+  if (options?.defer) {
+    if (renderProjectListFrame) {
+      cancelAnimationFrame(renderProjectListFrame);
+    }
+    renderProjectListFrame = requestAnimationFrame(() => {
+      renderProjectListFrame = null;
+      drawList();
+    });
     return;
   }
 
-  filtered.forEach((item) => {
-    const card = document.createElement('article');
-    card.className = 'project-card';
-    if (state.selectedProjectId === item.Id) {
-      card.classList.add('selected');
-    }
-    card.dataset.id = item.Id;
-
-    const accent = document.createElement('span');
-    accent.className = 'project-card-accent';
-    accent.style.background = statusColor(item.status);
-
-    const content = document.createElement('div');
-    content.className = 'project-card-content';
-
-    const status = document.createElement('span');
-    status.className = 'project-card-status';
-    status.textContent = item.status || 'Sem status';
-    status.style.color = statusColor(item.status);
-
-    const title = document.createElement('span');
-    title.className = 'project-card-title';
-    title.textContent = item.Title || 'Projeto sem título';
-    content.append(status, title);
-    if (item.budgetBrl) {
-      const budgetRow = document.createElement('div');
-      budgetRow.className = 'project-card-bottom';
-      const budget = document.createElement('span');
-      budget.className = 'project-card-meta';
-      budget.textContent = BRL.format(item.budgetBrl);
-      budgetRow.append(budget);
-      content.append(budgetRow);
-    }
-    card.append(accent, content);
-    card.addEventListener('click', () => selectProject(item.Id));
-    projectList.append(card);
-  });
+  if (renderProjectListFrame) {
+    cancelAnimationFrame(renderProjectListFrame);
+    renderProjectListFrame = null;
+  }
+  drawList();
 }
 
 async function selectProject(projectId) {
@@ -955,7 +1082,7 @@ function renderProjectDetails(detail) {
   status.textContent = project.status || 'Sem status';
   header.append(title, status);
 
-  if (project.status === 'Aprovado') {
+  if (project.status === PROJECT_STATUSES.APPROVED) {
     const info = document.createElement('p');
     info.className = 'project-overview__hint';
     info.textContent = 'Projeto aprovado - somente leitura.';
@@ -994,8 +1121,8 @@ function renderProjectDetails(detail) {
   actions.className = 'project-overview__actions';
 
   const statusKey = normalizeStatusKey(project.status);
-  const editableStatuses = new Set(['Rascunho', 'Reprovado', 'Reprovado para Revisão']);
-  const viewOnlyStatuses = new Set(['Aprovado', 'Em Aprovação']);
+  const editableStatuses = STATUS_GROUPS.APPROVAL_ALLOWED;
+  const viewOnlyStatuses = STATUS_GROUPS.READ_ONLY;
 
   if (viewOnlyStatuses.has(statusKey)) {
     const viewBtn = document.createElement('button');
@@ -1283,14 +1410,14 @@ function openProjectForm(mode, detail = null) {
 
   if (mode === 'create') {
     formTitle.textContent = 'Novo Projeto';
-    statusField.value = 'Rascunho';
+    statusField.value = PROJECT_STATUSES.DRAFT;
     setApprovalYearToCurrent();
     updateBudgetSections({ clear: true });
   } else if (detail) {
     fillFormWithProject(detail);
   }
 
-  const statusKey = detail?.project?.status || statusField.value || 'Rascunho';
+  const statusKey = detail?.project?.status || statusField.value || PROJECT_STATUSES.DRAFT;
   applyStatusBehavior(statusKey);
 
   updateSimplePepYears();
@@ -1302,7 +1429,7 @@ function openProjectForm(mode, detail = null) {
 function fillFormWithProject(detail) {
   const { project, simplePeps, milestones, activities, activityPeps } = detail;
   formTitle.textContent = `Editar Projeto #${project.Id}`;
-  statusField.value = project.status || 'Rascunho';
+  statusField.value = project.status || PROJECT_STATUSES.DRAFT;
 
   document.getElementById('projectName').value = project.Title || '';
   document.getElementById('category').value = project.category || '';
@@ -2948,7 +3075,9 @@ async function handleFormSubmit(event) {
     return;
   }
 
-  const normalizedStatus = isApproval ? 'Em Aprovação' : 'Rascunho';
+  const normalizedStatus = isApproval
+    ? PROJECT_STATUSES.IN_APPROVAL
+    : PROJECT_STATUSES.DRAFT;
   statusField.value = normalizedStatus;
 
   const payload = collectProjectData();
@@ -2985,7 +3114,7 @@ async function handleFormSubmit(event) {
         contentType: 'application/json'
       });
 
-      await sp.updateItem('Projects', resolvedId, { status: 'Em Aprovação' });
+      await sp.updateItem('Projects', resolvedId, { status: PROJECT_STATUSES.IN_APPROVAL });
     }
 
     if (resolvedId) {
@@ -3025,15 +3154,15 @@ async function handleFormSubmit(event) {
 
     if (isApproval && Number.isFinite(resolvedId)) {
       try {
-        await sp.updateItem('Projects', resolvedId, { status: 'Rascunho' });
-        updateProjectState(resolvedId, { status: 'Rascunho' });
+        await sp.updateItem('Projects', resolvedId, { status: PROJECT_STATUSES.DRAFT });
+        updateProjectState(resolvedId, { status: PROJECT_STATUSES.DRAFT });
         renderProjectList();
         if (state.currentDetails?.project?.Id === resolvedId) {
           state.currentDetails = {
             ...state.currentDetails,
             project: {
               ...state.currentDetails.project,
-              status: 'Rascunho'
+              status: PROJECT_STATUSES.DRAFT
             }
           };
           renderProjectDetails(state.currentDetails);
@@ -3041,7 +3170,7 @@ async function handleFormSubmit(event) {
       } catch (rollbackError) {
         console.error('Erro ao reverter status após falha no envio', rollbackError);
       }
-      statusField.value = 'Rascunho';
+      statusField.value = PROJECT_STATUSES.DRAFT;
     }
 
     scrollFormToTop();
@@ -3516,15 +3645,15 @@ function showStatus(message, options = {}) {
 
 function statusColor(status) {
   switch (status) {
-    case 'Rascunho':
+    case PROJECT_STATUSES.DRAFT:
       return '#414141';
-    case 'Em Aprovação':
+    case PROJECT_STATUSES.IN_APPROVAL:
       return '#970886';
-    case 'Reprovado para Revisão':
+    case PROJECT_STATUSES.REJECTED_FOR_REVIEW:
       return '#fe8f46';
-    case 'Aprovado':
+    case PROJECT_STATUSES.APPROVED:
       return '#3d9308';
-    case 'Reprovado':
+    case PROJECT_STATUSES.REJECTED:
       return '#f83241';
     default:
       return '#414141';
