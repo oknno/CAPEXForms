@@ -14,14 +14,21 @@ class SharePointService {
     if (!listName) {
       throw new Error('Lista SharePoint não informada.');
     }
-    return `${this.siteUrl}/_api/web/lists/getbytitle('${listName}')${path}`;
+    const safeListName = String(listName).replace(/'/g, "''");
+    return `${this.siteUrl}/_api/web/lists/getbytitle('${safeListName}')${path}`;
   }
 
   sanitizeFileName(fileName) {
     if (typeof fileName !== 'string') {
       return '';
     }
-    return fileName.replace(/'/g, "''");
+    const normalized = fileName.normalize ? fileName.normalize('NFKC') : fileName;
+    const withoutControl = normalized.replace(/[\u0000-\u001f\u007f]/g, '');
+    const cleaned = withoutControl.replace(/[\\/:*?"<>|]/g, '_').trim();
+    if (!cleaned) {
+      return '';
+    }
+    return cleaned.replace(/'/g, "''");
   }
 
   async request(url, options = {}) {
@@ -103,7 +110,9 @@ async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
 
   // 🔑 Sempre serializa objeto para JSON formatado e valida conteúdo
   let bodyContent = fileContent;
-  if (typeof fileContent === 'object' && !(fileContent instanceof Blob)) {
+  if (fileContent instanceof Blob) {
+    bodyContent = fileContent;
+  } else if (typeof fileContent === 'object' && fileContent !== null) {
     try {
       bodyContent = JSON.stringify(fileContent, null, 2);
     } catch (serializationError) {
@@ -112,15 +121,39 @@ async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
     }
   } else if (typeof fileContent === 'string') {
     const trimmed = fileContent.trim();
-    if (trimmed) {
-      try {
-        JSON.parse(trimmed);
-      } catch (jsonError) {
-        console.error('Conteúdo do anexo não é um JSON válido.', jsonError);
-        throw new Error('O conteúdo do anexo não é um JSON válido.');
-      }
+    if (!trimmed) {
+      throw new Error('O conteúdo do anexo JSON está vazio.');
+    }
+    try {
+      JSON.parse(trimmed);
+    } catch (jsonError) {
+      console.error('Conteúdo do anexo não é um JSON válido.', jsonError);
+      throw new Error('O conteúdo do anexo não é um JSON válido.');
     }
     bodyContent = trimmed;
+  } else if (fileContent !== undefined && fileContent !== null) {
+    const textContent = String(fileContent).trim();
+    if (!textContent) {
+      throw new Error('O conteúdo do anexo JSON está vazio.');
+    }
+    try {
+      JSON.parse(textContent);
+    } catch (jsonError) {
+      console.error('Conteúdo do anexo não é um JSON válido.', jsonError);
+      throw new Error('O conteúdo do anexo não é um JSON válido.');
+    }
+    bodyContent = textContent;
+  } else {
+    throw new Error('O conteúdo do anexo JSON está vazio.');
+  }
+
+  if (!(bodyContent instanceof Blob)) {
+    const normalizedContent =
+      typeof bodyContent === 'string' ? bodyContent.trim() : String(bodyContent ?? '').trim();
+    if (!normalizedContent) {
+      throw new Error('O conteúdo do anexo JSON está vazio.');
+    }
+    bodyContent = normalizedContent;
   }
 
   const digest = await this.getFormDigest();
@@ -286,7 +319,7 @@ const EXCHANGE_RATE = 5.6; // 1 USD = 5.6 BRL
 const DATE_RANGE_ERROR_MESSAGE = 'A data de término não pode ser anterior à data de início.';
 
 const SITE_URL = window.SHAREPOINT_SITE_URL || 'https://arcelormittal.sharepoint.com/sites/controladorialongos/capex';
-const sp = new SharePointService("https://arcelormittal.sharepoint.com/sites/controladorialongos/capex");
+const sp = new SharePointService(SITE_URL);
 
 const state = {
   projects: [],
@@ -369,11 +402,17 @@ const summaryGanttChart = document.getElementById('summaryGanttChart');
 const summaryConfirmBtn = document.getElementById('summaryConfirmBtn');
 const summaryEditBtn = document.getElementById('summaryEditBtn');
 
+const summaryTitle = document.getElementById('summaryTitle');
+
 const formSummaryView = document.getElementById('formSummaryView');
 const formSummarySections = document.getElementById('formSummarySections');
 const formSummaryGanttSection = document.getElementById('formSummaryGanttSection');
 const formSummaryGanttChart = document.getElementById('formSummaryGanttChart');
 const formSummaryCloseBtn = document.getElementById('formSummaryCloseBtn');
+
+if (summaryTitle && !summaryTitle.hasAttribute('tabindex')) {
+  summaryTitle.setAttribute('tabindex', '-1');
+}
 
 const companySelect = document.getElementById('company');
 const centerSelect = document.getElementById('center');
@@ -398,6 +437,23 @@ const PROJECT_STATUSES = Object.freeze({
   REJECTED_FOR_REVIEW: 'Reprovado para Revisão',
   IN_APPROVAL: 'Em Aprovação'
 });
+
+function statusColor(status) {
+  switch (status) {
+    case PROJECT_STATUSES.DRAFT:
+      return '#414141';
+    case PROJECT_STATUSES.IN_APPROVAL:
+      return '#970886';
+    case PROJECT_STATUSES.REJECTED_FOR_REVIEW:
+      return '#fe8f46';
+    case PROJECT_STATUSES.APPROVED:
+      return '#3d9308';
+    case PROJECT_STATUSES.REJECTED:
+      return '#f83241';
+    default:
+      return '#414141';
+  }
+}
 
 const STATUS_GROUPS = Object.freeze({
   READ_ONLY: new Set([PROJECT_STATUSES.APPROVED, PROJECT_STATUSES.IN_APPROVAL]),
@@ -1018,6 +1074,10 @@ function renderProjectList(options = {}) {
 }
 
 async function selectProject(projectId) {
+  if (renderProjectListFrame) {
+    cancelAnimationFrame(renderProjectListFrame);
+    renderProjectListFrame = null;
+  }
   state.selectedProjectId = projectId;
   renderProjectList();
   await loadProjectDetails(projectId);
@@ -1550,7 +1610,9 @@ function openSummaryOverlay(triggerButton = null) {
   populateSummaryOverlay();
   summaryOverlay.classList.remove('hidden');
   summaryOverlay.scrollTop = 0;
-  if (summaryConfirmBtn) {
+  if (summaryTitle) {
+    summaryTitle.focus();
+  } else if (summaryConfirmBtn) {
     summaryConfirmBtn.focus();
   }
 }
@@ -3643,21 +3705,6 @@ function showStatus(message, options = {}) {
   formStatus.classList.add(`feedback--${tone}`);
 }
 
-function statusColor(status) {
-  switch (status) {
-    case PROJECT_STATUSES.DRAFT:
-      return '#414141';
-    case PROJECT_STATUSES.IN_APPROVAL:
-      return '#970886';
-    case PROJECT_STATUSES.REJECTED_FOR_REVIEW:
-      return '#fe8f46';
-    case PROJECT_STATUSES.APPROVED:
-      return '#3d9308';
-    case PROJECT_STATUSES.REJECTED:
-      return '#f83241';
-    default:
-      return '#414141';
-  }
 }
 
 function parseNumber(value) {
