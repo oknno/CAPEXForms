@@ -58,6 +58,25 @@
         </div>
       </div>
 
+      <div id="formSummaryView" class="summary-panel form-summary hidden" aria-live="polite">
+        <header class="summary-header">
+          <h2 id="formSummaryTitle">Resumo do Projeto</h2>
+          <p class="summary-subtitle">Visualização apenas leitura dos dados do projeto.</p>
+        </header>
+
+        <div class="summary-body">
+          <div id="formSummarySections" class="summary-sections"></div>
+          <section id="formSummaryGanttSection" class="summary-section summary-gantt hidden">
+            <h3>Gráfico Gantt</h3>
+            <div id="formSummaryGanttChart" class="gantt-chart"></div>
+          </section>
+        </div>
+
+        <footer class="summary-actions">
+          <button type="button" id="formSummaryCloseBtn" class="btn secondary">Fechar</button>
+        </footer>
+      </div>
+
       <!-- ============================== -->
       <!-- 1. Sobre o Projeto             -->
       <!-- ============================== -->
@@ -278,6 +297,7 @@
       <p id="dateHint" class="hint" aria-live="polite"></p>
 
       <div class="form-actions">
+        <button type="button" id="submitForApprovalBtn" class="btn accent">Enviar para Aprovação</button>
         <button type="button" id="saveProjectBtn" class="btn primary">Salvar</button>
       </div>
     </form>

@@ -176,6 +176,8 @@ const projectForm = document.getElementById('projectForm');
 const formTitle = document.getElementById('formTitle');
 const closeFormBtn = document.getElementById('closeFormBtn');
 const saveProjectBtn = document.getElementById('saveProjectBtn');
+const submitForApprovalBtn = document.getElementById('submitForApprovalBtn');
+const formActions = projectForm?.querySelector('.form-actions') || null;
 const formStatus = document.getElementById('formStatus');
 const formErrors = document.getElementById('formErrors');
 const formErrorsTitle = document.getElementById('formErrorsTitle');
@@ -201,6 +203,12 @@ const summaryGanttChart = document.getElementById('summaryGanttChart');
 const summaryConfirmBtn = document.getElementById('summaryConfirmBtn');
 const summaryEditBtn = document.getElementById('summaryEditBtn');
 
+const formSummaryView = document.getElementById('formSummaryView');
+const formSummarySections = document.getElementById('formSummarySections');
+const formSummaryGanttSection = document.getElementById('formSummaryGanttSection');
+const formSummaryGanttChart = document.getElementById('formSummaryGanttChart');
+const formSummaryCloseBtn = document.getElementById('formSummaryCloseBtn');
+
 const companySelect = document.getElementById('company');
 const centerSelect = document.getElementById('center');
 const unitSelect = document.getElementById('unit');
@@ -216,6 +224,61 @@ const projectEndDateInput = document.getElementById('endDate');
 const simplePepTemplate = document.getElementById('simplePepTemplate');
 const milestoneTemplate = document.getElementById('milestoneTemplate');
 const activityTemplate = document.getElementById('activityTemplate');
+
+const READ_ONLY_STATUSES = new Set(['Aprovado', 'Reprovado', 'Em Aprovação']);
+const APPROVAL_ALLOWED_STATUSES = new Set(['Rascunho', 'Reprovado para Revisão']);
+
+const defaultSummaryContext = {
+  sections: summarySections,
+  ganttSection: summaryGanttSection,
+  ganttChart: summaryGanttChart
+};
+
+const formSummaryContext = {
+  sections: formSummarySections,
+  ganttSection: formSummaryGanttSection,
+  ganttChart: formSummaryGanttChart
+};
+
+let activeSummaryContext = defaultSummaryContext;
+let currentFormMode = null;
+
+function normalizeStatusKey(status) {
+  return typeof status === 'string' ? status.trim() : '';
+}
+
+function isReadOnlyStatus(status) {
+  return READ_ONLY_STATUSES.has(normalizeStatusKey(status));
+}
+
+function canSubmitForApproval(status) {
+  const key = normalizeStatusKey(status);
+  return !key || APPROVAL_ALLOWED_STATUSES.has(key);
+}
+
+function withSummaryContext(context, callback) {
+  if (typeof callback !== 'function') return;
+  const previousContext = activeSummaryContext;
+  activeSummaryContext = context || previousContext;
+  try {
+    callback();
+  } finally {
+    activeSummaryContext = previousContext;
+  }
+}
+
+function clearSummaryContent(context) {
+  if (!context) return;
+  if (context.sections) {
+    context.sections.innerHTML = '';
+  }
+  if (context.ganttChart) {
+    context.ganttChart.innerHTML = '';
+  }
+  if (context.ganttSection) {
+    context.ganttSection.classList.add('hidden');
+  }
+}
 
 // ============================================================================
 // Gantt Chart
@@ -524,7 +587,16 @@ function bindEvents() {
   if (saveProjectBtn) {
     saveProjectBtn.addEventListener('click', (event) => {
       event.preventDefault();
+      projectForm.dataset.submitIntent = 'save';
       openSummaryOverlay(saveProjectBtn);
+    });
+  }
+
+  if (submitForApprovalBtn) {
+    submitForApprovalBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      projectForm.dataset.submitIntent = 'approval';
+      openSummaryOverlay(submitForApprovalBtn);
     });
   }
 
@@ -534,6 +606,10 @@ function bindEvents() {
 
   if (summaryEditBtn) {
     summaryEditBtn.addEventListener('click', () => closeSummaryOverlay());
+  }
+
+  if (formSummaryCloseBtn) {
+    formSummaryCloseBtn.addEventListener('click', () => closeForm());
   }
 
   if (companySelect) {
@@ -997,6 +1073,118 @@ function updateCompanyDependentFields(companyValue, selectedValues = {}) {
 
 // ============================================================================
 // Formulário: abertura, preenchimento e coleta dos dados
+function setFormFieldsDisabled(disabled) {
+  if (!projectForm) return;
+  const elements = projectForm.querySelectorAll('input, textarea, select, button');
+
+  elements.forEach((element) => {
+    if (!element) return;
+    if (element.id === 'closeFormBtn') return;
+    if (element.closest('.form-summary')) return;
+
+    if (disabled) {
+      if (!Object.prototype.hasOwnProperty.call(element.dataset, 'readonlyOriginalDisabled')) {
+        element.dataset.readonlyOriginalDisabled = element.disabled ? 'true' : 'false';
+      }
+      element.disabled = true;
+      element.setAttribute('aria-disabled', 'true');
+    } else {
+      if (!Object.prototype.hasOwnProperty.call(element.dataset, 'readonlyOriginalDisabled')) {
+        if (element.disabled) {
+          element.setAttribute('aria-disabled', 'true');
+        } else {
+          element.removeAttribute('aria-disabled');
+        }
+        return;
+      }
+      const original = element.dataset.readonlyOriginalDisabled;
+      if (original === 'true') {
+        element.disabled = true;
+        element.setAttribute('aria-disabled', 'true');
+      } else {
+        element.disabled = false;
+        element.removeAttribute('aria-disabled');
+      }
+      if (original !== undefined) {
+        delete element.dataset.readonlyOriginalDisabled;
+      }
+      if (element.disabled) {
+        element.setAttribute('aria-disabled', 'true');
+      }
+    }
+  });
+}
+
+function setFormMode(mode, options = {}) {
+  if (!projectForm) return;
+  const { showApprovalButton = false, refreshSummary = false } = options;
+  const targetMode = mode === 'readonly' ? 'readonly' : 'edit';
+  const modeChanged = currentFormMode !== targetMode;
+  currentFormMode = targetMode;
+
+  if (targetMode === 'readonly') {
+    if (modeChanged) {
+      projectForm.classList.add('project-form--readonly');
+      setFormFieldsDisabled(true);
+      if (formSummaryView) {
+        formSummaryView.classList.remove('hidden');
+      }
+      if (formActions) {
+        formActions.classList.add('hidden');
+      }
+      if (saveProjectBtn) {
+        saveProjectBtn.classList.add('hidden');
+      }
+      if (submitForApprovalBtn) {
+        submitForApprovalBtn.classList.add('hidden');
+      }
+    }
+
+    if (formSummaryView && (modeChanged || refreshSummary)) {
+      populateSummaryContent({ context: formSummaryContext, refreshGantt: true });
+    }
+  } else {
+    if (modeChanged) {
+      projectForm.classList.remove('project-form--readonly');
+      setFormFieldsDisabled(false);
+      if (formSummaryView) {
+        formSummaryView.classList.add('hidden');
+        clearSummaryContent(formSummaryContext);
+      }
+    }
+
+    if (formActions) {
+      formActions.classList.remove('hidden');
+    }
+    if (saveProjectBtn) {
+      saveProjectBtn.classList.remove('hidden');
+    }
+    if (submitForApprovalBtn) {
+      submitForApprovalBtn.classList.toggle('hidden', !showApprovalButton);
+    }
+  }
+}
+
+function applyStatusBehavior(status) {
+  const statusKey = normalizeStatusKey(status);
+  if (isReadOnlyStatus(statusKey)) {
+    if (formTitle) {
+      formTitle.textContent = 'Resumo do Projeto';
+    }
+    setFormMode('readonly', { refreshSummary: true });
+    if (projectForm) {
+      projectForm.dataset.submitIntent = 'save';
+    }
+    return;
+  }
+
+  const showApprovalButton = canSubmitForApproval(statusKey);
+  setFormMode('edit', { showApprovalButton });
+  if (projectForm) {
+    projectForm.dataset.submitIntent = 'save';
+  }
+}
+
 // ============================================================================
 function openProjectForm(mode, detail = null) {
   projectForm.reset();
@@ -1004,6 +1192,10 @@ function openProjectForm(mode, detail = null) {
   resetValidationState();
   projectForm.dataset.mode = mode;
   projectForm.dataset.projectId = detail?.project?.Id || '';
+  projectForm.dataset.submitIntent = 'save';
+
+  currentFormMode = null;
+  setFormMode('edit', { showApprovalButton: true });
 
   updateInvestmentLevelField();
 
@@ -1030,6 +1222,9 @@ function openProjectForm(mode, detail = null) {
   } else if (detail) {
     fillFormWithProject(detail);
   }
+
+  const statusKey = detail?.project?.status || statusField.value || 'Rascunho';
+  applyStatusBehavior(statusKey);
 
   updateSimplePepYears();
   overlay.classList.remove('hidden');
@@ -1154,6 +1349,10 @@ function openSummaryOverlay(triggerButton = null) {
   }
 
   summaryTriggerButton = triggerButton || null;
+  if (summaryConfirmBtn) {
+    const intent = projectForm.dataset.submitIntent || 'save';
+    summaryConfirmBtn.textContent = intent === 'approval' ? 'Enviar para Aprovação' : 'Confirmar';
+  }
   populateSummaryOverlay();
   summaryOverlay.classList.remove('hidden');
   summaryOverlay.scrollTop = 0;
@@ -1190,10 +1389,11 @@ function handleSummaryConfirm() {
 
 function populateSummaryOverlay() {
   if (!summarySections) return;
+  populateSummaryContent({ context: defaultSummaryContext, refreshGantt: true });
+}
 
-  summarySections.innerHTML = '';
-
-  const sections = [
+function getSummarySectionsData() {
+  return [
     {
       title: 'Sobre o Projeto',
       entries: [
@@ -1245,16 +1445,27 @@ function populateSummaryOverlay() {
       ]
     }
   ];
+}
 
-  sections.forEach((section) => createSummarySection(section.title, section.entries));
+function populateSummaryContent(options = {}) {
+  const { context = defaultSummaryContext, refreshGantt = false } = options;
+  const sections = context?.sections;
+  if (!sections) return;
 
-  renderPepSummary();
-  renderMilestoneSummary();
-  populateSummaryGantt({ refreshFirst: true });
+  withSummaryContext(context, () => {
+    clearSummaryContent(context);
+    getSummarySectionsData().forEach((section) => {
+      createSummarySection(section.title, section.entries);
+    });
+    renderPepSummary();
+    renderMilestoneSummary();
+    populateSummaryGantt({ refreshFirst: refreshGantt });
+  });
 }
 
 function createSummarySection(title, entries = []) {
-  if (!summarySections || !entries.length) return;
+  const sections = activeSummaryContext?.sections;
+  if (!sections || !entries.length) return;
 
   const section = document.createElement('section');
   section.className = 'summary-section';
@@ -1288,12 +1499,13 @@ function createSummarySection(title, entries = []) {
 
   if (list.children.length) {
     section.appendChild(list);
-    summarySections.appendChild(section);
+    sections.appendChild(section);
   }
 }
 
 function renderPepSummary() {
-  if (!summarySections) return;
+  const sections = activeSummaryContext?.sections;
+  if (!sections) return;
   if (!simplePepList || !milestoneList) return;
 
   const rows = [];
@@ -1396,11 +1608,12 @@ function renderPepSummary() {
 
   table.appendChild(tbody);
   section.appendChild(table);
-  summarySections.appendChild(section);
+  sections.appendChild(section);
 }
 
 function renderMilestoneSummary() {
-  if (!summarySections || !milestoneList) return;
+  const sections = activeSummaryContext?.sections;
+  if (!sections || !milestoneList) return;
   if (keyProjectSection.classList.contains('hidden')) return;
 
   const milestones = milestoneList.querySelectorAll('.milestone');
@@ -1488,12 +1701,15 @@ function renderMilestoneSummary() {
   });
 
   section.appendChild(wrapper);
-  summarySections.appendChild(section);
+  sections.appendChild(section);
 }
 
 function populateSummaryGantt(options = {}) {
   const { refreshFirst = false } = options;
-  if (!summaryGanttSection || !summaryGanttChart) return;
+  const context = activeSummaryContext;
+  const ganttSection = context?.ganttSection;
+  const ganttChart = context?.ganttChart;
+  if (!ganttSection || !ganttChart) return;
 
   if (refreshFirst) {
     refreshGantt();
@@ -1502,16 +1718,16 @@ function populateSummaryGantt(options = {}) {
   }
 
   if (keyProjectSection.classList.contains('hidden')) {
-    summaryGanttSection.classList.add('hidden');
-    summaryGanttChart.innerHTML = '';
+    ganttSection.classList.add('hidden');
+    ganttChart.innerHTML = '';
     return;
   }
 
   const drawSummary = () =>
     drawGantt(collectMilestonesForGantt(), {
-      container: summaryGanttSection,
-      chartElement: summaryGanttChart,
-      titleElement: summaryGanttSection.querySelector('h3'),
+      container: ganttSection,
+      chartElement: ganttChart,
+      titleElement: ganttSection.querySelector('h3'),
       emptyMessage: 'Nenhuma atividade para exibir'
     });
 
@@ -1523,8 +1739,8 @@ function populateSummaryGantt(options = {}) {
     initGantt();
     google.charts.setOnLoadCallback(drawSummary);
   } else {
-    summaryGanttSection.classList.remove('hidden');
-    summaryGanttChart.innerHTML = '<p class="gantt-empty">Nenhuma atividade para exibir</p>';
+    ganttSection.classList.remove('hidden');
+    ganttChart.innerHTML = '<p class="gantt-empty">Nenhuma atividade para exibir</p>';
   }
 }
 
@@ -2531,20 +2747,22 @@ async function handleFormSubmit(event) {
   event.preventDefault();
   const mode = projectForm.dataset.mode;
   const projectId = projectForm.dataset.projectId;
+  const submitIntent = projectForm.dataset.submitIntent || 'save';
+  const isApproval = submitIntent === 'approval';
 
   const validation = runFormValidations({ scrollOnError: true, focusFirstError: true });
   if (!validation.valid) {
     return;
   }
 
-  const normalizedStatus = 'Rascunho';
+  const normalizedStatus = isApproval ? 'Em Aprovação' : 'Rascunho';
   statusField.value = normalizedStatus;
 
   const payload = collectProjectData();
   payload.status = normalizedStatus;
 
   scrollFormToTop();
-  showStatus('Salvando…', { type: 'info' });
+  showStatus(isApproval ? 'Enviando para aprovação…' : 'Salvando…', { type: 'info' });
 
   try {
     let savedProjectId = projectId;
@@ -2581,7 +2799,7 @@ async function handleFormSubmit(event) {
       }
     }
 
-    showStatus('Projeto salvo com sucesso!', { type: 'success' });
+    showStatus(isApproval ? 'Projeto enviado para aprovação!' : 'Projeto salvo com sucesso!', { type: 'success' });
     await loadProjects();
     if (savedProjectId) {
       await selectProject(Number(savedProjectId));
@@ -2602,6 +2820,8 @@ async function handleFormSubmit(event) {
       ],
       { tone: 'error', title: statusMessage }
     );
+  } finally {
+    projectForm.dataset.submitIntent = 'save';
   }
 }
 
