@@ -3579,6 +3579,13 @@ function updateSimplePepYears() {
  * Garante ao menos uma linha de PEP simples pronta para preenchimento.
  */
 function ensureSimplePepRow() {
+  if (!simplePepList) return;
+  if (simplePepSection?.classList?.contains('hidden')) {
+    return;
+  }
+  if (keyProjectSection && !keyProjectSection.classList.contains('hidden')) {
+    return;
+  }
   const row = createSimplePepRow({ year: parseInt(approvalYearInput.value, 10) || '' });
   simplePepList.append(row);
 }
