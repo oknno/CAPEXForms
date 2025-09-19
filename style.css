@@ -863,6 +863,12 @@ p {
   width: 100%;
 }
 
+.field-control > input,
+.field-control > select,
+.field-control > textarea {
+  width: 100%;
+}
+
 .field-group.has-error {
   gap: 10px;
 }
