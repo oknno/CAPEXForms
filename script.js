@@ -2124,7 +2124,7 @@ function updateBudgetSections(options = {}) {
     if (!preserve) {
       milestoneList.innerHTML = '';
     }
-    if (!simplePepList.children.length) {
+    if (!simplePepList.children.length && !preserve) {
       ensureSimplePepRow();
     }
   }
