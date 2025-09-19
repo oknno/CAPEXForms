@@ -436,7 +436,7 @@ function collectMilestonesForGantt() {
       const fim = activityEl.querySelector('.activity-end')?.value || null;
       const anual = [];
       const ano = parseNumber(activityEl.querySelector('.activity-pep-year')?.value);
-      const amountRaw = parseFloat(activityEl.querySelector('.activity-pep-amount')?.value);
+      const amountRaw = parseNumericInputValue(activityEl.querySelector('.activity-pep-amount'));
       const amount = Number.isFinite(amountRaw) ? amountRaw : 0;
       const descricao = activityEl.querySelector('.activity-pep-title')?.value.trim() || '';
 
@@ -1299,7 +1299,7 @@ function fillFormWithProject(detail) {
   document.getElementById('startDate').value = project.startDate ? project.startDate.substring(0, 10) : '';
   document.getElementById('endDate').value = project.endDate ? project.endDate.substring(0, 10) : '';
 
-  document.getElementById('projectBudget').value = project.budgetBrl ?? '';
+  document.getElementById('projectBudget').value = sanitizeNumericInputValue(project.budgetBrl);
   updateInvestmentLevelField();
   document.getElementById('fundingSource').value = project.fundingSource || '';
   const selectedCompany = project.company || '';
@@ -2091,8 +2091,8 @@ function handleOverlayEscape(event) {
 
 function updateBudgetSections(options = {}) {
   const { preserve = false, clear = false } = options;
-  const value = parseFloat(projectBudgetInput.value.replace(',', '.'));
-  const isNumber = !Number.isNaN(value) && Number.isFinite(value);
+  const value = getProjectBudgetValue();
+  const isNumber = Number.isFinite(value);
   setSectionInteractive(simplePepSection, false);
   setSectionInteractive(keyProjectSection, false);
 
@@ -2337,15 +2337,100 @@ function rememberFieldPreviousValue(element) {
   element.dataset.previousValue = element.value ?? '';
 }
 
+function normalizeNumericString(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value.toString() : '';
+  }
+
+  let text = String(value).trim();
+  if (!text) {
+    return '';
+  }
+
+  let sanitized = text.replace(/\s+/g, '');
+  let sign = '';
+  if (sanitized.startsWith('-')) {
+    sign = '-';
+    sanitized = sanitized.slice(1);
+  }
+
+  sanitized = sanitized.replace(/[^0-9.,]/g, '');
+  if (!sanitized) {
+    return '';
+  }
+
+  const separators = sanitized.match(/[.,]/g) || [];
+  const uniqueSeparators = new Set(separators);
+  const lastComma = sanitized.lastIndexOf(',');
+  const lastDot = sanitized.lastIndexOf('.');
+  let decimalIndex = Math.max(lastComma, lastDot);
+  let decimalSeparator = decimalIndex >= 0 ? sanitized[decimalIndex] : null;
+  let integerPart = sanitized;
+  let fractionalPart = '';
+
+  if (decimalSeparator) {
+    integerPart = sanitized.slice(0, decimalIndex);
+    fractionalPart = sanitized.slice(decimalIndex + 1);
+
+    if (
+      fractionalPart.length > 2 &&
+      separators.length > 1 &&
+      uniqueSeparators.size === 1
+    ) {
+      decimalSeparator = null;
+      integerPart = sanitized;
+      fractionalPart = '';
+    }
+  }
+
+  integerPart = integerPart.replace(/[.,]/g, '');
+  if (!integerPart) {
+    integerPart = '0';
+  }
+
+  if (!decimalSeparator) {
+    return sign + integerPart;
+  }
+
+  fractionalPart = fractionalPart.replace(/[.,]/g, '');
+  if (!fractionalPart) {
+    return sign + integerPart;
+  }
+
+  return `${sign}${integerPart}.${fractionalPart}`;
+}
+
+function coerceNumericValue(value) {
+  const normalized = normalizeNumericString(value);
+  if (!normalized) {
+    return NaN;
+  }
+  const number = Number.parseFloat(normalized);
+  return Number.isFinite(number) ? number : NaN;
+}
+
+function sanitizeNumericInputValue(value) {
+  const number = coerceNumericValue(value);
+  return Number.isFinite(number) ? number.toString() : '';
+}
+
 function parseNumericInputValue(source) {
   if (!source) return 0;
-  const rawValue = typeof source === 'string' ? source : source.value;
-  if (rawValue === undefined || rawValue === null || rawValue === '') {
-    return 0;
+
+  if (typeof source === 'object' && source !== null) {
+    if (typeof source.valueAsNumber === 'number' && !Number.isNaN(source.valueAsNumber)) {
+      return source.valueAsNumber;
+    }
+    const numericValue = coerceNumericValue(source.value);
+    return Number.isFinite(numericValue) ? numericValue : 0;
   }
-  const normalized = String(rawValue).replace(',', '.');
-  const number = Number.parseFloat(normalized);
-  return Number.isFinite(number) ? number : 0;
+
+  const numericValue = coerceNumericValue(source);
+  return Number.isFinite(numericValue) ? numericValue : 0;
 }
 
 function determineInvestmentLevel(budgetBrl) {
@@ -2903,7 +2988,7 @@ function createSimplePepRow({ id = '', title = '', amount = '', year = '' } = {}
   const row = fragment.querySelector('.pep-row');
   row.dataset.pepId = id;
   row.querySelector('.pep-title').value = title || '';
-  row.querySelector('.pep-amount').value = amount ?? '';
+  row.querySelector('.pep-amount').value = sanitizeNumericInputValue(amount);
   row.querySelector('.pep-year').value = year ?? '';
   return row;
 }
@@ -2931,7 +3016,7 @@ function addActivityBlock(milestoneElement, data = {}) {
 
   activity.querySelector('.activity-title').value = data.title || '';
   if (amountInput) {
-    amountInput.value = data.pepAmount ?? '';
+    amountInput.value = sanitizeNumericInputValue(data.pepAmount);
   }
   if (startInput) {
     startInput.value = data.start ? data.start.substring(0, 10) : '';
@@ -3141,7 +3226,7 @@ async function persistSimplePeps(projectId, approvalYear) {
   for (const row of simplePepList.querySelectorAll('.pep-row')) {
     const id = row.dataset.pepId;
     const title = row.querySelector('.pep-title').value.trim();
-    const amount = parseFloat(row.querySelector('.pep-amount').value) || 0;
+    const amount = parseNumericInputValue(row.querySelector('.pep-amount')) || 0;
     const year = parseNumber(row.querySelector('.pep-year').value) || approvalYear;
     const payload = {
       Title: title,
@@ -3215,7 +3300,7 @@ async function persistKeyProjects(projectId) {
       activityIds.add(Number(activityId));
 
       const pepTitle = activity.querySelector('.activity-pep-title')?.value.trim() || '';
-      const pepAmount = parseFloat(activity.querySelector('.activity-pep-amount')?.value) || 0;
+      const pepAmount = parseNumericInputValue(activity.querySelector('.activity-pep-amount')) || 0;
       const pepYearInput = activity.querySelector('.activity-pep-year');
       let pepYear = parseNumber(pepYearInput?.value);
       if (!pepYear) {
