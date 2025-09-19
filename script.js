@@ -43,8 +43,9 @@ async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
   if (!listName) throw new Error('Lista SharePoint não informada.');
   if (!itemId) throw new Error('ID do item inválido para anexar arquivo.');
 
-  const { overwrite = false, contentType = 'application/json' } = options;
-  const rawFileName = fileName || `resumo_${itemId}.json`;
+  // 👉 força sempre extensão .json e content-type correto
+  const { overwrite = false } = options;
+  const rawFileName = fileName?.endsWith(".json") ? fileName : `resumo_${itemId}.json`;
   const sanitizedFileName = this.sanitizeFileName(rawFileName);
   const encodedFileName = encodeURIComponent(sanitizedFileName);
 
@@ -62,11 +63,17 @@ async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
     }
   }
 
+  // 🔑 Sempre serializa objeto para JSON formatado
+  let bodyContent = fileContent;
+  if (typeof fileContent === 'object' && !(fileContent instanceof Blob)) {
+    bodyContent = JSON.stringify(fileContent, null, 2);
+  }
+
   const digest = await this.getFormDigest();
   const headers = {
     Accept: 'application/json;odata=verbose',
     'X-RequestDigest': digest,
-    'Content-Type': contentType
+    'Content-Type': 'application/json'
   };
 
   const url = this.buildUrl(
@@ -74,9 +81,9 @@ async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
     `/items(${itemId})/AttachmentFiles/add(FileName='${encodedFileName}')`
   );
 
-  const body = fileContent instanceof Blob
-    ? fileContent
-    : new Blob([fileContent], { type: contentType });
+  const body = bodyContent instanceof Blob
+    ? bodyContent
+    : new Blob([bodyContent], { type: 'application/json' });
 
   console.log("🔎 Salvando anexo em:", url, "Arquivo:", sanitizedFileName);
 
