@@ -3705,8 +3705,6 @@ function showStatus(message, options = {}) {
   formStatus.classList.add(`feedback--${tone}`);
 }
 
-}
-
 function parseNumber(value) {
   const number = parseInt(value, 10);
   return Number.isFinite(number) ? number : null;
