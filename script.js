@@ -1881,7 +1881,10 @@ function fillFormWithProject(detail) {
       });
       const relatedActivities = activities.filter((act) => act.milestonesIdId === milestone.Id);
       relatedActivities.forEach((activity) => {
-        const relatedPeps = activityPeps.filter((pep) => pep.activitiesId === activity.Id);
+        const actId = Number(activity.Id);
+        const relatedPeps = activityPeps.filter(
+          (pep) => Number(pep.activitiesIdId ?? pep.activitiesId) === actId
+        );
         const primaryPep = relatedPeps[0] || null;
         const activityBlock = addActivityBlock(block, {
           id: activity.Id,
