@@ -1856,20 +1856,41 @@ function buildSummaryAttachmentFileName(projectId) {
   return `${baseName}.pdf`;
 }
 
-async function generateSummaryPdfBlob() {
-  const summaryElement = document.getElementById('summaryOverlay');
-  if (!summaryElement) {
+async function generateSummaryPdfBlob(element) {
+  if (!element) {
     throw new Error('Resumo do projeto não está disponível para gerar o PDF.');
   }
 
-  const html2canvas = window.html2canvas;
-  if (!html2canvas) {
-    throw new Error('Biblioteca html2canvas não foi carregada.');
+  if (!window.html2canvas || !window.jspdf || typeof window.jspdf.jsPDF !== 'function') {
+    throw new Error('Bibliotecas necessárias (html2canvas/jsPDF) não foram carregadas corretamente.');
   }
 
-  const jsPDFConstructor = window.jspdf?.jsPDF;
-  if (!jsPDFConstructor) {
-    throw new Error('Biblioteca jsPDF não foi carregada.');
+  const canvas = await window.html2canvas(element, {
+    scale: Math.max(window.devicePixelRatio || 1, 2),
+    backgroundColor: '#ffffff',
+    useCORS: true,
+    logging: false
+  });
+
+  const imgData = canvas.toDataURL('image/png');
+  const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
+  const imgProps = pdf.getImageProperties(imgData);
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+  pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+  return pdf.output('blob');
+}
+
+async function saveSummaryPdfAttachment(projectId) {
+  const id = Number(projectId);
+  if (!Number.isFinite(id)) {
+    throw new Error('ID do projeto inválido para gerar o PDF.');
+  }
+
+  const summaryElement = document.getElementById('summaryOverlay');
+  if (!summaryElement) {
+    throw new Error('Resumo do projeto não está disponível para gerar o PDF.');
   }
 
   const summaryWasHidden = summaryElement.classList.contains('hidden');
@@ -1900,33 +1921,17 @@ async function generateSummaryPdfBlob() {
     }
 
     summaryElement.scrollTop = 0;
-
-    const canvas = await html2canvas(summaryElement, {
-      scale: Math.max(window.devicePixelRatio || 1, 2),
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false
-    });
+    const pdfBlob = await generateSummaryPdfBlob(summaryElement);
 
     if (summaryWasHidden) {
       summaryElement.style.opacity = '0';
     }
 
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDFConstructor('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgProps = pdf.getImageProperties(imgData);
-    const margin = 10;
-    const maxWidth = pageWidth - margin * 2;
-    const maxHeight = pageHeight - margin * 2;
-    const ratio = Math.min(maxWidth / imgProps.width, maxHeight / imgProps.height);
-    const pdfWidth = imgProps.width * ratio;
-    const pdfHeight = imgProps.height * ratio;
-    const offsetX = (pageWidth - pdfWidth) / 2;
-    const offsetY = (pageHeight - pdfHeight) / 2;
-    pdf.addImage(imgData, 'PNG', offsetX, offsetY, pdfWidth, pdfHeight);
-    return pdf.output('blob');
+    const fileName = buildSummaryAttachmentFileName(id);
+    await sp.addAttachment(SUMMARY_ATTACHMENT_LIST, id, fileName, pdfBlob, {
+      overwrite: OVERWRITE_SUMMARY_ATTACHMENT,
+      contentType: 'application/pdf'
+    });
   } finally {
     summaryElement.scrollTop = previousScrollTop;
 
@@ -1938,20 +1943,6 @@ async function generateSummaryPdfBlob() {
       clearSummaryContent(captureContext);
     }
   }
-}
-
-async function saveSummaryPdfAttachment(projectId) {
-  const id = Number(projectId);
-  if (!Number.isFinite(id)) {
-    throw new Error('ID do projeto inválido para gerar o PDF.');
-  }
-
-  const pdfBlob = await generateSummaryPdfBlob();
-  const fileName = buildSummaryAttachmentFileName(id);
-  await sp.addAttachment(SUMMARY_ATTACHMENT_LIST, id, fileName, pdfBlob, {
-    overwrite: OVERWRITE_SUMMARY_ATTACHMENT,
-    contentType: 'application/pdf'
-  });
 }
 
 function buildActivityPeriod(activity) {
@@ -3076,7 +3067,10 @@ async function handleFormSubmit(event) {
     }
 
     await persistRelatedRecords(resolvedId, payload);
-    await saveSummaryPdfAttachment(resolvedId);
+
+    if (isApproval) {
+      await saveSummaryPdfAttachment(resolvedId);
+    }
 
     if (resolvedId) {
       updateProjectState(resolvedId, {
