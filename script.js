@@ -196,23 +196,6 @@ const DATE_RANGE_ERROR_MESSAGE = 'A data de término não pode ser anterior à d
 const SITE_URL = window.SHAREPOINT_SITE_URL || 'https://arcelormittal.sharepoint.com/sites/controladorialongos/capex';
 const sp = new SharePointService("https://arcelormittal.sharepoint.com/sites/controladorialongos/capex");
 
-const ATTACHMENT_MODES = Object.freeze({
-  OVERWRITE: 'overwrite',
-  HISTORY: 'history'
-});
-
-const SUMMARY_ATTACHMENT_MODE = (() => {
-  const rawMode = (window.CAPEX_SUMMARY_ATTACHMENT_MODE || ATTACHMENT_MODES.OVERWRITE)
-    .toString()
-    .toLowerCase();
-  return Object.values(ATTACHMENT_MODES).includes(rawMode)
-    ? rawMode
-    : ATTACHMENT_MODES.OVERWRITE;
-})();
-
-const SUMMARY_ATTACHMENT_LIST = 'Projects';
-const SUMMARY_ATTACHMENT_PREFIX = 'Resumo';
-
 const state = {
   projects: [],
   selectedProjectId: null,
@@ -317,8 +300,6 @@ const activityTemplate = document.getElementById('activityTemplate');
 
 const READ_ONLY_STATUSES = new Set(['Aprovado', 'Em Aprovação']);
 const APPROVAL_ALLOWED_STATUSES = new Set(['Rascunho', 'Reprovado', 'Reprovado para Revisão']);
-const OVERWRITE_SUMMARY_ATTACHMENT = SUMMARY_ATTACHMENT_MODE === ATTACHMENT_MODES.OVERWRITE;
-
 const defaultSummaryContext = {
   sections: summarySections,
   ganttSection: summaryGanttSection,
@@ -1837,55 +1818,9 @@ async function waitForSummaryRender(context, options = {}) {
   await new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
-function formatTimestampForFile(date = new Date()) {
-  const pad = (value) => String(value).padStart(2, '0');
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-  const seconds = pad(date.getSeconds());
-  return `${year}${month}${day}_${hours}${minutes}${seconds}`;
-}
-
-function buildSummaryAttachmentFileName(projectId) {
-  const baseName = `${SUMMARY_ATTACHMENT_PREFIX}_${projectId}`;
-  if (SUMMARY_ATTACHMENT_MODE === ATTACHMENT_MODES.HISTORY) {
-    return `${baseName}_${formatTimestampForFile()}.pdf`;
-  }
-  return `${baseName}.pdf`;
-}
-
-async function generateSummaryPdfBlob(element) {
-  if (!element) {
-    throw new Error('Resumo do projeto não está disponível para gerar o PDF.');
-  }
-
+async function generateSummaryPdfBlob() {
   if (!window.html2canvas || !window.jspdf || typeof window.jspdf.jsPDF !== 'function') {
     throw new Error('Bibliotecas necessárias (html2canvas/jsPDF) não foram carregadas corretamente.');
-  }
-
-  const canvas = await window.html2canvas(element, {
-    scale: Math.max(window.devicePixelRatio || 1, 2),
-    backgroundColor: '#ffffff',
-    useCORS: true,
-    logging: false
-  });
-
-  const imgData = canvas.toDataURL('image/png');
-  const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
-  const imgProps = pdf.getImageProperties(imgData);
-  const pdfWidth = pdf.internal.pageSize.getWidth();
-  const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-  pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-  return pdf.output('blob');
-}
-
-async function saveSummaryPdfAttachment(projectId) {
-  const id = Number(projectId);
-  if (!Number.isFinite(id)) {
-    throw new Error('ID do projeto inválido para gerar o PDF.');
   }
 
   const summaryElement = document.getElementById('summaryOverlay');
@@ -1895,9 +1830,11 @@ async function saveSummaryPdfAttachment(projectId) {
 
   const summaryWasHidden = summaryElement.classList.contains('hidden');
   const previousScrollTop = summaryElement.scrollTop;
-  const previousOpacity = summaryElement.style.opacity;
-  const previousPointerEvents = summaryElement.style.pointerEvents;
-  const previousTransition = summaryElement.style.transition;
+  const previousStyles = {
+    opacity: summaryElement.style.opacity,
+    pointerEvents: summaryElement.style.pointerEvents,
+    transition: summaryElement.style.transition
+  };
 
   const captureContext = {
     ...defaultSummaryContext,
@@ -1917,32 +1854,68 @@ async function saveSummaryPdfAttachment(projectId) {
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
     if (summaryWasHidden) {
-      summaryElement.style.opacity = previousOpacity || '';
+      summaryElement.style.opacity = previousStyles.opacity || '';
     }
 
     summaryElement.scrollTop = 0;
-    const pdfBlob = await generateSummaryPdfBlob(summaryElement);
+
+    const canvas = await window.html2canvas(summaryElement, {
+      scale: Math.max(window.devicePixelRatio || 1, 2),
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, 'PNG', 0, position, pageWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      position -= pageHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, pageWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
 
     if (summaryWasHidden) {
       summaryElement.style.opacity = '0';
     }
 
-    const fileName = buildSummaryAttachmentFileName(id);
-    await sp.addAttachment(SUMMARY_ATTACHMENT_LIST, id, fileName, pdfBlob, {
-      overwrite: OVERWRITE_SUMMARY_ATTACHMENT,
-      contentType: 'application/pdf'
-    });
+    return pdf.output('blob');
   } finally {
     summaryElement.scrollTop = previousScrollTop;
 
     if (summaryWasHidden) {
-      summaryElement.style.opacity = previousOpacity || '';
-      summaryElement.style.pointerEvents = previousPointerEvents || '';
-      summaryElement.style.transition = previousTransition || '';
+      summaryElement.style.opacity = previousStyles.opacity || '';
+      summaryElement.style.pointerEvents = previousStyles.pointerEvents || '';
+      summaryElement.style.transition = previousStyles.transition || '';
       summaryElement.classList.add('hidden');
       clearSummaryContent(captureContext);
     }
   }
+}
+
+async function saveSummaryPdfAttachment(projectId, blob) {
+  const id = Number(projectId);
+  if (!Number.isFinite(id)) {
+    throw new Error('ID do projeto inválido para anexar o PDF.');
+  }
+  if (!(blob instanceof Blob)) {
+    throw new Error('PDF inválido para salvar como anexo.');
+  }
+
+  const arrayBuffer = await blob.arrayBuffer();
+  await sp.addAttachment('Projects', id, 'ResumoProjeto.pdf', arrayBuffer, {
+    contentType: 'application/pdf'
+  });
 }
 
 function buildActivityPeriod(activity) {
@@ -3069,7 +3042,8 @@ async function handleFormSubmit(event) {
     await persistRelatedRecords(resolvedId, payload);
 
     if (isApproval) {
-      await saveSummaryPdfAttachment(resolvedId);
+      const pdfBlob = await generateSummaryPdfBlob();
+      await saveSummaryPdfAttachment(resolvedId, pdfBlob);
     }
 
     if (resolvedId) {
