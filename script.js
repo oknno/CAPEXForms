@@ -23,12 +23,17 @@ class SharePointService {
       return '';
     }
     const normalized = fileName.normalize ? fileName.normalize('NFKC') : fileName;
-    const withoutControl = normalized.replace(/[\u0000-\u001f\u007f]/g, '');
-    const cleaned = withoutControl.replace(/[\\/:*?"<>|]/g, '_').trim();
-    if (!cleaned) {
+    const trimmed = normalized.trim();
+    if (!trimmed) {
       return '';
     }
-    return cleaned.replace(/'/g, "''");
+    const withoutControl = trimmed.replace(/[\u0000-\u001f\u007f]/g, '');
+    const replacedInvalid = withoutControl.replace(/[\\/:*?"<>|]/g, '_');
+    const collapsedSpaces = replacedInvalid.replace(/\s+/g, ' ').trim();
+    if (!collapsedSpaces) {
+      return '';
+    }
+    return collapsedSpaces.replace(/'/g, "''");
   }
 
   async request(url, options = {}) {
@@ -3171,10 +3176,12 @@ async function handleFormSubmit(event) {
       const jsonContent = JSON.stringify(approvalSummary, null, 2);
       const jsonBlob = new Blob([jsonContent], { type: 'application/json' });
 
-      await sp.addAttachment('Projects', resolvedId, 'resumo.txt', jsonBlob, {
-        overwrite: true,
-        contentType: 'application/json'
-      });
+      const attachmentOptions = {
+        contentType: 'application/json',
+        ...(mode !== 'create' ? { overwrite: true } : {})
+      };
+
+      await sp.addAttachment('Projects', resolvedId, 'resumo.txt', jsonBlob, attachmentOptions);
 
       await sp.updateItem('Projects', resolvedId, { status: PROJECT_STATUSES.IN_APPROVAL });
     }
