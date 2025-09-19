@@ -579,6 +579,41 @@ p {
   padding-right: 8px;
 }
 
+.summary-panel--capture {
+  position: fixed;
+  left: -1200px;
+  top: 0;
+  width: 960px;
+  max-width: 960px;
+  background: #fff;
+  border-radius: 20px;
+  padding: 32px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  pointer-events: none;
+  z-index: -1;
+  color: #1f1f3d;
+}
+
+.summary-panel--capture .summary-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary-panel--capture .summary-subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.summary-panel--capture .summary-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
 .summary-sections {
   display: flex;
   flex-direction: column;

@@ -17,17 +17,90 @@ class SharePointService {
     return `${this.siteUrl}/_api/web/lists/getbytitle('${listName}')${path}`;
   }
 
+  sanitizeFileName(fileName) {
+    if (typeof fileName !== 'string') {
+      return '';
+    }
+    return fileName.replace(/'/g, "''");
+  }
+
   async request(url, options = {}) {
     const response = await fetch(url, options);
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(text || response.statusText);
+      const error = new Error(text || response.statusText);
+      error.status = response.status;
+      throw error;
     }
     if (response.status === 204) {
       return null;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
+  }
+
+  async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
+    if (!listName) {
+      throw new Error('Lista SharePoint não informada.');
+    }
+    if (!itemId) {
+      throw new Error('ID do item inválido para anexar arquivo.');
+    }
+
+    const { overwrite = false, contentType = 'application/octet-stream' } = options;
+    const normalizedFileName = this.sanitizeFileName(fileName || 'anexo.pdf');
+
+    if (overwrite) {
+      try {
+        await this.deleteAttachment(listName, itemId, normalizedFileName);
+      } catch (error) {
+        if (error?.status !== 404) {
+          throw error;
+        }
+      }
+    }
+
+    const digest = await this.getFormDigest();
+    const headers = {
+      Accept: 'application/json;odata=verbose',
+      'X-RequestDigest': digest,
+      'Content-Type': contentType
+    };
+    const url = this.buildUrl(
+      listName,
+      `/items(${itemId})/AttachmentFiles/add(FileName='${normalizedFileName}')`
+    );
+
+    const body = fileContent instanceof Blob
+      ? fileContent
+      : new Blob([fileContent], { type: contentType });
+
+    await this.request(url, { method: 'POST', headers, body });
+    return true;
+  }
+
+  async deleteAttachment(listName, itemId, fileName) {
+    if (!listName) {
+      throw new Error('Lista SharePoint não informada.');
+    }
+    if (!itemId) {
+      throw new Error('ID do item inválido para remover anexo.');
+    }
+
+    const digest = await this.getFormDigest();
+    const headers = {
+      Accept: 'application/json;odata=verbose',
+      'X-RequestDigest': digest,
+      'IF-MATCH': '*',
+      'X-HTTP-Method': 'DELETE'
+    };
+    const sanitizedName = this.sanitizeFileName(fileName || '');
+    const url = this.buildUrl(
+      listName,
+      `/items(${itemId})/AttachmentFiles/getByFileName(fileName='${sanitizedName}')`
+    );
+    await this.request(url, { method: 'POST', headers });
+    return true;
   }
 
   async getFormDigest() {
@@ -122,6 +195,23 @@ const DATE_RANGE_ERROR_MESSAGE = 'A data de término não pode ser anterior à d
 
 const SITE_URL = window.SHAREPOINT_SITE_URL || 'https://arcelormittal.sharepoint.com/sites/controladorialongos/capex';
 const sp = new SharePointService("https://arcelormittal.sharepoint.com/sites/controladorialongos/capex");
+
+const ATTACHMENT_MODES = Object.freeze({
+  OVERWRITE: 'overwrite',
+  HISTORY: 'history'
+});
+
+const SUMMARY_ATTACHMENT_MODE = (() => {
+  const rawMode = (window.CAPEX_SUMMARY_ATTACHMENT_MODE || ATTACHMENT_MODES.OVERWRITE)
+    .toString()
+    .toLowerCase();
+  return Object.values(ATTACHMENT_MODES).includes(rawMode)
+    ? rawMode
+    : ATTACHMENT_MODES.OVERWRITE;
+})();
+
+const SUMMARY_ATTACHMENT_LIST = 'Projects';
+const SUMMARY_ATTACHMENT_PREFIX = 'Resumo';
 
 const state = {
   projects: [],
@@ -225,8 +315,9 @@ const simplePepTemplate = document.getElementById('simplePepTemplate');
 const milestoneTemplate = document.getElementById('milestoneTemplate');
 const activityTemplate = document.getElementById('activityTemplate');
 
-const READ_ONLY_STATUSES = new Set(['Aprovado', 'Reprovado', 'Em Aprovação']);
-const APPROVAL_ALLOWED_STATUSES = new Set(['Rascunho', 'Reprovado para Revisão']);
+const READ_ONLY_STATUSES = new Set(['Aprovado', 'Em Aprovação']);
+const APPROVAL_ALLOWED_STATUSES = new Set(['Rascunho', 'Reprovado', 'Reprovado para Revisão']);
+const OVERWRITE_SUMMARY_ATTACHMENT = SUMMARY_ATTACHMENT_MODE === ATTACHMENT_MODES.OVERWRITE;
 
 const defaultSummaryContext = {
   sections: summarySections,
@@ -496,7 +587,7 @@ function drawGantt(milestones, options = {}) {
       titleElement.classList.remove('hidden');
     }
     chartElement.innerHTML = `<p class="gantt-empty">${emptyMessage}</p>`;
-    return { minDate: null, maxDate: null, rowCount: 0 };
+    return { minDate: null, maxDate: null, rowCount: 0, chart: null };
   }
 
   chartElement.innerHTML = '';
@@ -542,7 +633,7 @@ function drawGantt(milestones, options = {}) {
     titleElement.classList.remove('hidden');
   }
 
-  return { minDate, maxDate, rowCount: rows.length };
+  return { minDate, maxDate, rowCount: rows.length, chart };
 }
 
 // ============================================================================
@@ -887,18 +978,18 @@ function renderProjectDetails(detail) {
   const actions = document.createElement('div');
   actions.className = 'project-overview__actions';
 
-  const statusKey = project.status || '';
-  const canEdit = ['Rascunho', 'Reprovado para Revisão'].includes(statusKey);
-  const viewOnlyStatuses = ['Aprovado', 'Reprovado', 'Em Aprovação'];
+  const statusKey = normalizeStatusKey(project.status);
+  const editableStatuses = new Set(['Rascunho', 'Reprovado', 'Reprovado para Revisão']);
+  const viewOnlyStatuses = new Set(['Aprovado', 'Em Aprovação']);
 
-  if (viewOnlyStatuses.includes(statusKey)) {
+  if (viewOnlyStatuses.has(statusKey)) {
     const viewBtn = document.createElement('button');
     viewBtn.type = 'button';
     viewBtn.className = 'btn ghost';
     viewBtn.textContent = 'Visualizar Projeto';
     viewBtn.addEventListener('click', () => openProjectForm('edit', detail));
     actions.append(viewBtn);
-  } else if (canEdit) {
+  } else if (editableStatuses.has(statusKey)) {
     const editBtn = document.createElement('button');
     editBtn.type = 'button';
     editBtn.className = 'btn primary';
@@ -906,13 +997,17 @@ function renderProjectDetails(detail) {
     editBtn.addEventListener('click', () => openProjectForm('edit', detail));
     actions.append(editBtn);
 
-    if (statusKey === 'Rascunho') {
+    if (canSubmitForApproval(statusKey)) {
       const approveBtn = document.createElement('button');
       approveBtn.type = 'button';
       approveBtn.className = 'btn accent';
       approveBtn.textContent = 'Enviar para Aprovação';
       approveBtn.addEventListener('click', () => {
-        sendProjectForApproval(project.Id, approveBtn);
+        openProjectForm('edit', detail);
+        requestAnimationFrame(() => {
+          projectForm.dataset.submitIntent = 'approval';
+          openSummaryOverlay(submitForApprovalBtn || approveBtn);
+        });
       });
       actions.append(approveBtn);
     }
@@ -930,49 +1025,6 @@ function renderProjectDetails(detail) {
   }
 
   projectDetails.append(wrapper);
-}
-
-async function sendProjectForApproval(projectId, triggerButton) {
-  const id = Number(projectId);
-  if (!id) return;
-
-  const button = triggerButton || null;
-  const originalText = button?.textContent;
-
-  if (button) {
-    button.disabled = true;
-    button.textContent = 'Enviando…';
-  }
-
-  try {
-    await sp.updateItem('Projects', id, { status: 'Em Aprovação' });
-    updateProjectState(id, { status: 'Em Aprovação' });
-    renderProjectList();
-
-    if (state.currentDetails?.project?.Id === id) {
-      state.currentDetails = {
-        ...state.currentDetails,
-        project: {
-          ...state.currentDetails.project,
-          status: 'Em Aprovação'
-        }
-      };
-      renderProjectDetails(state.currentDetails);
-    }
-  } catch (error) {
-    console.error('Erro ao enviar projeto para aprovação', error);
-    if (button) {
-      button.disabled = false;
-      button.textContent = originalText || 'Enviar para Aprovação';
-    }
-    window.alert('Não foi possível enviar o projeto para aprovação. Tente novamente.');
-    return;
-  } finally {
-    if (button) {
-      button.disabled = false;
-      button.textContent = originalText || 'Enviar para Aprovação';
-    }
-  }
 }
 
 function createEmptyState() {
@@ -1711,6 +1763,10 @@ function populateSummaryGantt(options = {}) {
   const ganttChart = context?.ganttChart;
   if (!ganttSection || !ganttChart) return;
 
+  if (context) {
+    context.lastGanttResult = undefined;
+  }
+
   if (refreshFirst) {
     refreshGantt();
     requestAnimationFrame(() => populateSummaryGantt());
@@ -1720,16 +1776,28 @@ function populateSummaryGantt(options = {}) {
   if (keyProjectSection.classList.contains('hidden')) {
     ganttSection.classList.add('hidden');
     ganttChart.innerHTML = '';
+    if (context) {
+      context.lastGanttResult = null;
+    }
     return;
   }
 
+  const assignResult = (result) => {
+    if (context) {
+      context.lastGanttResult = result || null;
+    }
+    return result;
+  };
+
   const drawSummary = () =>
-    drawGantt(collectMilestonesForGantt(), {
-      container: ganttSection,
-      chartElement: ganttChart,
-      titleElement: ganttSection.querySelector('h3'),
-      emptyMessage: 'Nenhuma atividade para exibir'
-    });
+    assignResult(
+      drawGantt(collectMilestonesForGantt(), {
+        container: ganttSection,
+        chartElement: ganttChart,
+        titleElement: ganttSection.querySelector('h3'),
+        emptyMessage: 'Nenhuma atividade para exibir'
+      })
+    );
 
   if (ganttReady && window.google?.visualization?.Gantt) {
     drawSummary();
@@ -1741,7 +1809,159 @@ function populateSummaryGantt(options = {}) {
   } else {
     ganttSection.classList.remove('hidden');
     ganttChart.innerHTML = '<p class="gantt-empty">Nenhuma atividade para exibir</p>';
+    if (context) {
+      context.lastGanttResult = null;
+    }
   }
+}
+
+function createSummaryCaptureContext() {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'summary-panel summary-panel--capture';
+  wrapper.setAttribute('aria-hidden', 'true');
+
+  const header = document.createElement('header');
+  header.className = 'summary-header';
+
+  const title = document.createElement('h2');
+  title.textContent = 'Resumo do Projeto';
+
+  const subtitle = document.createElement('p');
+  subtitle.className = 'summary-subtitle';
+  subtitle.textContent = '';
+
+  header.append(title, subtitle);
+
+  const body = document.createElement('div');
+  body.className = 'summary-body';
+
+  const sections = document.createElement('div');
+  sections.className = 'summary-sections';
+
+  const ganttSection = document.createElement('section');
+  ganttSection.className = 'summary-section summary-gantt hidden';
+  const ganttTitle = document.createElement('h3');
+  ganttTitle.textContent = 'Gráfico Gantt';
+  const ganttChart = document.createElement('div');
+  ganttChart.className = 'gantt-chart';
+
+  ganttSection.append(ganttTitle, ganttChart);
+  body.append(sections, ganttSection);
+
+  wrapper.append(header, body);
+
+  return {
+    wrapper,
+    sections,
+    ganttSection,
+    ganttChart,
+    headerTitle: title,
+    headerSubtitle: subtitle,
+    lastGanttResult: undefined
+  };
+}
+
+async function waitForSummaryRender(context, options = {}) {
+  if (!context) return;
+  const { timeout = 2000 } = options;
+  const start = Date.now();
+
+  while (context.lastGanttResult === undefined && Date.now() - start < timeout) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
+  const result = context.lastGanttResult;
+  if (result?.chart && window.google?.visualization?.events) {
+    await new Promise((resolve) => {
+      const listener = google.visualization.events.addListener(result.chart, 'ready', () => {
+        google.visualization.events.removeListener(listener);
+        resolve();
+      });
+    });
+  }
+
+  await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+function formatTimestampForFile(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  const seconds = pad(date.getSeconds());
+  return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+}
+
+function buildSummaryAttachmentFileName(projectId) {
+  const baseName = `${SUMMARY_ATTACHMENT_PREFIX}_${projectId}`;
+  if (SUMMARY_ATTACHMENT_MODE === ATTACHMENT_MODES.HISTORY) {
+    return `${baseName}_${formatTimestampForFile()}.pdf`;
+  }
+  return `${baseName}.pdf`;
+}
+
+async function generateSummaryPdfBlob() {
+  if (!window.html2canvas) {
+    throw new Error('Biblioteca html2canvas não foi carregada.');
+  }
+  if (!window.jspdf?.jsPDF) {
+    throw new Error('Biblioteca jsPDF não foi carregada.');
+  }
+
+  const context = createSummaryCaptureContext();
+  const projectName = document.getElementById('projectName')?.value?.trim() || 'Projeto sem título';
+  const statusValue = statusField?.value || '';
+  const now = new Date();
+
+  context.headerTitle.textContent = `Resumo do Projeto - ${projectName}`;
+  const metadataParts = [];
+  if (statusValue) {
+    metadataParts.push(`Status: ${statusValue}`);
+  }
+  metadataParts.push(`Gerado em ${DATE_FMT.format(now)}`);
+  context.headerSubtitle.textContent = metadataParts.join(' · ');
+
+  document.body.appendChild(context.wrapper);
+
+  try {
+    populateSummaryContent({ context, refreshGantt: true });
+    await waitForSummaryRender(context);
+    const scale = Math.max(window.devicePixelRatio || 1, 2);
+    const canvas = await window.html2canvas(context.wrapper, {
+      scale,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false
+    });
+    const orientation = canvas.width >= canvas.height ? 'landscape' : 'portrait';
+    const pdf = new window.jspdf.jsPDF({
+      orientation,
+      unit: 'px',
+      format: [canvas.width, canvas.height]
+    });
+    const imageData = canvas.toDataURL('image/png');
+    pdf.addImage(imageData, 'PNG', 0, 0, canvas.width, canvas.height);
+    return pdf.output('blob');
+  } finally {
+    clearSummaryContent(context);
+    context.wrapper.remove();
+  }
+}
+
+async function saveSummaryPdfAttachment(projectId) {
+  const id = Number(projectId);
+  if (!Number.isFinite(id)) {
+    throw new Error('ID do projeto inválido para gerar o PDF.');
+  }
+
+  const pdfBlob = await generateSummaryPdfBlob();
+  const fileName = buildSummaryAttachmentFileName(id);
+  await sp.addAttachment(SUMMARY_ATTACHMENT_LIST, id, fileName, pdfBlob, {
+    overwrite: OVERWRITE_SUMMARY_ATTACHMENT,
+    contentType: 'application/pdf'
+  });
 }
 
 function buildActivityPeriod(activity) {
@@ -2764,6 +2984,8 @@ async function handleFormSubmit(event) {
   scrollFormToTop();
   showStatus(isApproval ? 'Enviando para aprovação…' : 'Salvando…', { type: 'info' });
 
+  let resolvedId = Number(projectId) || null;
+
   try {
     let savedProjectId = projectId;
     if (mode === 'create') {
@@ -2773,9 +2995,17 @@ async function handleFormSubmit(event) {
       await sp.updateItem('Projects', Number(projectId), payload);
     }
 
-    await persistRelatedRecords(Number(savedProjectId || projectId), payload);
+    resolvedId = Number(savedProjectId || projectId);
+    if (!Number.isFinite(resolvedId)) {
+      throw new Error('ID do projeto inválido após salvar.');
+    }
 
-    const resolvedId = Number(savedProjectId || projectId);
+    await persistRelatedRecords(resolvedId, payload);
+
+    if (isApproval) {
+      await saveSummaryPdfAttachment(resolvedId);
+    }
+
     if (resolvedId) {
       updateProjectState(resolvedId, {
         Title: payload.Title,
@@ -2799,22 +3029,53 @@ async function handleFormSubmit(event) {
       }
     }
 
-    showStatus(isApproval ? 'Projeto enviado para aprovação!' : 'Projeto salvo com sucesso!', { type: 'success' });
+    const successMessage = isApproval
+      ? 'Projeto enviado para aprovação!'
+      : 'Projeto salvo com sucesso!';
+    showStatus(successMessage, { type: 'success' });
     await loadProjects();
-    if (savedProjectId) {
-      await selectProject(Number(savedProjectId));
+    if (resolvedId) {
+      await selectProject(resolvedId);
     }
     closeForm();
   } catch (error) {
     console.error('Erro ao salvar projeto', error);
+
+    if (isApproval && Number.isFinite(resolvedId)) {
+      try {
+        await sp.updateItem('Projects', resolvedId, { status: 'Rascunho' });
+        updateProjectState(resolvedId, { status: 'Rascunho' });
+        renderProjectList();
+        if (state.currentDetails?.project?.Id === resolvedId) {
+          state.currentDetails = {
+            ...state.currentDetails,
+            project: {
+              ...state.currentDetails.project,
+              status: 'Rascunho'
+            }
+          };
+          renderProjectDetails(state.currentDetails);
+        }
+      } catch (rollbackError) {
+        console.error('Erro ao reverter status após falha no envio', rollbackError);
+      }
+      statusField.value = 'Rascunho';
+    }
+
     scrollFormToTop();
-    const statusMessage = 'Não foi possível salvar. Verifique os erros abaixo.';
+    const statusMessage = isApproval
+      ? 'Não foi possível enviar para aprovação. Verifique os erros abaixo.'
+      : 'Não foi possível salvar. Verifique os erros abaixo.';
     showStatus(statusMessage, { type: 'error' });
     renderErrorSummary(
       [
         {
-          title: 'Erro ao salvar',
-          items: ['Não foi possível salvar o projeto. Verifique os dados e tente novamente.'],
+          title: isApproval ? 'Erro ao enviar para aprovação' : 'Erro ao salvar',
+          items: [
+            isApproval
+              ? 'Não foi possível concluir o envio para aprovação. Verifique os dados, tente novamente ou contate o suporte.'
+              : 'Não foi possível salvar o projeto. Verifique os dados e tente novamente.'
+          ],
           type: 'general'
         }
       ],
