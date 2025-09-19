@@ -1818,6 +1818,113 @@ async function waitForSummaryRender(context, options = {}) {
   await new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
+function temporarilyDisableDefine() {
+  const hadDefine = Object.prototype.hasOwnProperty.call(window, 'define');
+  const previousDefine = window.define;
+  window.define = undefined;
+
+  return () => {
+    if (hadDefine) {
+      window.define = previousDefine;
+    } else {
+      delete window.define;
+    }
+  };
+}
+
+async function prepareGanttChartForPdf(context) {
+  if (!context) {
+    return null;
+  }
+
+  const result = context.lastGanttResult;
+  const chartElement = context.ganttChart;
+  const chart = result?.chart;
+  if (!chartElement || !chart || typeof chart.getImageURI !== 'function') {
+    return null;
+  }
+
+  let imageUri = '';
+  try {
+    imageUri = chart.getImageURI();
+  } catch (error) {
+    console.warn('Não foi possível gerar a imagem do gráfico Gantt para o PDF.', error);
+    return null;
+  }
+
+  if (!imageUri) {
+    return null;
+  }
+
+  const overlayImage = new Image();
+  overlayImage.src = imageUri;
+  overlayImage.alt = 'Gráfico Gantt';
+  overlayImage.setAttribute('aria-hidden', 'true');
+  overlayImage.style.position = 'absolute';
+  overlayImage.style.top = '0';
+  overlayImage.style.left = '0';
+  overlayImage.style.width = '100%';
+  overlayImage.style.height = '100%';
+  overlayImage.style.objectFit = 'contain';
+  overlayImage.style.backgroundColor = '#ffffff';
+  overlayImage.style.pointerEvents = 'none';
+
+  const measuredHeight = Math.max(chartElement.offsetHeight, chartElement.scrollHeight, chartElement.clientHeight, 0);
+  const previousStyles = {
+    position: chartElement.style.position,
+    minHeight: chartElement.style.minHeight,
+    overflow: chartElement.style.overflow
+  };
+
+  const childElements = Array.from(chartElement.children);
+  const previousVisibility = new Map();
+  childElements.forEach((child) => {
+    if (child instanceof HTMLElement) {
+      previousVisibility.set(child, child.style.visibility);
+      child.style.visibility = 'hidden';
+    }
+  });
+
+  const requiresRelativePosition = !previousStyles.position || previousStyles.position === 'static';
+  if (requiresRelativePosition) {
+    chartElement.style.position = 'relative';
+  }
+
+  chartElement.style.overflow = 'hidden';
+  if (!previousStyles.minHeight) {
+    const fallbackHeight = measuredHeight > 0 ? measuredHeight : 240;
+    chartElement.style.minHeight = `${fallbackHeight}px`;
+  }
+
+  chartElement.appendChild(overlayImage);
+
+  await new Promise((resolve) => {
+    if (overlayImage.complete) {
+      resolve();
+    } else {
+      overlayImage.addEventListener('load', resolve, { once: true });
+      overlayImage.addEventListener('error', resolve, { once: true });
+    }
+  });
+
+  return () => {
+    if (overlayImage.parentNode === chartElement) {
+      chartElement.removeChild(overlayImage);
+    }
+
+    childElements.forEach((child) => {
+      if (child instanceof HTMLElement) {
+        const visibility = previousVisibility.get(child);
+        child.style.visibility = visibility || '';
+      }
+    });
+
+    chartElement.style.position = previousStyles.position;
+    chartElement.style.overflow = previousStyles.overflow;
+    chartElement.style.minHeight = previousStyles.minHeight;
+  };
+}
+
 async function generateSummaryPdfBlob() {
   if (!window.html2canvas || !window.jspdf || typeof window.jspdf.jsPDF !== 'function') {
     throw new Error('Bibliotecas necessárias (html2canvas/jsPDF) não foram carregadas corretamente.');
@@ -1848,9 +1955,15 @@ async function generateSummaryPdfBlob() {
     summaryElement.style.transition = 'none';
   }
 
+  let cleanupGantt = null;
+  let shouldRefreshGantt = false;
+
   try {
     populateSummaryContent({ context: captureContext, refreshGantt: true });
     await waitForSummaryRender(captureContext);
+    cleanupGantt = await prepareGanttChartForPdf(captureContext);
+    shouldRefreshGantt = typeof cleanupGantt === 'function' && !summaryWasHidden;
+
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
     if (summaryWasHidden) {
@@ -1859,12 +1972,18 @@ async function generateSummaryPdfBlob() {
 
     summaryElement.scrollTop = 0;
 
-    const canvas = await window.html2canvas(summaryElement, {
-      scale: Math.max(window.devicePixelRatio || 1, 2),
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false
-    });
+    const restoreDefine = temporarilyDisableDefine();
+    let canvas;
+    try {
+      canvas = await window.html2canvas(summaryElement, {
+        scale: Math.max(window.devicePixelRatio || 1, 2),
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false
+      });
+    } finally {
+      restoreDefine();
+    }
 
     const imgData = canvas.toDataURL('image/png');
     const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
@@ -1891,6 +2010,13 @@ async function generateSummaryPdfBlob() {
 
     return pdf.output('blob');
   } finally {
+    if (typeof cleanupGantt === 'function') {
+      cleanupGantt();
+      if (shouldRefreshGantt) {
+        requestAnimationFrame(() => populateSummaryGantt({ refreshFirst: true }));
+      }
+    }
+
     summaryElement.scrollTop = previousScrollTop;
 
     if (summaryWasHidden) {
