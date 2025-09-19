@@ -97,7 +97,7 @@ class SharePointService {
     const sanitizedName = this.sanitizeFileName(fileName || '');
     const url = this.buildUrl(
       listName,
-      `/items(${itemId})/AttachmentFiles/getByFileName(fileName='${sanitizedName}')`
+      `/items(${itemId})/AttachmentFiles/getByFileName('${sanitizedName}')`
     );
     await this.request(url, { method: 'POST', headers });
     return true;
