@@ -95,9 +95,10 @@ class SharePointService {
       'X-HTTP-Method': 'DELETE'
     };
     const sanitizedName = this.sanitizeFileName(fileName || '');
+    const encodedName = encodeURIComponent(sanitizedName);
     const url = this.buildUrl(
       listName,
-      `/items(${itemId})/AttachmentFiles/getByFileName('${sanitizedName}')`
+      `/items(${itemId})/AttachmentFiles/getByFileName('${encodedName}')`
     );
     await this.request(url, { method: 'POST', headers });
     return true;
