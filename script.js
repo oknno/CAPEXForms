@@ -1818,232 +1818,6 @@ async function waitForSummaryRender(context, options = {}) {
   await new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
-function temporarilyDisableDefine() {
-  const hadDefine = Object.prototype.hasOwnProperty.call(window, 'define');
-  const previousDefine = window.define;
-  window.define = undefined;
-
-  return () => {
-    if (hadDefine) {
-      window.define = previousDefine;
-    } else {
-      delete window.define;
-    }
-  };
-}
-
-async function prepareGanttChartForPdf(context) {
-  if (!context) {
-    return null;
-  }
-
-  const result = context.lastGanttResult;
-  const chartElement = context.ganttChart;
-  const chart = result?.chart;
-  if (!chartElement || !chart || typeof chart.getImageURI !== 'function') {
-    return null;
-  }
-
-  let imageUri = '';
-  try {
-    imageUri = chart.getImageURI();
-  } catch (error) {
-    console.warn('Não foi possível gerar a imagem do gráfico Gantt para o PDF.', error);
-    return null;
-  }
-
-  if (!imageUri) {
-    return null;
-  }
-
-  const overlayImage = new Image();
-  overlayImage.src = imageUri;
-  overlayImage.alt = 'Gráfico Gantt';
-  overlayImage.setAttribute('aria-hidden', 'true');
-  overlayImage.style.position = 'absolute';
-  overlayImage.style.top = '0';
-  overlayImage.style.left = '0';
-  overlayImage.style.width = '100%';
-  overlayImage.style.height = '100%';
-  overlayImage.style.objectFit = 'contain';
-  overlayImage.style.backgroundColor = '#ffffff';
-  overlayImage.style.pointerEvents = 'none';
-
-  const measuredHeight = Math.max(chartElement.offsetHeight, chartElement.scrollHeight, chartElement.clientHeight, 0);
-  const previousStyles = {
-    position: chartElement.style.position,
-    minHeight: chartElement.style.minHeight,
-    overflow: chartElement.style.overflow
-  };
-
-  const childElements = Array.from(chartElement.children);
-  const previousVisibility = new Map();
-  childElements.forEach((child) => {
-    if (child instanceof HTMLElement) {
-      previousVisibility.set(child, child.style.visibility);
-      child.style.visibility = 'hidden';
-    }
-  });
-
-  const requiresRelativePosition = !previousStyles.position || previousStyles.position === 'static';
-  if (requiresRelativePosition) {
-    chartElement.style.position = 'relative';
-  }
-
-  chartElement.style.overflow = 'hidden';
-  if (!previousStyles.minHeight) {
-    const fallbackHeight = measuredHeight > 0 ? measuredHeight : 240;
-    chartElement.style.minHeight = `${fallbackHeight}px`;
-  }
-
-  chartElement.appendChild(overlayImage);
-
-  await new Promise((resolve) => {
-    if (overlayImage.complete) {
-      resolve();
-    } else {
-      overlayImage.addEventListener('load', resolve, { once: true });
-      overlayImage.addEventListener('error', resolve, { once: true });
-    }
-  });
-
-  return () => {
-    if (overlayImage.parentNode === chartElement) {
-      chartElement.removeChild(overlayImage);
-    }
-
-    childElements.forEach((child) => {
-      if (child instanceof HTMLElement) {
-        const visibility = previousVisibility.get(child);
-        child.style.visibility = visibility || '';
-      }
-    });
-
-    chartElement.style.position = previousStyles.position;
-    chartElement.style.overflow = previousStyles.overflow;
-    chartElement.style.minHeight = previousStyles.minHeight;
-  };
-}
-
-async function generateSummaryPdfBlob() {
-  if (!window.html2canvas || !window.jspdf || typeof window.jspdf.jsPDF !== 'function') {
-    throw new Error('Bibliotecas necessárias (html2canvas/jsPDF) não foram carregadas corretamente.');
-  }
-
-  const summaryElement = document.getElementById('summaryOverlay');
-  if (!summaryElement) {
-    throw new Error('Resumo do projeto não está disponível para gerar o PDF.');
-  }
-
-  const summaryWasHidden = summaryElement.classList.contains('hidden');
-  const previousScrollTop = summaryElement.scrollTop;
-  const previousStyles = {
-    opacity: summaryElement.style.opacity,
-    pointerEvents: summaryElement.style.pointerEvents,
-    transition: summaryElement.style.transition
-  };
-
-  const captureContext = {
-    ...defaultSummaryContext,
-    lastGanttResult: undefined
-  };
-
-  if (summaryWasHidden) {
-    summaryElement.classList.remove('hidden');
-    summaryElement.style.opacity = '0';
-    summaryElement.style.pointerEvents = 'none';
-    summaryElement.style.transition = 'none';
-  }
-
-  let cleanupGantt = null;
-  let shouldRefreshGantt = false;
-
-  try {
-    populateSummaryContent({ context: captureContext, refreshGantt: true });
-    await waitForSummaryRender(captureContext);
-    cleanupGantt = await prepareGanttChartForPdf(captureContext);
-    shouldRefreshGantt = typeof cleanupGantt === 'function' && !summaryWasHidden;
-
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-
-    if (summaryWasHidden) {
-      summaryElement.style.opacity = previousStyles.opacity || '';
-    }
-
-    summaryElement.scrollTop = 0;
-
-    const restoreDefine = temporarilyDisableDefine();
-    let canvas;
-    try {
-      canvas = await window.html2canvas(summaryElement, {
-        scale: Math.max(window.devicePixelRatio || 1, 2),
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        logging: false
-      });
-    } finally {
-      restoreDefine();
-    }
-
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgHeight = (canvas.height * pageWidth) / canvas.width;
-
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    pdf.addImage(imgData, 'PNG', 0, position, pageWidth, imgHeight);
-    heightLeft -= pageHeight;
-
-    while (heightLeft > 0) {
-      position -= pageHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, pageWidth, imgHeight);
-      heightLeft -= pageHeight;
-    }
-
-    if (summaryWasHidden) {
-      summaryElement.style.opacity = '0';
-    }
-
-    return pdf.output('blob');
-  } finally {
-    if (typeof cleanupGantt === 'function') {
-      cleanupGantt();
-      if (shouldRefreshGantt) {
-        requestAnimationFrame(() => populateSummaryGantt({ refreshFirst: true }));
-      }
-    }
-
-    summaryElement.scrollTop = previousScrollTop;
-
-    if (summaryWasHidden) {
-      summaryElement.style.opacity = previousStyles.opacity || '';
-      summaryElement.style.pointerEvents = previousStyles.pointerEvents || '';
-      summaryElement.style.transition = previousStyles.transition || '';
-      summaryElement.classList.add('hidden');
-      clearSummaryContent(captureContext);
-    }
-  }
-}
-
-async function saveSummaryPdfAttachment(projectId, blob) {
-  const id = Number(projectId);
-  if (!Number.isFinite(id)) {
-    throw new Error('ID do projeto inválido para anexar o PDF.');
-  }
-  if (!(blob instanceof Blob)) {
-    throw new Error('PDF inválido para salvar como anexo.');
-  }
-
-  const arrayBuffer = await blob.arrayBuffer();
-  await sp.addAttachment('Projects', id, 'ResumoProjeto.pdf', arrayBuffer, {
-    contentType: 'application/pdf'
-  });
-}
-
 function buildActivityPeriod(activity) {
   if (!activity) return '';
   const startValue = activity.querySelector('.activity-start')?.value;
@@ -3168,8 +2942,16 @@ async function handleFormSubmit(event) {
     await persistRelatedRecords(resolvedId, payload);
 
     if (isApproval) {
-      const pdfBlob = await generateSummaryPdfBlob();
-      await saveSummaryPdfAttachment(resolvedId, pdfBlob);
+      const approvalSummary = buildApprovalSummary(resolvedId, payload);
+      const jsonContent = JSON.stringify(approvalSummary, null, 2);
+      const jsonBlob = new Blob([jsonContent], { type: 'application/json' });
+
+      await sp.addAttachment('Projects', resolvedId, 'resumo.json', jsonBlob, {
+        overwrite: true,
+        contentType: 'application/json'
+      });
+
+      await sp.updateItem('Projects', resolvedId, { status: 'Em Aprovação' });
     }
 
     if (resolvedId) {
@@ -3299,6 +3081,209 @@ async function persistRelatedRecords(projectId, projectData) {
     await persistSimplePeps(projectId, approvalYear);
     await cleanupKeyProjects();
   }
+}
+
+function collectSimplePepDataForSummary() {
+  if (!simplePepList) return [];
+
+  const peps = [];
+  simplePepList.querySelectorAll('.pep-row').forEach((row) => {
+    const idValue = parseNumber(row.dataset.pepId);
+    const titleSelect = row.querySelector('.pep-title');
+    const titleValue = titleSelect?.value?.trim() || '';
+    const titleDisplay = getSelectOptionText(titleSelect);
+    const amountInput = row.querySelector('.pep-amount');
+    const amountText = amountInput?.value ?? '';
+    const yearInput = row.querySelector('.pep-year');
+    const yearText = yearInput?.value ?? '';
+
+    const hasData = Boolean(titleValue) || amountText.trim() !== '' || yearText.trim() !== '';
+    if (!hasData) {
+      return;
+    }
+
+    const parsedId = Number.isFinite(idValue) ? idValue : null;
+    const parsedAmount = parseNumericInputValue(amountInput);
+    const parsedYear = parseNumber(yearText);
+
+    peps.push({
+      id: parsedId,
+      title: titleValue,
+      titleDisplay,
+      amountBrl: Number.isFinite(parsedAmount) ? parsedAmount : 0,
+      amountText,
+      year: Number.isFinite(parsedYear) ? parsedYear : null,
+      yearText,
+      type: 'simple'
+    });
+  });
+
+  return peps;
+}
+
+function collectMilestonesForSummary() {
+  if (!milestoneList) return [];
+
+  const milestones = [];
+  milestoneList.querySelectorAll('.milestone').forEach((milestoneEl) => {
+    const milestoneIdValue = parseNumber(milestoneEl.dataset.milestoneId);
+    const resolvedMilestoneId = Number.isFinite(milestoneIdValue) ? milestoneIdValue : null;
+    const titleValue = milestoneEl.querySelector('.milestone-title')?.value.trim() || '';
+    const activities = [];
+
+    milestoneEl.querySelectorAll('.activity').forEach((activityEl) => {
+      const activityIdValue = parseNumber(activityEl.dataset.activityId);
+      const resolvedActivityId = Number.isFinite(activityIdValue) ? activityIdValue : null;
+      const title = activityEl.querySelector('.activity-title')?.value.trim() || '';
+      const startDateValue = activityEl.querySelector('.activity-start')?.value || '';
+      const endDateValue = activityEl.querySelector('.activity-end')?.value || '';
+      const supplier = activityEl.querySelector('.activity-supplier')?.value.trim() || '';
+      const description = activityEl.querySelector('.activity-description')?.value.trim() || '';
+
+      const pepTitleSelect = activityEl.querySelector('.activity-pep-title');
+      const pepTitleValue = pepTitleSelect?.value?.trim() || '';
+      const pepTitleDisplay = getSelectOptionText(pepTitleSelect);
+      const pepAmountInput = activityEl.querySelector('.activity-pep-amount');
+      const pepAmountText = pepAmountInput?.value ?? '';
+      const pepYearInput = activityEl.querySelector('.activity-pep-year');
+      const pepYearText = pepYearInput?.value ?? '';
+      const pepIdValue = parseNumber(activityEl.dataset.pepId);
+
+      const hasActivityData = [
+        title,
+        startDateValue,
+        endDateValue,
+        supplier,
+        description,
+        pepTitleValue,
+        pepAmountText,
+        pepYearText
+      ].some((value) => (typeof value === 'string' ? value.trim() !== '' : value !== null));
+
+      if (!hasActivityData) {
+        return;
+      }
+
+      const parsedPepAmount = parseNumericInputValue(pepAmountInput);
+      const parsedPepYear = parseNumber(pepYearText);
+
+      const pep =
+        pepTitleValue || pepAmountText.trim() !== '' || pepYearText.trim() !== ''
+          ? {
+              id: Number.isFinite(pepIdValue) ? pepIdValue : null,
+              title: pepTitleValue,
+              titleDisplay: pepTitleDisplay,
+              amountBrl: Number.isFinite(parsedPepAmount) ? parsedPepAmount : 0,
+              amountText: pepAmountText,
+              year: Number.isFinite(parsedPepYear) ? parsedPepYear : null,
+              yearText: pepYearText
+            }
+          : null;
+
+      activities.push({
+        id: resolvedActivityId,
+        milestoneId: resolvedMilestoneId,
+        title,
+        startDate: startDateValue || null,
+        endDate: endDateValue || null,
+        supplier,
+        description,
+        pep
+      });
+    });
+
+    if (!activities.length && !titleValue) {
+      return;
+    }
+
+    milestones.push({
+      id: resolvedMilestoneId,
+      title: titleValue,
+      activities
+    });
+  });
+
+  return milestones;
+}
+
+function collectActivitiesForSummary(milestones) {
+  const activities = [];
+  const safeMilestones = Array.isArray(milestones) ? milestones : [];
+
+  safeMilestones.forEach((milestone) => {
+    const milestoneId = milestone?.id ?? null;
+    const milestoneTitle = milestone?.title ?? '';
+    const milestoneActivities = Array.isArray(milestone?.activities) ? milestone.activities : [];
+
+    milestoneActivities.forEach((activity) => {
+      if (!activity) return;
+      activities.push({
+        ...activity,
+        milestoneId,
+        milestoneTitle
+      });
+    });
+  });
+
+  return activities;
+}
+
+function collectPepEntriesForSummary(simplePeps, activities) {
+  const peps = Array.isArray(simplePeps)
+    ? simplePeps.map((pep) => ({ ...pep }))
+    : [];
+
+  const activityList = Array.isArray(activities) ? activities : [];
+  activityList.forEach((activity) => {
+    if (!activity?.pep) return;
+    peps.push({
+      ...activity.pep,
+      type: 'activity',
+      activityId: activity.id ?? null,
+      activityTitle: activity.title ?? '',
+      milestoneId: activity.milestoneId ?? null,
+      milestoneTitle: activity.milestoneTitle ?? ''
+    });
+  });
+
+  return peps;
+}
+
+function collectProjectDisplayValues() {
+  return {
+    investmentLevel: getSelectOptionText(investmentLevelSelect),
+    company: getSelectOptionText(companySelect),
+    center: getSelectOptionText(centerSelect),
+    unit: getSelectOptionText(unitSelect),
+    location: getSelectOptionText(locationSelect),
+    depreciationCostCenter: getSelectOptionText(depreciationSelect),
+    category: getSelectOptionText(document.getElementById('category')),
+    investmentType: getSelectOptionText(document.getElementById('investmentType')),
+    assetType: getSelectOptionText(document.getElementById('assetType')),
+    kpiType: getSelectOptionText(document.getElementById('kpiType'))
+  };
+}
+
+function buildApprovalSummary(projectId, projectData = {}) {
+  const simplePeps = collectSimplePepDataForSummary();
+  const milestones = collectMilestonesForSummary();
+  const activities = collectActivitiesForSummary(milestones);
+  const peps = collectPepEntriesForSummary(simplePeps, activities);
+  const displayValues = collectProjectDisplayValues();
+
+  const numericId = Number(projectId);
+  const resolvedId = Number.isFinite(numericId) ? numericId : projectId;
+
+  return {
+    project: {
+      id: resolvedId,
+      ...projectData,
+      displayValues
+    },
+    milestones,
+    activities,
+    peps
+  };
 }
 
 async function persistSimplePeps(projectId, approvalYear) {
