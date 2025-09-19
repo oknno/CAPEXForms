@@ -1,3 +1,13 @@
+<!--
+/*! 
+ * index.html
+ * Descrição: Marca a estrutura principal da aplicação CAPEX, incluindo layout, formulários e resumos.
+ * Autor: Matheus Okano
+ * Versão: v1.0
+ * Última atualização: 2025-09-19
+ * Nota: Documentação e comentários adicionados sem alterar a lógica do sistema.
+ */
+-->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -9,25 +19,33 @@
 </head>
 <body>
   <!-- =============================================================== -->
-  <!-- Cabeçalho principal com logo e acesso rápido para novo projeto -->
+  <!-- Cabeçalho principal com logo e ação para abertura do formulário -->
+  <!-- Estrutura: botão #newProjectBtn é monitorado pelo JS para abrir o overlay -->
+  <!-- Acessibilidade: header fixo garante visibilidade do CTA; botão recebe foco inicial após carregamento -->
   <!-- =============================================================== -->
   <header class="main-header">
     <div class="logo" aria-label="Logo CAPEX"></div>
+    <!-- Botão primário que dispara a criação de um novo registro de projeto -->
     <button id="newProjectBtn" type="button" class="btn primary">Novo Projeto</button>
   </header>
 
   <!-- =============================================================== -->
-  <!-- Aplicação: sidebar com lista e painel de detalhes do projeto -->
+  <!-- Região principal da aplicação: lista de projetos e painel de detalhes -->
+  <!-- ID #app consumido pelo JS para organizar eventos; layout em grid com aside + section -->
   <!-- =============================================================== -->
   <div id="app" class="app-layout">
+    <!-- Sidebar com filtro de texto e lista dinâmica de projetos carregados do SharePoint -->
     <aside id="projectSidebar" class="sidebar">
       <div class="sidebar-header">
         <h2>Projetos</h2>
+        <!-- Campo de busca para filtrar os cards renderizados na lista via debounce -->
         <input id="projectSearch" type="search" placeholder="Pesquisar por nome" autocomplete="off">
       </div>
+      <!-- Container rolável que recebe os cards via renderProjectList(); role list garante semântica -->
       <div id="projectList" class="project-list" role="list"></div>
     </aside>
 
+    <!-- Painel central com detalhes do projeto selecionado; aria-live notifica mudanças sem recarregar -->
     <section id="projectDetails" class="details" aria-live="polite">
       <div class="empty-state">
         <h2>Selecione um projeto</h2>
@@ -37,14 +55,17 @@
   </div>
 
   <!-- =============================================================== -->
-  <!-- Formulário de criação/edição de projetos CAPEX -->
+  <!-- Overlay de formulário: role=dialog para modal; foco inicial no título para leitores de tela -->
+  <!-- JS controla classe .hidden, tecla ESC e restauração de foco no botão disparador -->
   <!-- =============================================================== -->
   <div id="formOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="formTitle">
+    <!-- Botão de fechar flutuante acessível, usado como fallback de fechamento rápido -->
     <button type="button" class="form-close-btn" aria-label="Fechar">&times;</button>
     <form id="projectForm" class="project-form" novalidate>
       <div class="form-header">
         <h2 id="formTitle">Novo Projeto</h2>
         <div class="form-header-actions">
+          <!-- Botão secundário utilizado para disparar a confirmação de fechamento -->
           <button type="button" id="closeFormBtn" class="btn ghost">Fechar</button>
         </div>
       </div>
@@ -52,13 +73,16 @@
       <input type="hidden" id="statusField" value="Rascunho">
 
       <div class="form-feedback">
+        <!-- Avisos informativos, sucesso ou erro geral do formulário -->
         <div id="formStatus" class="feedback" role="alert" aria-live="polite"></div>
+        <!-- Resumo de validações com aria-live assertive para alertar usuários com tecnologia assistiva -->
         <div id="formErrors" class="feedback" role="alert" aria-live="assertive">
           <strong id="formErrorsTitle" class="feedback-title"></strong>
           <ul id="errorSummaryList" class="error-summary"></ul>
         </div>
       </div>
 
+      <!-- Visualização somente leitura acionada no modo resumo dentro do próprio formulário -->
       <div id="formSummaryView" class="summary-panel form-summary hidden" aria-live="polite">
         <header class="summary-header">
           <h2 id="formSummaryTitle">Resumo do Projeto</h2>
@@ -67,6 +91,7 @@
 
         <div class="summary-body">
           <div id="formSummarySections" class="summary-sections"></div>
+          <!-- Seção condicional para exibir o Gantt dentro do resumo interno -->
           <section id="formSummaryGanttSection" class="summary-section summary-gantt hidden">
             <h3>Gráfico Gantt</h3>
             <div id="formSummaryGanttChart" class="gantt-chart"></div>
@@ -74,6 +99,7 @@
         </div>
 
         <footer class="summary-actions">
+          <!-- Botão para fechar o modo resumo e retornar à edição -->
           <button type="button" id="formSummaryCloseBtn" class="btn secondary">Fechar</button>
         </footer>
       </div>
@@ -81,23 +107,28 @@
       <!-- ============================== -->
       <!-- 1. Sobre o Projeto             -->
       <!-- ============================== -->
+      <!-- Seção sempre visível, agrupa campos essenciais do cadastro -->
       <fieldset class="form-section">
         <legend>1. Sobre o Projeto</legend>
         <div class="field-group">
           <label for="projectName">Nome do Projeto</label>
+          <!-- Campo obrigatório que alimenta o título em cards e resumos -->
           <input id="projectName" name="projectName" type="text" required maxlength="255" placeholder="Título do projeto">
         </div>
         <div class="field-group">
           <label for="projectBudget">Orçamento do Projeto em R$</label>
+          <!-- Valor usado para definir nível de investimento e habilitar seções PEP/Key Projects -->
           <input id="projectBudget" name="projectBudget" type="number" min="0" step="0.01" required>
         </div>
         <div class="field-grid">
           <div class="field-group">
             <label for="approvalYear">Ano de Aprovação</label>
+            <!-- Preenchido automaticamente com o ano corrente e bloqueado para edição manual -->
             <input id="approvalYear" name="approvalYear" type="number" min="1900" max="9999" required readonly>
           </div>
           <div class="field-group">
             <label for="investmentLevel">Nível de Investimento</label>
+            <!-- Seleção calculada via script conforme orçamento convertido em USD -->
             <select id="investmentLevel" name="investmentLevel" required>
               <option value="">Selecione o nível de investimento</option>
               <option value="N1">N1 ≥ $150m Board of Directors</option>
@@ -108,6 +139,7 @@
           </div>
           <div class="field-group">
             <label for="startDate">Data de Início</label>
+            <!-- Datas alimentam validação cruzada com atividades e cronograma Gantt -->
             <input id="startDate" name="startDate" type="date" required>
           </div>
           <div class="field-group">
@@ -120,6 +152,7 @@
       <!-- ============================== -->
       <!-- 2. Origem e Função             -->
       <!-- ============================== -->
+      <!-- Bloco para classificar fonte de recursos e finalidade do investimento -->
       <fieldset class="form-section">
         <legend>2. Origem e Função</legend>
         <div class="field-grid">
@@ -137,6 +170,7 @@
       <!-- ============================== -->
       <!-- 3. Informação Operacional      -->
       <!-- ============================== -->
+      <!-- Seletores encadeados: opções atualizadas via JS com base na empresa escolhida -->
       <fieldset class="form-section">
         <legend>3. Informação Operacional</legend>
         <div class="field-grid">
@@ -225,6 +259,7 @@
       <!-- ============================== -->
       <!-- 4. Detalhamento Complementar   -->
       <!-- ============================== -->
+      <!-- Campos de texto livre para contexto estratégico e solução proposta -->
       <fieldset class="form-section">
         <legend>4. Detalhamento Complementar</legend>
         <div class="field-group">
@@ -240,16 +275,19 @@
       <!-- ============================== -->
       <!-- 5. Elemento PEP (até 1MM)      -->
       <!-- ============================== -->
+      <!-- Exibido somente quando orçamento < 1MM; lista dinâmica clonada via template #simplePepTemplate -->
       <fieldset id="simplePepSection" class="form-section hidden">
         <legend>5. Elemento PEP</legend>
         <p class="hint">Disponível apenas quando o orçamento é inferior a R$ 1.000.000,00.</p>
         <div id="simplePepList" class="dynamic-list"></div>
+        <!-- Botão que adiciona nova linha PEP por meio do template dinamicamente -->
         <button type="button" id="addSimplePepBtn" class="btn ghost">Adicionar PEP</button>
       </fieldset>
 
       <!-- ============================== -->
       <!-- 6. Indicadores de Desempenho   -->
       <!-- ============================== -->
+      <!-- Dados de KPI alimentam o resumo e processos de aprovação -->
       <fieldset class="form-section">
         <legend>6. Indicadores de Desempenho</legend>
         <div class="field-grid">
@@ -283,26 +321,36 @@
       <!-- ============================== -->
       <!-- 7. Key Projects (a partir 1MM) -->
       <!-- ============================== -->
+      <!-- Seção exclusiva para orçamentos >= 1MM com marcos e atividades vinculadas ao Gantt -->
       <fieldset id="keyProjectSection" class="form-section hidden">
         <legend>7. KEY Projects</legend>
         <p class="hint">Disponível quando o orçamento é igual ou superior a R$ 1.000.000,00.</p>
         <div id="milestoneList" class="dynamic-list"></div>
+        <!-- CTA para duplicar o template #milestoneTemplate criando novo marco -->
         <button type="button" id="addMilestoneBtn" class="btn ghost">Adicionar Marco</button>
+        <!-- Container exibido após preencher marcos/atividades; aria-live informa atualizações do Gantt -->
         <div id="ganttContainer" class="gantt-container hidden" aria-live="polite">
           <h3 id="ganttChartTitle">Cronograma do Projeto</h3>
           <div id="ganttChart" class="gantt-chart" role="img" aria-label="Gráfico de Gantt do projeto"></div>
         </div>
       </fieldset>
 
+      <!-- Dicas dinâmicas atualizadas pelo JS conforme validações de orçamento e datas -->
       <p id="budgetHint" class="hint" aria-live="polite"></p>
       <p id="dateHint" class="hint" aria-live="polite"></p>
 
       <div class="form-actions">
+        <!-- Botão principal que dispara fluxo de validação e abre o overlay de resumo -->
         <button type="button" id="saveProjectBtn" class="btn primary">Salvar</button>
       </div>
     </form>
   </div>
 
+  <!-- =============================================================== -->
+  <!-- Overlay de resumo para confirmação antes do envio/ aprovação -->
+  <!-- role=dialog com tabindex=-1 garante foco programático no título -->
+  <!-- Fechamento via botão ou tecla ESC restaurando foco no gatilho -->
+  <!-- =============================================================== -->
   <div
     id="summaryOverlay"
     class="overlay overlay-summary hidden"
@@ -335,6 +383,7 @@
   <!-- =============================================================== -->
   <!-- Templates para listas dinâmicas (PEPs, marcos e atividades)    -->
   <!-- =============================================================== -->
+  <!-- Templates são clonados pelo script e preservam classes/IDs esperados nas validações -->
   <template id="simplePepTemplate">
     <div class="pep-row" data-pep-id="">
       <div class="field-grid three-cols">
@@ -362,6 +411,7 @@
     </div>
   </template>
 
+  <!-- Template para cada marco do Key Project; inclui botão para remover o bloco completo -->
   <template id="milestoneTemplate">
     <div class="milestone" data-milestone-id="">
       <div class="milestone-header">
@@ -378,6 +428,7 @@
     </div>
   </template>
 
+  <!-- Template de atividade dentro de um marco; campos alimentam Gantt e anexos JSON -->
   <template id="activityTemplate">
     <div class="activity" data-activity-id="" data-pep-id="">
       <div class="activity-header">
