@@ -1815,52 +1815,6 @@ function populateSummaryGantt(options = {}) {
   }
 }
 
-function createSummaryCaptureContext() {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'summary-panel summary-panel--capture';
-  wrapper.setAttribute('aria-hidden', 'true');
-
-  const header = document.createElement('header');
-  header.className = 'summary-header';
-
-  const title = document.createElement('h2');
-  title.textContent = 'Resumo do Projeto';
-
-  const subtitle = document.createElement('p');
-  subtitle.className = 'summary-subtitle';
-  subtitle.textContent = '';
-
-  header.append(title, subtitle);
-
-  const body = document.createElement('div');
-  body.className = 'summary-body';
-
-  const sections = document.createElement('div');
-  sections.className = 'summary-sections';
-
-  const ganttSection = document.createElement('section');
-  ganttSection.className = 'summary-section summary-gantt hidden';
-  const ganttTitle = document.createElement('h3');
-  ganttTitle.textContent = 'Gráfico Gantt';
-  const ganttChart = document.createElement('div');
-  ganttChart.className = 'gantt-chart';
-
-  ganttSection.append(ganttTitle, ganttChart);
-  body.append(sections, ganttSection);
-
-  wrapper.append(header, body);
-
-  return {
-    wrapper,
-    sections,
-    ganttSection,
-    ganttChart,
-    headerTitle: title,
-    headerSubtitle: subtitle,
-    lastGanttResult: undefined
-  };
-}
-
 async function waitForSummaryRender(context, options = {}) {
   if (!context) return;
   const { timeout = 2000 } = options;
@@ -1903,50 +1857,86 @@ function buildSummaryAttachmentFileName(projectId) {
 }
 
 async function generateSummaryPdfBlob() {
-  if (!window.html2canvas) {
+  const summaryElement = document.getElementById('summaryOverlay');
+  if (!summaryElement) {
+    throw new Error('Resumo do projeto não está disponível para gerar o PDF.');
+  }
+
+  const html2canvas = window.html2canvas;
+  if (!html2canvas) {
     throw new Error('Biblioteca html2canvas não foi carregada.');
   }
-  if (!window.jspdf?.jsPDF) {
+
+  const jsPDFConstructor = window.jspdf?.jsPDF;
+  if (!jsPDFConstructor) {
     throw new Error('Biblioteca jsPDF não foi carregada.');
   }
 
-  const context = createSummaryCaptureContext();
-  const projectName = document.getElementById('projectName')?.value?.trim() || 'Projeto sem título';
-  const statusValue = statusField?.value || '';
-  const now = new Date();
+  const summaryWasHidden = summaryElement.classList.contains('hidden');
+  const previousScrollTop = summaryElement.scrollTop;
+  const previousOpacity = summaryElement.style.opacity;
+  const previousPointerEvents = summaryElement.style.pointerEvents;
+  const previousTransition = summaryElement.style.transition;
 
-  context.headerTitle.textContent = `Resumo do Projeto - ${projectName}`;
-  const metadataParts = [];
-  if (statusValue) {
-    metadataParts.push(`Status: ${statusValue}`);
+  const captureContext = {
+    ...defaultSummaryContext,
+    lastGanttResult: undefined
+  };
+
+  if (summaryWasHidden) {
+    summaryElement.classList.remove('hidden');
+    summaryElement.style.opacity = '0';
+    summaryElement.style.pointerEvents = 'none';
+    summaryElement.style.transition = 'none';
   }
-  metadataParts.push(`Gerado em ${DATE_FMT.format(now)}`);
-  context.headerSubtitle.textContent = metadataParts.join(' · ');
-
-  document.body.appendChild(context.wrapper);
 
   try {
-    populateSummaryContent({ context, refreshGantt: true });
-    await waitForSummaryRender(context);
-    const scale = Math.max(window.devicePixelRatio || 1, 2);
-    const canvas = await window.html2canvas(context.wrapper, {
-      scale,
+    populateSummaryContent({ context: captureContext, refreshGantt: true });
+    await waitForSummaryRender(captureContext);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    if (summaryWasHidden) {
+      summaryElement.style.opacity = previousOpacity || '';
+    }
+
+    summaryElement.scrollTop = 0;
+
+    const canvas = await html2canvas(summaryElement, {
+      scale: Math.max(window.devicePixelRatio || 1, 2),
       backgroundColor: '#ffffff',
       useCORS: true,
       logging: false
     });
-    const orientation = canvas.width >= canvas.height ? 'landscape' : 'portrait';
-    const pdf = new window.jspdf.jsPDF({
-      orientation,
-      unit: 'px',
-      format: [canvas.width, canvas.height]
-    });
-    const imageData = canvas.toDataURL('image/png');
-    pdf.addImage(imageData, 'PNG', 0, 0, canvas.width, canvas.height);
+
+    if (summaryWasHidden) {
+      summaryElement.style.opacity = '0';
+    }
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDFConstructor('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgProps = pdf.getImageProperties(imgData);
+    const margin = 10;
+    const maxWidth = pageWidth - margin * 2;
+    const maxHeight = pageHeight - margin * 2;
+    const ratio = Math.min(maxWidth / imgProps.width, maxHeight / imgProps.height);
+    const pdfWidth = imgProps.width * ratio;
+    const pdfHeight = imgProps.height * ratio;
+    const offsetX = (pageWidth - pdfWidth) / 2;
+    const offsetY = (pageHeight - pdfHeight) / 2;
+    pdf.addImage(imgData, 'PNG', offsetX, offsetY, pdfWidth, pdfHeight);
     return pdf.output('blob');
   } finally {
-    clearSummaryContent(context);
-    context.wrapper.remove();
+    summaryElement.scrollTop = previousScrollTop;
+
+    if (summaryWasHidden) {
+      summaryElement.style.opacity = previousOpacity || '';
+      summaryElement.style.pointerEvents = previousPointerEvents || '';
+      summaryElement.style.transition = previousTransition || '';
+      summaryElement.classList.add('hidden');
+      clearSummaryContent(captureContext);
+    }
   }
 }
 
@@ -3086,10 +3076,7 @@ async function handleFormSubmit(event) {
     }
 
     await persistRelatedRecords(resolvedId, payload);
-
-    if (isApproval) {
-      await saveSummaryPdfAttachment(resolvedId);
-    }
+    await saveSummaryPdfAttachment(resolvedId);
 
     if (resolvedId) {
       updateProjectState(resolvedId, {
