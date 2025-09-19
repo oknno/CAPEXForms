@@ -39,69 +39,96 @@ class SharePointService {
     return text ? JSON.parse(text) : null;
   }
 
-  async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
-    if (!listName) {
-      throw new Error('Lista SharePoint não informada.');
-    }
-    if (!itemId) {
-      throw new Error('ID do item inválido para anexar arquivo.');
-    }
+async addAttachment(listName, itemId, fileName, fileContent, options = {}) {
+  if (!listName) throw new Error('Lista SharePoint não informada.');
+  if (!itemId) throw new Error('ID do item inválido para anexar arquivo.');
 
-    const { overwrite = false, contentType = 'application/octet-stream' } = options;
-    const normalizedFileName = this.sanitizeFileName(fileName || `resumo_${itemId}.txt`);
+  const { overwrite = false, contentType = 'application/json' } = options;
+  const rawFileName = fileName || `resumo_${itemId}.json`;
+  const sanitizedFileName = this.sanitizeFileName(rawFileName);
+  const encodedFileName = encodeURIComponent(sanitizedFileName);
 
-    if (overwrite) {
-      try {
-        await this.deleteAttachment(listName, itemId, normalizedFileName);
-      } catch (error) {
-        if (error?.status !== 404) {
-          throw error;
-        }
+  if (!sanitizedFileName) {
+    throw new Error('Nome do arquivo inválido.');
+  }
+
+  if (overwrite) {
+    try {
+      await this.deleteAttachment(listName, itemId, sanitizedFileName);
+    } catch (error) {
+      if (error?.status !== 404) {
+        throw error;
       }
     }
-
-    const digest = await this.getFormDigest();
-    const headers = {
-      Accept: 'application/json;odata=verbose',
-      'X-RequestDigest': digest,
-      'Content-Type': contentType
-    };
-    const url = this.buildUrl(
-      listName,
-      `/items(${itemId})/AttachmentFiles/add(FileName='${normalizedFileName}')`
-    );
-
-    const body = fileContent instanceof Blob
-      ? fileContent
-      : new Blob([fileContent], { type: contentType });
-
-    await this.request(url, { method: 'POST', headers, body });
-    return true;
   }
 
-  async deleteAttachment(listName, itemId, fileName) {
-    if (!listName) {
-      throw new Error('Lista SharePoint não informada.');
-    }
-    if (!itemId) {
-      throw new Error('ID do item inválido para remover anexo.');
-    }
+  const digest = await this.getFormDigest();
+  const headers = {
+    Accept: 'application/json;odata=verbose',
+    'X-RequestDigest': digest,
+    'Content-Type': contentType
+  };
 
-    const digest = await this.getFormDigest();
-    const headers = {
-      Accept: 'application/json;odata=verbose',
-      'X-RequestDigest': digest,
-      'IF-MATCH': '*',
-      'X-HTTP-Method': 'DELETE'
-    };
-    const sanitizedName = this.sanitizeFileName(fileName || `resumo_${itemId}.txt`);
-    const url = this.buildUrl(
-      listName,
-      `/items(${itemId})/AttachmentFiles/getByFileName('${sanitizedName}')`
-    );
-    await this.request(url, { method: 'POST', headers });
-    return true;
+  const url = this.buildUrl(
+    listName,
+    `/items(${itemId})/AttachmentFiles/add(FileName='${encodedFileName}')`
+  );
+
+  const body = fileContent instanceof Blob
+    ? fileContent
+    : new Blob([fileContent], { type: contentType });
+
+  console.log("🔎 Salvando anexo em:", url, "Arquivo:", sanitizedFileName);
+
+  await this.request(url, { method: 'POST', headers, body });
+  return true;
+}
+
+async deleteAttachment(listName, itemId, fileName) {
+  if (!listName) throw new Error('Lista SharePoint não informada.');
+  if (!itemId) throw new Error('ID do item inválido para remover anexo.');
+
+  const rawFileName = fileName || `resumo_${itemId}.json`;
+  const sanitizedFileName = this.sanitizeFileName(rawFileName);
+  if (!sanitizedFileName) {
+    console.warn("⚠️ Nome inválido em deleteAttachment, abortando:", fileName);
+    return false;
   }
+
+  const encodedFileName = encodeURIComponent(sanitizedFileName);
+
+  // 🔎 Verifica se o anexo existe antes de tentar remover
+  const attachmentsUrl = this.buildUrl(listName, `/items(${itemId})/AttachmentFiles`);
+  const headersCheck = { Accept: 'application/json;odata=verbose' };
+  const attachments = await this.request(attachmentsUrl, { method: 'GET', headers: headersCheck });
+
+  const found = attachments?.d?.results?.some(
+    (att) => att.FileName && att.FileName.toLowerCase() === sanitizedFileName.toLowerCase()
+  );
+
+  if (!found) {
+    console.log(`⚠️ Anexo "${sanitizedFileName}" não existe no item ${itemId}, ignorando exclusão.`);
+    return false;
+  }
+
+  const digest = await this.getFormDigest();
+  const headers = {
+    Accept: 'application/json;odata=verbose',
+    'X-RequestDigest': digest,
+    'IF-MATCH': '*',
+    'X-HTTP-Method': 'DELETE'
+  };
+
+  const url = this.buildUrl(
+    listName,
+    `/items(${itemId})/AttachmentFiles/getByFileName('${encodedFileName}')`
+  );
+
+  console.log("🔎 Removendo anexo existente:", url, "Arquivo:", sanitizedFileName);
+
+  await this.request(url, { method: 'POST', headers });
+  return true;
+}
 
   async getFormDigest() {
     try {
