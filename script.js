@@ -49,7 +49,6 @@ class SharePointService {
 
     const { overwrite = false, contentType = 'application/octet-stream' } = options;
     const normalizedFileName = this.sanitizeFileName(fileName || `resumo_${itemId}.txt`);
-    const safeFileName = encodeURIComponent(normalizedFileName);
 
     if (overwrite) {
       try {
@@ -69,7 +68,7 @@ class SharePointService {
     };
     const url = this.buildUrl(
       listName,
-      `/items(${itemId})/AttachmentFiles/add(FileName='${safeFileName}')`
+      `/items(${itemId})/AttachmentFiles/add(FileName='${normalizedFileName}')`
     );
 
     const body = fileContent instanceof Blob
@@ -96,10 +95,9 @@ class SharePointService {
       'X-HTTP-Method': 'DELETE'
     };
     const sanitizedName = this.sanitizeFileName(fileName || `resumo_${itemId}.txt`);
-    const safeFileName = encodeURIComponent(sanitizedName);
     const url = this.buildUrl(
       listName,
-      `/items(${itemId})/AttachmentFiles/getByFileName('${safeFileName}')`
+      `/items(${itemId})/AttachmentFiles/getByFileName('${sanitizedName}')`
     );
     await this.request(url, { method: 'POST', headers });
     return true;
