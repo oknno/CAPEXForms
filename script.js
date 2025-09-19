@@ -1906,7 +1906,8 @@ function fillFormWithProject(detail) {
       milestoneList.append(block);
       state.editingSnapshot.milestones.add(Number(milestone.Id));
     });
-    if (!milestones.length) {
+    const isEditingMode = projectForm?.dataset.mode === 'edit';
+    if (!milestones.length && !isEditingMode) {
       ensureMilestoneBlock();
     }
   }
@@ -2613,7 +2614,7 @@ function updateBudgetSections(options = {}) {
     if (!preserve) {
       simplePepList.innerHTML = '';
     }
-    if (!milestoneList.children.length) {
+    if (!milestoneList.children.length && !preserve) {
       ensureMilestoneBlock();
     }
   } else {
