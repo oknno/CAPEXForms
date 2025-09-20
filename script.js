@@ -2129,7 +2129,12 @@ function bindEvents() {
 
   if (companySelect) {
     companySelect.addEventListener('change', (event) => {
-      updateCompanyDependentFields(event.target.value);
+      updateCompanyDependentFields(event.target.value, {
+        center: '',
+        location: '',
+        unit: '',
+        depreciation: ''
+      });
     });
   }
 
@@ -2579,37 +2584,41 @@ function formatDateValue(value) {
  * @param {string} [selectedValue=''] - Valor que deve permanecer selecionado.
  */
 function populateSelectOptions(selectElement, options = [], selectedValue = '') {
-  if (!selectElement) return;
+  if (!selectElement || selectElement.tagName !== 'SELECT') {
+    return;
+  }
+
+  const initialPlaceholderOption = selectElement.options?.[0];
+  const placeholderText = initialPlaceholderOption && initialPlaceholderOption.value === ''
+    ? initialPlaceholderOption.textContent || 'Selecione...'
+    : 'Selecione...';
+
+  const normalizedOptions = Array.isArray(options)
+    ? options.map((option) => String(option))
+    : [];
+  const normalizedSelectedValue = selectedValue != null ? String(selectedValue) : '';
 
   selectElement.innerHTML = '';
 
   const placeholderOption = document.createElement('option');
   placeholderOption.value = '';
-  placeholderOption.textContent = 'Selecione...';
-  if (!selectedValue) {
-    placeholderOption.selected = true;
-  }
+  placeholderOption.textContent = placeholderText;
   selectElement.appendChild(placeholderOption);
 
-  let hasSelectedOption = false;
-
-  options.forEach((text) => {
+  const fragment = document.createDocumentFragment();
+  normalizedOptions.forEach((text) => {
     const option = document.createElement('option');
     option.value = text;
     option.textContent = text;
-    if (selectedValue && text === selectedValue) {
-      option.selected = true;
-      hasSelectedOption = true;
-    }
-    selectElement.appendChild(option);
+    fragment.appendChild(option);
   });
 
-  if (selectedValue && !hasSelectedOption) {
-    const fallbackOption = document.createElement('option');
-    fallbackOption.value = selectedValue;
-    fallbackOption.textContent = selectedValue;
-    fallbackOption.selected = true;
-    selectElement.appendChild(fallbackOption);
+  selectElement.appendChild(fragment);
+
+  if (normalizedSelectedValue && normalizedOptions.includes(normalizedSelectedValue)) {
+    selectElement.value = normalizedSelectedValue;
+  } else {
+    selectElement.value = '';
   }
 }
 
@@ -2722,44 +2731,72 @@ function applyCenter(companyCode, centerCode, { locationEl, unitEl }) {
  * @param {string} companyValue - Empresa selecionada.
  * @param {{center?:string, unit?:string, location?:string, depreciation?:string}} [selectedValues={}] - Valores previamente gravados.
  */
-function updateCompanyDependentFields(companyValue, selectedValues = {}) {
-  const rules = resolveCompanyRules();
-  const companyRule = rules?.[companyValue] || {};
-  const centersMap = companyRule.centers || {};
-  const centerCodes = Object.keys(centersMap);
+function updateCompanyDependentFields(companyValue, selectedValues) {
+  const companySelect = document.getElementById('company');
+  const centerSelect = document.getElementById('center');
+  const locationSelect = document.getElementById('location');
+  const unitSelect = document.getElementById('unit');
+  const depreciationSelect = document.getElementById('depreciationCostCenter');
 
-  fillOptions(centerSelect, centerCodes, { placeholder: 'Selecione o centro' });
-
-  const preferredCenter = selectedValues.center || '';
-  const currentValue = centerSelect?.value || '';
-  const desiredCenter = preferredCenter && centerCodes.includes(preferredCenter)
-    ? preferredCenter
-    : (centerCodes.includes(currentValue) ? currentValue : '');
-  if (centerSelect && desiredCenter) {
-    centerSelect.value = desiredCenter;
+  if (!centerSelect && !locationSelect && !unitSelect && !depreciationSelect) {
+    return;
   }
 
-  const cascadeTargets = { centerEl: centerSelect, locationEl: locationSelect, unitEl: unitSelect };
-  applyCenter(companyValue, centerSelect?.value || '', cascadeTargets);
+  const hasSelectedValues = arguments.length > 1 && selectedValues && typeof selectedValues === 'object';
+  const preserve = hasSelectedValues
+    ? {
+        center: selectedValues.center != null ? String(selectedValues.center) : '',
+        location: selectedValues.location != null ? String(selectedValues.location) : '',
+        unit: selectedValues.unit != null ? String(selectedValues.unit) : '',
+        depreciation: selectedValues.depreciation != null ? String(selectedValues.depreciation) : ''
+      }
+    : {
+        center: centerSelect?.value || '',
+        location: locationSelect?.value || '',
+        unit: unitSelect?.value || '',
+        depreciation: depreciationSelect?.value || ''
+      };
 
-  if (locationSelect) {
-    const availableLocations = getLocations(companyValue, centerSelect?.value || '');
-    const selectedLocation = selectedValues.location || '';
-    if (selectedLocation && availableLocations.includes(selectedLocation)) {
-      locationSelect.value = selectedLocation;
-    }
+  const allRules = typeof resolveCompanyRules === 'function' ? resolveCompanyRules() : {};
+  const companyKey = companyValue != null ? String(companyValue) : (companySelect?.value || '');
+  const rules = allRules?.[companyKey] || {};
+
+  const centersSource = rules.centers;
+  const centers = Array.isArray(centersSource)
+    ? centersSource.map((center) => String(center))
+    : centersSource && typeof centersSource === 'object'
+      ? Object.keys(centersSource)
+      : [];
+
+  populateSelectOptions(centerSelect, centers, preserve.center);
+
+  const activeCenter = centerSelect?.value || '';
+  let locations = [];
+  let units = [];
+
+  if (Array.isArray(rules.locations)) {
+    locations = rules.locations.map((location) => String(location));
+  } else if (centersSource && typeof centersSource === 'object') {
+    const centerRule = centersSource[activeCenter];
+    locations = Array.isArray(centerRule?.locations)
+      ? centerRule.locations.map((location) => String(location))
+      : [];
+    units = Array.isArray(centerRule?.units)
+      ? centerRule.units.map((unit) => String(unit))
+      : [];
   }
 
-  if (unitSelect) {
-    const availableUnits = getUnits(companyValue, centerSelect?.value || '');
-    const selectedUnit = selectedValues.unit || '';
-    if (selectedUnit && availableUnits.includes(selectedUnit)) {
-      unitSelect.value = selectedUnit;
-    }
+  if (Array.isArray(rules.units) && units.length === 0) {
+    units = rules.units.map((unit) => String(unit));
   }
 
-  const depreciationOptions = safeArray(companyRule.depreciation);
-  populateSelectOptions(depreciationSelect, depreciationOptions, selectedValues.depreciation);
+  populateSelectOptions(locationSelect, locations, preserve.location);
+  populateSelectOptions(unitSelect, units, preserve.unit);
+
+  const depreciation = Array.isArray(rules.depreciation)
+    ? rules.depreciation.map((item) => String(item))
+    : [];
+  populateSelectOptions(depreciationSelect, depreciation, preserve.depreciation);
 }
 
 function isValidSelection({ company, center, location, unit }) {
@@ -5011,6 +5048,7 @@ function collectProjectData() {
   const budgetValue = getProjectBudgetValue();
   const budgetBrl = Number.isFinite(budgetValue) ? budgetValue : 0;
   const investmentLevelValue = determineInvestmentLevel(budgetValue);
+  const depreciationValue = document.getElementById('depreciationCostCenter')?.value || '';
 
   const data = {
     Title: document.getElementById('projectName').value.trim(),
@@ -5024,7 +5062,7 @@ function collectProjectData() {
     budgetBrl,
     investmentLevel: investmentLevelValue,
     fundingSource: document.getElementById('fundingSource').value.trim(),
-    depreciationCostCenter: document.getElementById('depreciationCostCenter').value.trim(),
+    depreciationCostCenter: depreciationValue,
     company: document.getElementById('company').value.trim(),
     center: document.getElementById('center').value.trim(),
     unit: document.getElementById('unit').value.trim(),
@@ -5251,13 +5289,16 @@ function collectPepEntriesForSummary(simplePeps, activities) {
  * @returns {Object} Mapa de valores exibidos ao usuário.
  */
 function collectProjectDisplayValues() {
+  const depText = document.getElementById('depreciationCostCenter')?.selectedOptions?.[0]?.text
+    || depreciationSelect?.selectedOptions?.[0]?.text
+    || '';
   return {
     investmentLevel: getSelectOptionText(investmentLevelSelect),
     company: getSelectOptionText(companySelect),
     center: getSelectOptionText(centerSelect),
     unit: getSelectOptionText(unitSelect),
     location: getSelectOptionText(locationSelect),
-    depreciationCostCenter: getSelectOptionText(depreciationSelect),
+    depreciationCostCenter: depText,
     category: getSelectOptionText(document.getElementById('category')),
     investmentType: getSelectOptionText(document.getElementById('investmentType')),
     assetType: getSelectOptionText(document.getElementById('assetType')),
