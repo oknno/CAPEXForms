@@ -779,6 +779,10 @@ const defaultSummaryContext = {
   ganttChart: summaryGanttChart
 };
 
+if (typeof window !== 'undefined' && !window.companyRules) {
+  window.companyRules = companyRules;
+}
+
 const formSummaryContext = {
   sections: formSummarySections,
   ganttSection: formSummaryGanttSection,
@@ -1720,23 +1724,152 @@ function populateSelectOptions(selectElement, options = [], selectedValue = '') 
   }
 }
 
+function fillOptions(selectEl, items = [], { placeholder = 'Selecione...' } = {}) {
+  if (!selectEl) return;
+  const prev = selectEl.value;
+  selectEl.innerHTML = '';
+  if (placeholder) {
+    const opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = placeholder;
+    selectEl.appendChild(opt0);
+  }
+  const frag = document.createDocumentFragment();
+  for (const v of items) {
+    const opt = document.createElement('option');
+    opt.value = String(v);
+    opt.textContent = String(v);
+    frag.appendChild(opt);
+  }
+  selectEl.appendChild(frag);
+  if (items.includes(prev)) selectEl.value = prev; // preserva seleção válida
+}
+
+function getUnits(companyCode, centerCode) {
+  if (!centerCode) return [];
+  const key = `${companyCode}|${centerCode}`;
+  if (typeof window.unitsByCompanyCenter?.[key] !== 'undefined') {
+    return window.unitsByCompanyCenter[key] || [];
+  }
+  return Array.isArray(window.centerUnits?.[centerCode]) ? window.centerUnits[centerCode] : [];
+}
+
+function getLocations(centerCode) {
+  if (!centerCode) return [];
+  return Array.isArray(window.centerLocations?.[centerCode]) ? window.centerLocations[centerCode] : [];
+}
+
+function applyCompany(companyCode, { centerEl, locationEl, unitEl }) {
+  const rulesSource = typeof window !== 'undefined' && window.companyRules ? window.companyRules : companyRules;
+  const centers = (rulesSource?.[companyCode]?.centers) || [];
+  fillOptions(centerEl, centers, { placeholder: 'Selecione o centro' });
+  fillOptions(locationEl, [],    { placeholder: 'Selecione a localização' });
+  fillOptions(unitEl, [],        { placeholder: 'Selecione a unidade' });
+}
+
+function applyCenter(companyCode, centerCode, { locationEl, unitEl }) {
+  const locs  = getLocations(centerCode);
+  const units = getUnits(companyCode, centerCode);
+  fillOptions(locationEl, locs,  { placeholder: 'Selecione a localização' });
+  fillOptions(unitEl,      units,{ placeholder: 'Selecione a unidade' });
+}
+
+(function wireCompanyCenterLocationUnit() {
+  const els = {
+    companyEl:  document.getElementById('company'),
+    centerEl:   document.getElementById('center'),
+    locationEl: document.getElementById('location'),
+    unitEl:     document.getElementById('unit'),
+  };
+  if (!els.companyEl || !els.centerEl || !els.locationEl || !els.unitEl) {
+    console.warn('[cascata] Ajuste os IDs: company, center, location, unit.');
+    return;
+  }
+
+  els.companyEl.addEventListener('change', (e) => {
+    applyCompany(e.target.value, els);
+  });
+
+  els.centerEl.addEventListener('change', (e) => {
+    const company = els.companyEl.value || '';
+    applyCenter(company, e.target.value, els);
+  });
+
+  const initCompany = els.companyEl.value || '';
+  if (initCompany) {
+    applyCompany(initCompany, els);
+    const initCenter = els.centerEl.value || '';
+    if (initCenter) {
+      applyCenter(initCompany, initCenter, els);
+    }
+  }
+})();
+
 /**
  * Atualiza selects dependentes (centro, unidade etc.) conforme empresa escolhida.
  * @param {string} companyValue - Empresa selecionada.
  * @param {{center?:string, unit?:string, location?:string, depreciation?:string}} [selectedValues={}] - Valores previamente gravados.
  */
 function updateCompanyDependentFields(companyValue, selectedValues = {}) {
-  const rules = companyRules[companyValue] || {
-    centers: [],
-    units: [],
-    locations: [],
-    depreciation: []
-  };
+  const rulesSource = typeof window !== 'undefined' && window.companyRules ? window.companyRules : companyRules;
+  const centers = (rulesSource?.[companyValue]?.centers) || [];
 
-  populateSelectOptions(centerSelect, rules.centers, selectedValues.center);
-  populateSelectOptions(unitSelect, rules.units, selectedValues.unit);
-  populateSelectOptions(locationSelect, rules.locations, selectedValues.location);
-  populateSelectOptions(depreciationSelect, rules.depreciation, selectedValues.depreciation);
+  fillOptions(centerSelect, centers, { placeholder: 'Selecione o centro' });
+
+  const desiredCenter = selectedValues.center && centers.includes(selectedValues.center)
+    ? selectedValues.center
+    : centerSelect?.value || '';
+  if (centerSelect && desiredCenter && centers.includes(desiredCenter)) {
+    centerSelect.value = desiredCenter;
+  }
+
+  const cascadeTargets = { centerEl: centerSelect, locationEl: locationSelect, unitEl: unitSelect };
+  applyCenter(companyValue, centerSelect?.value || '', cascadeTargets);
+
+  const selectedLocation = selectedValues.location || '';
+  if (locationSelect) {
+    const availableLocations = getLocations(centerSelect?.value || '');
+    if (selectedLocation && availableLocations.includes(selectedLocation)) {
+      locationSelect.value = selectedLocation;
+    }
+  }
+
+  const selectedUnit = selectedValues.unit || '';
+  if (unitSelect) {
+    const availableUnits = getUnits(companyValue, centerSelect?.value || '');
+    if (selectedUnit && availableUnits.includes(selectedUnit)) {
+      unitSelect.value = selectedUnit;
+    }
+  }
+
+  const depreciationOptions = (rulesSource?.[companyValue]?.depreciation) || [];
+  populateSelectOptions(depreciationSelect, depreciationOptions, selectedValues.depreciation);
+}
+
+function isValidSelection({ company, center, location, unit }) {
+  const rulesSource = typeof window !== 'undefined' && window.companyRules ? window.companyRules : companyRules;
+  const centersOk = (rulesSource?.[company]?.centers || []).includes(center);
+  if (!centersOk) return false;
+  const locOk = getLocations(center).includes(location);
+  if (!locOk) return false;
+  const unitOk = getUnits(company, center).includes(unit);
+  return unitOk;
+}
+
+const form = document.querySelector('form#projectForm');
+if (form) {
+  form.addEventListener('submit', (ev) => {
+    const sels = {
+      company:  document.getElementById('company')?.value || '',
+      center:   document.getElementById('center')?.value || '',
+      location: document.getElementById('location')?.value || '',
+      unit:     document.getElementById('unit')?.value || '',
+    };
+    if (!isValidSelection(sels)) {
+      ev.preventDefault();
+      alert('Seleção inválida: verifique Empresa, Centro, Localização e Unidade.');
+    }
+  });
 }
 
 // ============================================================================
