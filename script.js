@@ -534,126 +534,206 @@ const validationState = {
   activityDateDetails: null
 };
 
+const EMPTY_ARRAY = Object.freeze([]);
+
+function createCenterDictionary(centerCodes, units, locations) {
+  if (!Array.isArray(centerCodes) || !centerCodes.length) return {};
+  const normalizedUnits = Array.isArray(units) ? [...units] : [];
+  const normalizedLocations = Array.isArray(locations) ? [...locations] : [];
+  return centerCodes.reduce((acc, code) => {
+    acc[code] = {
+      units: normalizedUnits,
+      locations: normalizedLocations
+    };
+    return acc;
+  }, {});
+}
+
+function normalizeCompanyRules(rules) {
+  if (!rules || typeof rules !== 'object') return {};
+  return Object.entries(rules).reduce((acc, [companyCode, entry]) => {
+    if (!entry || typeof entry !== 'object') return acc;
+    const depreciation = Array.isArray(entry.depreciation) ? [...entry.depreciation] : [];
+    const centers = {};
+    const centersSource = entry.centers;
+    if (centersSource && typeof centersSource === 'object' && !Array.isArray(centersSource)) {
+      Object.entries(centersSource).forEach(([centerCode, centerEntry]) => {
+        if (!centerEntry || typeof centerEntry !== 'object') return;
+        centers[centerCode] = {
+          units: Array.isArray(centerEntry.units) ? [...centerEntry.units] : [],
+          locations: Array.isArray(centerEntry.locations) ? [...centerEntry.locations] : []
+        };
+      });
+    } else if (Array.isArray(centersSource)) {
+      const sharedUnits = Array.isArray(entry.units) ? [...entry.units] : [];
+      const sharedLocations = Array.isArray(entry.locations) ? [...entry.locations] : [];
+      centersSource.forEach((centerCode) => {
+        centers[centerCode] = {
+          units: sharedUnits,
+          locations: sharedLocations
+        };
+      });
+    }
+    acc[companyCode] = { depreciation, centers };
+    return acc;
+  }, {});
+}
+
+function markCompanyRulesNormalized(rules) {
+  if (rules && typeof rules === 'object' && !rules.__normalized) {
+    Object.defineProperty(rules, '__normalized', { value: true, enumerable: false, configurable: true });
+  }
+  return rules || {};
+}
+
 const companyRules = {
   BMJF: {
-    centers: [
-      '4000','4100','4200','5000','6003','6004','6006','6007','7115','7500','7502','7510',
-      '9206','9216','9217','9227','9307','9308','9309','9333','9335','9344','9345','9351',
-      '9353','9355','9360','9361','9366','9367','9368','9372','9374','9375','9377','9378',
-      '9379','9381','9382','9397','9404','9416','9450','9460','9515','9600','9607','9618',
-      '9633','9650','9651','9655','9660','9661','9670','9682','9683','9684','9689','9696',
-      '9703','9718','9719','9728','9729','9733','9840','9860','9870','9880','9881','9910',
-      'EN01','MA10','SA20'
-    ],
-    units: [
-      'CD - COMITÊ DIGITAL',
-      'SU - JUIZ DE FORA - SUPRIMENTOS',
-      'UJ - JUIZ DE FORA - SIDERURGIA',
-      'UJ - JUIZ DE FORA - TREFILARIA',
-      'BM - BARRA MANSA - SIDERURGIA',
-      'BM - BARRA MANSA - TREFILARIA',
-      'SU - BARRA MANSA - ALMOXARIFADO',
-      'RS - RESENDE - SIDERURGIA',
-      'RS - RESENDE - TREFILARIA',
-      'SU - RESENDE - ALMOXARIFADO',
-      'ME - METÁLICOS CONTAGEM',
-      'BF - FLORESTAS SF',
-      'LP - DIR. LOGÍSTICA E PLAN.',
-      'BC - VP COMERCIAL',
-      'EC - ESCRITÓRIO CENTRAL - ECA',
-      'SH - TI - SHARED SERVICE',
-      'SU - SUPRIMENTOS CORPORATIVO',
-      'ME - PÁTIO SUC.IRACEMÁPOLIS',
-      'UP - PÁTIO SUC.IRACEMÁPOLIS',
-      'ME - ENTREPOSTO MARACANAÚ',
-      'ME - ENTREPOSTO JABOATÃO',
-      'ME - RCS ALVORADA',
-      'BC - LOJA SALVADOR',
-      'BC - DBA GUARAPUAVA',
-      'BC - CDB RIO DE JANEIRO',
-      'BC - DBA BOA VISTA',
-      'ME - RCS MANAUS',
-      'BC - DBA PATO BRANCO',
-      'ME - ENTREPOSTO PINHAIS',
-      'BC - LOJA BONSUCESSO',
-      'BC - CL CONFINS',
-      'BC - CDB SÃO PAULO',
-      'BC - CDB SALVADOR',
-      'BC - HUB SALVADOR',
-      'BC - CDB FORTALEZA',
-      'BC - LOJA ARICANDUVA',
-      'BC - LOJA MOGI DAS CRUZES',
-      'BC - LOJA SJ PINHAIS',
-      'BC - CL EXTREMA',
-      'BC - LOJA ITAIM PAULISTA',
-      'BC - LOJA OSASCO',
-      'BC - LOJA ITAQUAQUECETUBA',
-      'BC - LOJA BELO HORIZONTE',
-      'BC - LOJA SANTA BÁRBARA',
-      'ME - ENTREPOSTO GUARULHOS',
-      'ME - ENTREPOSTO CANDEIAS',
-      'BC - BELGO PRONTO CURITIBA',
-      'FT - FÁBRICA DE TELAS SP',
-      'SU - ALMOXARIFADO FÁBR. TELAS SP',
-      'ME - ENTREPOSTO FIAT GOIANIA',
-      'BC - CDB BELO HORIZONTE',
-      'BC - CDB CURITIBA',
-      'BC - CDB MARABÁ',
-      'ME - ENTREPOSTO BAURU',
-      'BC - DBA CASCAVEL',
-      'BC - DBA JUIZ DE FORA',
-      'BC - DBA RIO DAS PEDRAS',
-      'BC - LOJA RECIFE',
-      'BC - CDB BELÉM',
-      'BC - CDB RECIFE',
-      'BC - LOJA GUARULHOS',
-      'BC - CDB SÃO PAULO II',
-      'BC - BELGO PRONTO RIO DAS PEDRAS',
-      'GA - GUILMAN AMORIM',
-      'SU - SUPRIMENTOS - MONLEVADE',
-      'UM - MONLEVADE',
-      'SU - ALMOXARIFADO PIRACICABA',
-      'UP - PIRACICABA',
-      'SU - ALMOXARIFADO SABARÁ',
-      'US - SABARÁ',
-      'BC - BELGO PRONTO MARACANAÚ',
-      'RP - TREFILARIA RIO DAS PEDRAS',
-      'SU - ALMOXARIFADO RIO DAS PEDRAS',
-      'CE - COMERCIALIZADORA DE ENERGIA',
-      'MA - MINA DO ANDRADE',
-      'MS - MINA SERRA AZUL'
-    ],
-    // União das localizações de todos os centros acima que existem no mapa
-    locations: [
-      'AC','AF','EU','GR','GT','JF','LA','LE','MA','MS','RH','TI','TR','BM','ET','MU','RS',
-      'BH','BS','RI','SC','SR','CL','CO','IA','RD','BP','IR','JA','AV','MN','CT','HB','GU',
-      'CA','SP','TT','GO','BU','CS','GA','JM','RE','SI','PI','BA','SA','RP','BR','FR','MI',
-      'OV','SF','US'
-    ],
-    depreciation: ['CC-01', 'CC-02']
+    depreciation: ['CC-01', 'CC-02'],
+    centers: createCenterDictionary(
+      [
+        '4000','4100','4200','5000','6003','6004','6006','6007','7115','7500','7502','7510',
+        '9206','9216','9217','9227','9307','9308','9309','9333','9335','9344','9345','9351',
+        '9353','9355','9360','9361','9366','9367','9368','9372','9374','9375','9377','9378',
+        '9379','9381','9382','9397','9404','9416','9450','9460','9515','9600','9607','9618',
+        '9633','9650','9651','9655','9660','9661','9670','9682','9683','9684','9689','9696',
+        '9703','9718','9719','9728','9729','9733','9840','9860','9870','9880','9881','9910',
+        'EN01','MA10','SA20'
+      ],
+      [
+        'CD - COMITÊ DIGITAL',
+        'SU - JUIZ DE FORA - SUPRIMENTOS',
+        'UJ - JUIZ DE FORA - SIDERURGIA',
+        'UJ - JUIZ DE FORA - TREFILARIA',
+        'BM - BARRA MANSA - SIDERURGIA',
+        'BM - BARRA MANSA - TREFILARIA',
+        'SU - BARRA MANSA - ALMOXARIFADO',
+        'RS - RESENDE - SIDERURGIA',
+        'RS - RESENDE - TREFILARIA',
+        'SU - RESENDE - ALMOXARIFADO',
+        'ME - METÁLICOS CONTAGEM',
+        'BF - FLORESTAS SF',
+        'LP - DIR. LOGÍSTICA E PLAN.',
+        'BC - VP COMERCIAL',
+        'EC - ESCRITÓRIO CENTRAL - ECA',
+        'SH - TI - SHARED SERVICE',
+        'SU - SUPRIMENTOS CORPORATIVO',
+        'ME - PÁTIO SUC.IRACEMÁPOLIS',
+        'UP - PÁTIO SUC.IRACEMÁPOLIS',
+        'ME - ENTREPOSTO MARACANAÚ',
+        'ME - ENTREPOSTO JABOATÃO',
+        'ME - RCS ALVORADA',
+        'BC - LOJA SALVADOR',
+        'BC - DBA GUARAPUAVA',
+        'BC - CDB RIO DE JANEIRO',
+        'BC - DBA BOA VISTA',
+        'ME - RCS MANAUS',
+        'BC - DBA PATO BRANCO',
+        'ME - ENTREPOSTO PINHAIS',
+        'BC - LOJA BONSUCESSO',
+        'BC - CL CONFINS',
+        'BC - CDB SÃO PAULO',
+        'BC - CDB SALVADOR',
+        'BC - HUB SALVADOR',
+        'BC - CDB FORTALEZA',
+        'BC - LOJA ARICANDUVA',
+        'BC - LOJA MOGI DAS CRUZES',
+        'BC - LOJA SJ PINHAIS',
+        'BC - CL EXTREMA',
+        'BC - LOJA ITAIM PAULISTA',
+        'BC - LOJA OSASCO',
+        'BC - LOJA ITAQUAQUECETUBA',
+        'BC - LOJA BELO HORIZONTE',
+        'BC - LOJA SANTA BÁRBARA',
+        'ME - ENTREPOSTO GUARULHOS',
+        'ME - ENTREPOSTO CANDEIAS',
+        'BC - BELGO PRONTO CURITIBA',
+        'FT - FÁBRICA DE TELAS SP',
+        'SU - ALMOXARIFADO FÁBR. TELAS SP',
+        'ME - ENTREPOSTO FIAT GOIANIA',
+        'BC - CDB BELO HORIZONTE',
+        'BC - CDB CURITIBA',
+        'BC - CDB MARABÁ',
+        'ME - ENTREPOSTO BAURU',
+        'BC - DBA CASCAVEL',
+        'BC - DBA JUIZ DE FORA',
+        'BC - DBA RIO DAS PEDRAS',
+        'BC - LOJA RECIFE',
+        'BC - CDB BELÉM',
+        'BC - CDB RECIFE',
+        'BC - LOJA GUARULHOS',
+        'BC - CDB SÃO PAULO II',
+        'BC - BELGO PRONTO RIO DAS PEDRAS',
+        'GA - GUILMAN AMORIM',
+        'SU - SUPRIMENTOS - MONLEVADE',
+        'UM - MONLEVADE',
+        'SU - ALMOXARIFADO PIRACICABA',
+        'UP - PIRACICABA',
+        'SU - ALMOXARIFADO SABARÁ',
+        'US - SABARÁ',
+        'BC - BELGO PRONTO MARACANAÚ',
+        'RP - TREFILARIA RIO DAS PEDRAS',
+        'SU - ALMOXARIFADO RIO DAS PEDRAS',
+        'CE - COMERCIALIZADORA DE ENERGIA',
+        'MA - MINA DO ANDRADE',
+        'MS - MINA SERRA AZUL'
+      ],
+      [
+        'AC','AF','EU','GR','GT','JF','LA','LE','MA','MS','RH','TI','TR','BM','ET','MU','RS',
+        'BH','BS','RI','SC','SR','CL','CO','IA','RD','BP','IR','JA','AV','MN','CT','HB','GU',
+        'CA','SP','TT','GO','BU','CS','GA','JM','RE','SI','PI','BA','SA','RP','BR','FR','MI',
+        'OV','SF','US'
+      ]
+    )
   },
 
   BF00: {
-    centers: ['E001','E201','E202','E204','E205','E210','E213','E501','E507','E601','E602'],
-    units: ['BF - BIOFLORESTAS'],
-    locations: ['EC','CO','GA','BU','FA','RD','RQ','CB','FQ'],
-    depreciation: ['CC-03']
+    depreciation: ['CC-03'],
+    centers: createCenterDictionary(
+      ['E001','E201','E202','E204','E205','E210','E213','E501','E507','E601','E602'],
+      ['BF - BIOFLORESTAS'],
+      ['EC','CO','GA','BU','FA','RD','RQ','CB','FQ']
+    )
   },
 
   ACBR: {
-    centers: ['AC01','AC02'],
-    units: ['NL - NOVVA LOGÍSTICA LTDA'],
-    locations: ['GR','TI'],
-    depreciation: ['CC-03']
+    depreciation: ['CC-03'],
+    centers: createCenterDictionary(
+      ['AC01','AC02'],
+      ['NL - NOVVA LOGÍSTICA LTDA'],
+      ['GR','TI']
+    )
   },
 
   AMTL: {
-    centers: ['TL01'],
-    units: ['SU - SUPRIMENTOS SITREL','TL - SITREL'],
-    locations: ['ET','GR','GT','LA','LE','MA','MS','MU','RH','SU','TI','TL'],
-    depreciation: ['CC-03']
+    depreciation: ['CC-03'],
+    centers: createCenterDictionary(
+      ['TL01'],
+      ['SU - SUPRIMENTOS SITREL','TL - SITREL'],
+      ['ET','GR','GT','LA','LE','MA','MS','MU','RH','SU','TI','TL']
+    )
   }
 };
+
+const defaultCompanyRules = markCompanyRulesNormalized(normalizeCompanyRules(companyRules));
+
+function resolveCompanyRules() {
+  if (typeof window !== 'undefined') {
+    const globalRules = window.companyRules;
+    if (!globalRules) {
+      window.companyRules = defaultCompanyRules;
+      return window.companyRules;
+    }
+    if (!globalRules.__normalized) {
+      window.companyRules = markCompanyRulesNormalized(normalizeCompanyRules(globalRules));
+    }
+    return window.companyRules;
+  }
+  return defaultCompanyRules;
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : EMPTY_ARRAY;
+}
 
 /**
  * Atualiza o estado local de um projeto específico preservando imutabilidade do array.
@@ -779,8 +859,8 @@ const defaultSummaryContext = {
   ganttChart: summaryGanttChart
 };
 
-if (typeof window !== 'undefined' && !window.companyRules) {
-  window.companyRules = companyRules;
+if (typeof window !== 'undefined') {
+  resolveCompanyRules();
 }
 
 const formSummaryContext = {
@@ -1747,28 +1827,32 @@ function fillOptions(selectEl, items = [], { placeholder = 'Selecione...' } = {}
 }
 
 function getUnits(companyCode, centerCode) {
-  if (!centerCode) return [];
-  const key = `${companyCode}|${centerCode}`;
-  if (Array.isArray(window.unitsByCompanyCenter?.[key])) return window.unitsByCompanyCenter[key];
-  if (Array.isArray(window.centerUnits?.[centerCode])) return window.centerUnits[centerCode];
-  return [];
+  if (!companyCode || !centerCode) return EMPTY_ARRAY;
+  const rules = resolveCompanyRules();
+  const companyRule = rules?.[companyCode];
+  const centerRule = companyRule?.centers?.[centerCode];
+  return safeArray(centerRule?.units);
 }
 
-function getLocations(centerCode) {
-  if (!centerCode) return [];
-  return Array.isArray(window.centerLocations?.[centerCode]) ? window.centerLocations[centerCode] : [];
+function getLocations(companyCode, centerCode) {
+  if (!companyCode || !centerCode) return EMPTY_ARRAY;
+  const rules = resolveCompanyRules();
+  const companyRule = rules?.[companyCode];
+  const centerRule = companyRule?.centers?.[centerCode];
+  return safeArray(centerRule?.locations);
 }
 
 function applyCompany(companyCode, { centerEl, locationEl, unitEl }) {
-  const rulesSource = typeof window !== 'undefined' && window.companyRules ? window.companyRules : companyRules;
-  const centers = (rulesSource?.[companyCode]?.centers) || [];
+  const rules = resolveCompanyRules();
+  const centersMap = rules?.[companyCode]?.centers || {};
+  const centers = Object.keys(centersMap);
   fillOptions(centerEl, centers, { placeholder: 'Selecione o centro' });
-  fillOptions(locationEl, [],    { placeholder: 'Selecione a localização' });
-  fillOptions(unitEl, [],        { placeholder: 'Selecione a unidade' });
+  fillOptions(locationEl, EMPTY_ARRAY, { placeholder: 'Selecione a localização' });
+  fillOptions(unitEl, EMPTY_ARRAY, { placeholder: 'Selecione a unidade' });
 }
 
 function applyCenter(companyCode, centerCode, { locationEl, unitEl }) {
-  const locs  = getLocations(centerCode);
+  const locs  = getLocations(companyCode, centerCode);
   const units = getUnits(companyCode, centerCode);
   fillOptions(locationEl, locs,  { placeholder: 'Selecione a localização' });
   fillOptions(unitEl,      units,{ placeholder: 'Selecione a unidade' });
@@ -1776,9 +1860,9 @@ function applyCenter(companyCode, centerCode, { locationEl, unitEl }) {
 
 (function wireCompanyCenterLocationUnit() {
   function ready() {
-    return document.readyState !== 'loading'
-      && window.companyRules
-      && (window.centerLocations || window.unitsByCompanyCenter || window.centerUnits);
+    if (document.readyState === 'loading') return false;
+    const rules = resolveCompanyRules();
+    return Object.keys(rules || {}).length > 0;
   }
 
   function run() {
@@ -1830,47 +1914,59 @@ function applyCenter(companyCode, centerCode, { locationEl, unitEl }) {
  * @param {{center?:string, unit?:string, location?:string, depreciation?:string}} [selectedValues={}] - Valores previamente gravados.
  */
 function updateCompanyDependentFields(companyValue, selectedValues = {}) {
-  const rulesSource = typeof window !== 'undefined' && window.companyRules ? window.companyRules : companyRules;
-  const centers = (rulesSource?.[companyValue]?.centers) || [];
+  const rules = resolveCompanyRules();
+  const companyRule = rules?.[companyValue] || {};
+  const centersMap = companyRule.centers || {};
+  const centerCodes = Object.keys(centersMap);
 
-  fillOptions(centerSelect, centers, { placeholder: 'Selecione o centro' });
+  fillOptions(centerSelect, centerCodes, { placeholder: 'Selecione o centro' });
 
-  const desiredCenter = selectedValues.center && centers.includes(selectedValues.center)
-    ? selectedValues.center
-    : centerSelect?.value || '';
-  if (centerSelect && desiredCenter && centers.includes(desiredCenter)) {
+  const preferredCenter = selectedValues.center || '';
+  const currentValue = centerSelect?.value || '';
+  const desiredCenter = preferredCenter && centerCodes.includes(preferredCenter)
+    ? preferredCenter
+    : (centerCodes.includes(currentValue) ? currentValue : '');
+  if (centerSelect && desiredCenter) {
     centerSelect.value = desiredCenter;
   }
 
   const cascadeTargets = { centerEl: centerSelect, locationEl: locationSelect, unitEl: unitSelect };
   applyCenter(companyValue, centerSelect?.value || '', cascadeTargets);
 
-  const selectedLocation = selectedValues.location || '';
   if (locationSelect) {
-    const availableLocations = getLocations(centerSelect?.value || '');
+    const availableLocations = getLocations(companyValue, centerSelect?.value || '');
+    const selectedLocation = selectedValues.location || '';
     if (selectedLocation && availableLocations.includes(selectedLocation)) {
       locationSelect.value = selectedLocation;
     }
   }
 
-  const selectedUnit = selectedValues.unit || '';
   if (unitSelect) {
     const availableUnits = getUnits(companyValue, centerSelect?.value || '');
+    const selectedUnit = selectedValues.unit || '';
     if (selectedUnit && availableUnits.includes(selectedUnit)) {
       unitSelect.value = selectedUnit;
     }
   }
 
-  const depreciationOptions = (rulesSource?.[companyValue]?.depreciation) || [];
+  const depreciationOptions = safeArray(companyRule.depreciation);
   populateSelectOptions(depreciationSelect, depreciationOptions, selectedValues.depreciation);
 }
 
 function isValidSelection({ company, center, location, unit }) {
-  const centersOk = (window.companyRules?.[company]?.centers || []).includes(center);
-  if (!centersOk) return false;
-  const locOk = getLocations(center).includes(location);
-  if (!locOk) return false;
-  const unitOk = getUnits(company, center).includes(unit);
+  const rules = resolveCompanyRules();
+  const companyRule = rules?.[company];
+  if (!companyRule) return false;
+  const centerRule = companyRule.centers?.[center];
+  if (!centerRule) return false;
+
+  const locations = safeArray(centerRule.locations);
+  const units = safeArray(centerRule.units);
+
+  const locationOk = locations.length === 0 ? !location : locations.includes(location);
+  if (!locationOk) return false;
+
+  const unitOk = units.length === 0 ? !unit : units.includes(unit);
   return unitOk;
 }
 
