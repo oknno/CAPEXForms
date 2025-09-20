@@ -3598,6 +3598,19 @@ function ensureMilestoneBlock() {
 }
 
 /**
+ * Normaliza valores de ID para uso consistente em data attributes.
+ * @param {*} value - Valor original informado.
+ * @returns {string} Representação textual segura ou string vazia.
+ */
+function resolveDatasetId(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  const stringValue = String(value);
+  return stringValue ? stringValue : '';
+}
+
+/**
  * Cria linha PEP a partir do template aplicando dados já salvos, quando houver.
  * @param {{id?:string|number,title?:string,amount?:number|string,year?:number|string}} [param0={}] - Dados iniciais.
  * @returns {HTMLElement} Linha gerada.
@@ -3605,7 +3618,7 @@ function ensureMilestoneBlock() {
 function createSimplePepRow({ id = '', title = '', amount = '', year = '' } = {}) {
   const fragment = simplePepTemplate.content.cloneNode(true);
   const row = fragment.querySelector('.pep-row');
-  row.dataset.pepId = id;
+  row.dataset.pepId = resolveDatasetId(id);
   row.querySelector('.pep-title').value = title || '';
   row.querySelector('.pep-amount').value = sanitizeNumericInputValue(amount);
   row.querySelector('.pep-year').value = year ?? '';
@@ -3620,7 +3633,7 @@ function createSimplePepRow({ id = '', title = '', amount = '', year = '' } = {}
 function createMilestoneBlock({ id = '', title = '' } = {}) {
   const fragment = milestoneTemplate.content.cloneNode(true);
   const block = fragment.querySelector('.milestone');
-  block.dataset.milestoneId = id;
+  block.dataset.milestoneId = resolveDatasetId(id);
   block.querySelector('.milestone-title').value = title || '';
   return block;
 }
@@ -3641,8 +3654,12 @@ function addActivityBlock(milestoneElement, data = {}) {
   const pepTitleInput = activity.querySelector('.activity-pep-title');
   const pepYearInput = activity.querySelector('.activity-pep-year');
 
-  activity.dataset.activityId = data.id || '';
-  activity.dataset.pepId = data.pepId || '';
+  const resolvedMilestoneId = resolveDatasetId(
+    data.milestoneId ?? milestoneElement.dataset?.milestoneId ?? ''
+  );
+  activity.dataset.activityId = resolveDatasetId(data.id);
+  activity.dataset.pepId = resolveDatasetId(data.pepId);
+  activity.dataset.milestoneId = resolvedMilestoneId;
 
   activity.querySelector('.activity-title').value = data.title || '';
   if (amountInput) {
@@ -4135,10 +4152,15 @@ async function persistSimplePeps(projectId, approvalYear) {
     };
     if (id) {
       await sp.updateItem('Peps', Number(id), payload);
+      row.dataset.pepId = resolveDatasetId(id);
       currentIds.add(Number(id));
     } else {
       const created = await sp.createItem('Peps', payload);
-      currentIds.add(Number(created.Id));
+      const createdId = created?.Id;
+      row.dataset.pepId = resolveDatasetId(createdId);
+      if (Number.isFinite(Number(createdId))) {
+        currentIds.add(Number(createdId));
+      }
     }
   }
 
@@ -4180,8 +4202,8 @@ async function persistKeyProjects(projectId) {
     } else {
       const created = await sp.createItem('Milestones', payload);
       milestoneId = created.Id;
-      milestone.dataset.milestoneId = milestoneId;
     }
+    milestone.dataset.milestoneId = resolveDatasetId(milestoneId);
     milestoneIds.add(Number(milestoneId));
 
     for (const activity of milestone.querySelectorAll('.activity')) {
@@ -4201,8 +4223,9 @@ async function persistKeyProjects(projectId) {
       } else {
         const createdActivity = await sp.createItem('Activities', activityPayload);
         activityId = createdActivity.Id;
-        activity.dataset.activityId = activityId;
       }
+      activity.dataset.activityId = resolveDatasetId(activityId);
+      activity.dataset.milestoneId = resolveDatasetId(milestoneId);
       activityIds.add(Number(activityId));
 
       const pepTitle = activity.querySelector('.activity-pep-title')?.value.trim() || '';
@@ -4242,8 +4265,8 @@ async function persistKeyProjects(projectId) {
         } else {
           const createdPep = await sp.createItem('Peps', pepPayload);
           pepId = createdPep.Id;
-          activity.dataset.pepId = pepId;
         }
+        activity.dataset.pepId = resolveDatasetId(pepId);
         activityPepIds.add(Number(pepId));
       } else if (pepIdRaw) {
         await sp.deleteItem('Peps', Number(pepIdRaw));
