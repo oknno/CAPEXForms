@@ -1727,6 +1727,7 @@ function populateSelectOptions(selectElement, options = [], selectedValue = '') 
 function fillOptions(selectEl, items = [], { placeholder = 'Selecione...' } = {}) {
   if (!selectEl) return;
   const prev = selectEl.value;
+  const normalizedItems = Array.isArray(items) ? items.map((item) => String(item)) : [];
   selectEl.innerHTML = '';
   if (placeholder) {
     const opt0 = document.createElement('option');
@@ -1735,23 +1736,22 @@ function fillOptions(selectEl, items = [], { placeholder = 'Selecione...' } = {}
     selectEl.appendChild(opt0);
   }
   const frag = document.createDocumentFragment();
-  for (const v of items) {
+  for (const v of normalizedItems) {
     const opt = document.createElement('option');
-    opt.value = String(v);
-    opt.textContent = String(v);
+    opt.value = v;
+    opt.textContent = v;
     frag.appendChild(opt);
   }
   selectEl.appendChild(frag);
-  if (items.includes(prev)) selectEl.value = prev; // preserva seleção válida
+  if (normalizedItems.includes(prev)) selectEl.value = prev; // preserva seleção válida
 }
 
 function getUnits(companyCode, centerCode) {
   if (!centerCode) return [];
   const key = `${companyCode}|${centerCode}`;
-  if (typeof window.unitsByCompanyCenter?.[key] !== 'undefined') {
-    return window.unitsByCompanyCenter[key] || [];
-  }
-  return Array.isArray(window.centerUnits?.[centerCode]) ? window.centerUnits[centerCode] : [];
+  if (Array.isArray(window.unitsByCompanyCenter?.[key])) return window.unitsByCompanyCenter[key];
+  if (Array.isArray(window.centerUnits?.[centerCode])) return window.centerUnits[centerCode];
+  return [];
 }
 
 function getLocations(centerCode) {
@@ -1775,33 +1775,52 @@ function applyCenter(companyCode, centerCode, { locationEl, unitEl }) {
 }
 
 (function wireCompanyCenterLocationUnit() {
-  const els = {
-    companyEl:  document.getElementById('company'),
-    centerEl:   document.getElementById('center'),
-    locationEl: document.getElementById('location'),
-    unitEl:     document.getElementById('unit'),
-  };
-  if (!els.companyEl || !els.centerEl || !els.locationEl || !els.unitEl) {
-    console.warn('[cascata] Ajuste os IDs: company, center, location, unit.');
-    return;
+  function ready() {
+    return document.readyState !== 'loading'
+      && window.companyRules
+      && (window.centerLocations || window.unitsByCompanyCenter || window.centerUnits);
   }
 
-  els.companyEl.addEventListener('change', (e) => {
-    applyCompany(e.target.value, els);
-  });
-
-  els.centerEl.addEventListener('change', (e) => {
-    const company = els.companyEl.value || '';
-    applyCenter(company, e.target.value, els);
-  });
-
-  const initCompany = els.companyEl.value || '';
-  if (initCompany) {
-    applyCompany(initCompany, els);
-    const initCenter = els.centerEl.value || '';
-    if (initCenter) {
-      applyCenter(initCompany, initCenter, els);
+  function run() {
+    const companyEl  = document.getElementById('company');
+    const centerEl   = document.getElementById('center');
+    const locationEl = document.getElementById('location');
+    const unitEl     = document.getElementById('unit');
+    if (!companyEl || !centerEl || !locationEl || !unitEl) {
+      console.warn('[cascata] Ajuste os IDs: company, center, location, unit.');
+      return;
     }
+
+    const els = { companyEl, centerEl, locationEl, unitEl };
+
+    companyEl.addEventListener('change', (e) => {
+      applyCompany(e.target.value, els);
+    });
+
+    centerEl.addEventListener('change', (e) => {
+      const company = companyEl.value || '';
+      applyCenter(company, e.target.value, els);
+    });
+
+    const initCompany = companyEl.value || '';
+    if (initCompany) {
+      applyCompany(initCompany, els);
+      const initCenter = centerEl.value || '';
+      if (initCenter) applyCenter(initCompany, initCenter, els);
+    }
+  }
+
+  if (!ready()) {
+    const t0 = Date.now();
+    const iv = setInterval(() => {
+      if (ready()) { clearInterval(iv); run(); }
+      else if (Date.now() - t0 > 2000) { clearInterval(iv); console.warn('[cascata] Mapas/DOM não prontos.'); }
+    }, 50);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => { /* no-op */ }, { once: true });
+    }
+  } else {
+    run();
   }
 })();
 
@@ -1847,8 +1866,7 @@ function updateCompanyDependentFields(companyValue, selectedValues = {}) {
 }
 
 function isValidSelection({ company, center, location, unit }) {
-  const rulesSource = typeof window !== 'undefined' && window.companyRules ? window.companyRules : companyRules;
-  const centersOk = (rulesSource?.[company]?.centers || []).includes(center);
+  const centersOk = (window.companyRules?.[company]?.centers || []).includes(center);
   if (!centersOk) return false;
   const locOk = getLocations(center).includes(location);
   if (!locOk) return false;
