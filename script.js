@@ -535,18 +535,48 @@ const validationState = {
 };
 
 const companyRules = {
-  'Empresa 01': {
-    centers: ['Centro 01', 'Centro 02'],
+  BMJF: {
+    centers: [
+      '4000','4100','4200','5000','6003','6004','6006','6007','7115','7500','7502','7510',
+      '9206','9216','9217','9227','9307','9308','9309','9333','9335','9344','9345','9351',
+      '9353','9355','9360','9361','9366','9367','9368','9372','9374','9375','9377','9378',
+      '9379','9381','9382','9397','9404','9416','9450','9460','9515','9600','9607','9618',
+      '9633','9650','9651','9655','9660','9661','9670','9682','9683','9684','9689','9696',
+      '9703','9718','9719','9728','9729','9733','9840','9860','9870','9880','9881','9910',
+      'EN01','MA10','SA20'
+    ],
     units: ['Unidade 01', 'Unidade 02'],
-    locations: ['Local 01', 'Local 02'],
+    // União das localizações de todos os centros acima que existem no mapa
+    locations: [
+      'AC','AF','EU','GR','GT','JF','LA','LE','MA','MS','RH','TI','TR','BM','ET','MU','RS',
+      'BH','BS','RI','SC','SR','CL','CO','IA','RD','BP','IR','JA','AV','MN','CT','HB','GU',
+      'CA','SP','TT','GO','BU','CS','GA','JM','RE','SI','PI','BA','SA','RP','BR','FR','MI',
+      'OV','SF','US'
+    ],
     depreciation: ['CC-01', 'CC-02']
   },
-  'Empresa 02': {
-    centers: ['Centro 03'],
+
+  BF00: {
+    centers: ['E001','E201','E202','E204','E205','E210','E213','E501','E507','E601','E602'],
     units: ['Unidade 03', 'Unidade 04'],
-    locations: ['Local 03'],
+    locations: ['EC','CO','GA','BU','FA','RD','RQ','CB','FQ'],
+    depreciation: ['CC-03']
+  },
+
+  ACBR: {
+    centers: ['AC01','AC02'],
+    units: ['Unidade 03', 'Unidade 04'],
+    locations: ['GR','TI'],
+    depreciation: ['CC-03']
+  },
+
+  AMTL: {
+    centers: ['TL01'],
+    units: ['Unidade 03', 'Unidade 04'],
+    locations: ['ET','GR','GT','LA','LE','MA','MS','MU','RH','SU','TI','TL'],
     depreciation: ['CC-03']
   }
+
 };
 
 /**
