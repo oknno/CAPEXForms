@@ -2797,6 +2797,26 @@ function updateCompanyDependentFields(companyValue, selectedValues) {
     ? rules.depreciation.map((item) => String(item))
     : [];
   populateSelectOptions(depreciationSelect, depreciation, preserve.depreciation);
+
+  const preservedDepreciation = typeof preserve.depreciation === 'string'
+    ? preserve.depreciation.trim()
+    : preserve.depreciation;
+
+  if (
+    depreciationSelect &&
+    depreciationSelect.tagName === 'SELECT' &&
+    preservedDepreciation &&
+    !depreciation.some((item) => (
+      typeof item === 'string' ? item.trim() : item
+    ) === preservedDepreciation)
+  ) {
+    const legacyOption = document.createElement('option');
+    legacyOption.value = preserve.depreciation;
+    legacyOption.textContent = preserve.depreciation;
+    legacyOption.dataset.legacy = 'true';
+    depreciationSelect.appendChild(legacyOption);
+    depreciationSelect.value = preserve.depreciation;
+  }
 }
 
 function isValidSelection({ company, center, location, unit }) {
