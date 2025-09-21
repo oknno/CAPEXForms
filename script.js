@@ -1612,8 +1612,6 @@ const companySelect = document.getElementById('company');
 const centerSelect = document.getElementById('center');
 const unitSelect = document.getElementById('unit');
 const locationSelect = document.getElementById('location');
-const depreciationSelect = document.getElementById('depreciationCostCenter');
-
 const approvalYearInput = document.getElementById('approvalYear');
 const projectBudgetInput = document.getElementById('projectBudget');
 const investmentLevelSelect = document.getElementById('investmentLevel');
@@ -2125,17 +2123,6 @@ function bindEvents() {
 
   if (formSummaryCloseBtn) {
     formSummaryCloseBtn.addEventListener('click', () => closeForm());
-  }
-
-  if (companySelect) {
-    companySelect.addEventListener('change', (event) => {
-      updateCompanyDependentFields(event.target.value, {
-        center: '',
-        location: '',
-        unit: '',
-        depreciation: ''
-      });
-    });
   }
 
   const debouncedBudgetRecalculation = debounce(() => {
@@ -2695,20 +2682,55 @@ function applyCenter(companyCode, centerCode, { locationEl, unitEl }) {
 
     const els = { companyEl, centerEl, locationEl, unitEl };
 
-    companyEl.addEventListener('change', (e) => {
-      applyCompany(e.target.value, els);
-    });
+    const handleCompanyChange = (e) => {
+      const companyValue = e.target.value;
+      if (typeof updateCompanyDependentFields === 'function') {
+        const depValue = (document.getElementById('depreciationCostCenter')?.value || '').trim();
+        updateCompanyDependentFields(companyValue, {
+          center: '',
+          location: '',
+          unit: '',
+          depreciationCostCenter: depValue
+        });
+        return;
+      }
+      applyCompany(companyValue, els);
+    };
 
-    centerEl.addEventListener('change', (e) => {
-      const company = companyEl.value || '';
-      applyCenter(company, e.target.value, els);
-    });
+    const handleCenterChange = (e) => {
+      const companyValue = companyEl.value || '';
+      const centerValue = e.target.value;
+      if (typeof updateCompanyDependentFields === 'function') {
+        const depValue = (document.getElementById('depreciationCostCenter')?.value || '').trim();
+        updateCompanyDependentFields(companyValue, {
+          center: centerValue,
+          location: '',
+          unit: '',
+          depreciationCostCenter: depValue
+        });
+        return;
+      }
+      applyCenter(companyValue, centerValue, els);
+    };
+
+    companyEl.addEventListener('change', handleCompanyChange);
+    centerEl.addEventListener('change', handleCenterChange);
 
     const initCompany = companyEl.value || '';
     if (initCompany) {
-      applyCompany(initCompany, els);
-      const initCenter = centerEl.value || '';
-      if (initCenter) applyCenter(initCompany, initCenter, els);
+      if (typeof updateCompanyDependentFields === 'function') {
+        const depValue = (document.getElementById('depreciationCostCenter')?.value || '').trim();
+        updateCompanyDependentFields(initCompany, {
+          center: centerEl.value || '',
+          location: locationEl.value || '',
+          unit: unitEl.value || '',
+          depreciationCostCenter: depValue
+        });
+      } else {
+        applyCompany(initCompany, els);
+        const initCenter = centerEl.value || '';
+        if (initCenter) applyCenter(initCompany, initCenter, els);
+      }
     }
   }
 
@@ -2729,16 +2751,16 @@ function applyCenter(companyCode, centerCode, { locationEl, unitEl }) {
 /**
  * Atualiza selects dependentes (centro, unidade etc.) conforme empresa escolhida.
  * @param {string} companyValue - Empresa selecionada.
- * @param {{center?:string, unit?:string, location?:string, depreciation?:string}} [selectedValues={}] - Valores previamente gravados.
+ * @param {{center?:string, unit?:string, location?:string, depreciation?:string, depreciationCostCenter?:string}} [selectedValues={}] - Valores previamente gravados.
  */
 function updateCompanyDependentFields(companyValue, selectedValues) {
   const companySelect = document.getElementById('company');
   const centerSelect = document.getElementById('center');
   const locationSelect = document.getElementById('location');
   const unitSelect = document.getElementById('unit');
-  const depreciationSelect = document.getElementById('depreciationCostCenter');
+  const depreciationFieldElement = document.getElementById('depreciationCostCenter');
 
-  if (!centerSelect && !locationSelect && !unitSelect && !depreciationSelect) {
+  if (!centerSelect && !locationSelect && !unitSelect && !depreciationFieldElement) {
     return;
   }
 
@@ -2748,13 +2770,15 @@ function updateCompanyDependentFields(companyValue, selectedValues) {
         center: selectedValues.center != null ? String(selectedValues.center) : '',
         location: selectedValues.location != null ? String(selectedValues.location) : '',
         unit: selectedValues.unit != null ? String(selectedValues.unit) : '',
-        depreciation: selectedValues.depreciation != null ? String(selectedValues.depreciation) : ''
+        depreciation: (
+          selectedValues.depreciationCostCenter ?? selectedValues.depreciation ?? ''
+        )?.toString().trim()
       }
     : {
         center: centerSelect?.value || '',
         location: locationSelect?.value || '',
         unit: unitSelect?.value || '',
-        depreciation: depreciationSelect?.value || ''
+        depreciation: (depreciationFieldElement?.value ?? '').trim()
       };
 
   const allRules = typeof resolveCompanyRules === 'function' ? resolveCompanyRules() : {};
@@ -2793,29 +2817,35 @@ function updateCompanyDependentFields(companyValue, selectedValues) {
   populateSelectOptions(locationSelect, locations, preserve.location);
   populateSelectOptions(unitSelect, units, preserve.unit);
 
-  const depreciation = Array.isArray(rules.depreciation)
-    ? rules.depreciation.map((item) => String(item))
+  // --- Depreciação: suporta SELECT ou INPUT ---
+  const depreciationField = document.getElementById('depreciationCostCenter');
+  const preservedDep = (
+    (selectedValues && (selectedValues.depreciationCostCenter ?? selectedValues.depreciation)) ??
+    depreciationField?.value ??
+    ''
+  ).trim();
+
+  // Se houver regras de depreciação por empresa e o campo for SELECT, ainda permita popular.
+  const depreciationList = Array.isArray(rules?.depreciation)
+    ? rules.depreciation.map(String)
     : [];
-  populateSelectOptions(depreciationSelect, depreciation, preserve.depreciation);
 
-  const preservedDepreciation = typeof preserve.depreciation === 'string'
-    ? preserve.depreciation.trim()
-    : preserve.depreciation;
+  // Caso SELECT: popula como antes + opção legada se preciso
+  if (depreciationField && depreciationField.tagName === 'SELECT') {
+    populateSelectOptions(depreciationField, depreciationList, preservedDep);
 
-  if (
-    depreciationSelect &&
-    depreciationSelect.tagName === 'SELECT' &&
-    preservedDepreciation &&
-    !depreciation.some((item) => (
-      typeof item === 'string' ? item.trim() : item
-    ) === preservedDepreciation)
-  ) {
-    const legacyOption = document.createElement('option');
-    legacyOption.value = preserve.depreciation;
-    legacyOption.textContent = preserve.depreciation;
-    legacyOption.dataset.legacy = 'true';
-    depreciationSelect.appendChild(legacyOption);
-    depreciationSelect.value = preserve.depreciation;
+    if (preservedDep && !depreciationList.includes(preservedDep)) {
+      const legacyOption = document.createElement('option');
+      legacyOption.value = preservedDep;
+      legacyOption.textContent = preservedDep + ' (existente)';
+      legacyOption.dataset.legacy = 'true';
+      depreciationField.appendChild(legacyOption);
+      depreciationField.value = preservedDep;
+    }
+  } else if (depreciationField) {
+    // Caso INPUT: apenas preservar/escrever
+    if (preservedDep) depreciationField.value = preservedDep;
+    if (!depreciationField.placeholder) depreciationField.placeholder = 'Ex.: CC-01';
   }
 }
 
@@ -3061,7 +3091,7 @@ function fillFormWithProject(detail) {
     center: project.center || '',
     unit: project.unit || '',
     location: project.location || '',
-    depreciation: project.depreciationCostCenter || ''
+    depreciationCostCenter: project.depreciationCostCenter || ''
   });
 
   document.getElementById('projectUser').value = project.projectUser || '';
@@ -5068,7 +5098,8 @@ function collectProjectData() {
   const budgetValue = getProjectBudgetValue();
   const budgetBrl = Number.isFinite(budgetValue) ? budgetValue : 0;
   const investmentLevelValue = determineInvestmentLevel(budgetValue);
-  const depreciationValue = document.getElementById('depreciationCostCenter')?.value || '';
+  const depField = document.getElementById('depreciationCostCenter');
+  const depreciationValue = depField?.value || '';
 
   const data = {
     Title: document.getElementById('projectName').value.trim(),
@@ -5309,16 +5340,15 @@ function collectPepEntriesForSummary(simplePeps, activities) {
  * @returns {Object} Mapa de valores exibidos ao usuário.
  */
 function collectProjectDisplayValues() {
-  const depText = document.getElementById('depreciationCostCenter')?.selectedOptions?.[0]?.text
-    || depreciationSelect?.selectedOptions?.[0]?.text
-    || '';
+  const depField = document.getElementById('depreciationCostCenter');
+  const depValue = depField?.value || '';
   return {
     investmentLevel: getSelectOptionText(investmentLevelSelect),
     company: getSelectOptionText(companySelect),
     center: getSelectOptionText(centerSelect),
     unit: getSelectOptionText(unitSelect),
     location: getSelectOptionText(locationSelect),
-    depreciationCostCenter: depText,
+    depreciationCostCenter: depValue,
     category: getSelectOptionText(document.getElementById('category')),
     investmentType: getSelectOptionText(document.getElementById('investmentType')),
     assetType: getSelectOptionText(document.getElementById('assetType')),
