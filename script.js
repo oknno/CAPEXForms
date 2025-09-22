@@ -1581,6 +1581,9 @@ const errorSummaryList = document.getElementById('errorSummaryList');
 const statusField = document.getElementById('statusField');
 const budgetHint = document.getElementById('budgetHint');
 const dateHint = document.getElementById('dateHint');
+const businessNeedInput = document.getElementById('businessNeed');
+const proposedSolutionInput = document.getElementById('proposedSolution');
+const descriptionTextareas = [businessNeedInput, proposedSolutionInput];
 const simplePepSection = document.getElementById('simplePepSection');
 const simplePepList = document.getElementById('simplePepList');
 const addSimplePepBtn = document.getElementById('addSimplePepBtn');
@@ -2252,6 +2255,13 @@ function bindEvents() {
     projectSearch.addEventListener('input', () => renderProjectList({ defer: true }));
   }
 
+  descriptionTextareas.forEach((textarea) => {
+    if (!textarea) return;
+    const handleFeedbackUpdate = () => updateCommentFeedback(textarea);
+    textarea.addEventListener('input', handleFeedbackUpdate);
+    textarea.addEventListener('keyup', handleFeedbackUpdate);
+  });
+
   projectForm.addEventListener('submit', handleFormSubmit);
   projectForm.addEventListener('focusin', handleFormFocusCapture);
   if (saveProjectBtn) {
@@ -2405,6 +2415,8 @@ function bindEvents() {
 
   milestoneList.addEventListener('input', handleMilestoneFormChange);
   milestoneList.addEventListener('change', handleMilestoneFormChange);
+
+  refreshCommentFeedback();
 }
 
 // ============================================================================
@@ -3055,6 +3067,8 @@ if (form) {
       alert('Seleção inválida: verifique Empresa, Centro, Localização e Unidade.');
     }
   });
+
+  refreshCommentFeedback();
 }
 
 // ============================================================================
@@ -3194,6 +3208,7 @@ function openProjectForm(mode, detail = null) {
   projectForm.reset();
   resetFormStatus();
   resetValidationState();
+  refreshCommentFeedback();
   projectForm.dataset.mode = mode;
   projectForm.dataset.projectId = detail?.project?.Id || '';
   projectForm.dataset.submitIntent = 'save';
@@ -3236,6 +3251,7 @@ function openProjectForm(mode, detail = null) {
   overlay.classList.remove('hidden');
   queueGanttRefresh();
   validateAllDateRanges();
+  refreshCommentFeedback();
 }
 
 /**
@@ -3349,6 +3365,7 @@ function fillFormWithProject(detail) {
   validatePepBudget();
   validateActivityDates();
   validateAllDateRanges();
+  refreshCommentFeedback();
 }
 
 /**
@@ -4077,6 +4094,56 @@ function setSectionInteractive(section, enabled) {
   section.querySelectorAll('input, textarea, button').forEach((element) => {
     if (element.type === 'hidden') return;
     element.disabled = !enabled;
+  });
+}
+
+const COMMENT_FEEDBACK_CLASSES = ['danger', 'warning', 'success'];
+const COMMENT_FEEDBACK_MESSAGES = {
+  danger: 'Abaixo de 100 caracteres: sujeito a reprovação',
+  warning: 'Boa descrição',
+  success: 'Ótima descrição'
+};
+const DESCRIPTION_MIN_LENGTH = 30;
+
+function getCommentFeedbackElement(textarea) {
+  if (!textarea) return null;
+  const group = textarea.closest('.field-group');
+  if (!group) return null;
+  return group.querySelector('.comment-feedback');
+}
+
+function setCommentFeedbackState(feedback, stateKey) {
+  if (!feedback) return;
+  COMMENT_FEEDBACK_CLASSES.forEach((className) => feedback.classList.remove(className));
+  if (!stateKey) {
+    feedback.textContent = '';
+    return;
+  }
+  feedback.classList.add(stateKey);
+  feedback.textContent = COMMENT_FEEDBACK_MESSAGES[stateKey] || '';
+}
+
+function updateCommentFeedback(textarea) {
+  if (!textarea) return;
+  const feedback = getCommentFeedbackElement(textarea);
+  if (!feedback) return;
+  const length = textarea.value.trim().length;
+  const stateKey = length > 300 ? 'success' : length >= 100 ? 'warning' : 'danger';
+  setCommentFeedbackState(feedback, stateKey);
+}
+
+function refreshCommentFeedback() {
+  descriptionTextareas.forEach((textarea) => {
+    if (!textarea) return;
+    const feedback = getCommentFeedbackElement(textarea);
+    if (!feedback) return;
+    const length = textarea.value.trim().length;
+    if (length === 0) {
+      setCommentFeedbackState(feedback, null);
+      return;
+    }
+    const stateKey = length > 300 ? 'success' : length >= 100 ? 'warning' : 'danger';
+    setCommentFeedbackState(feedback, stateKey);
   });
 }
 
@@ -5007,6 +5074,58 @@ function runFormValidations(options = {}) {
   return { valid: false, issues };
 }
 
+function validateProjectDescriptions(options = {}) {
+  const { minLength = DESCRIPTION_MIN_LENGTH, focusOnError = false } = options;
+  const issues = [];
+  let firstInvalid = null;
+
+  descriptionTextareas.forEach((textarea) => {
+    if (!textarea) return;
+    const length = textarea.value.trim().length;
+    if (length >= minLength) {
+      return;
+    }
+    const label = getFieldLabel(textarea);
+    const message = `${label} deve conter ao menos ${minLength} caracteres.`;
+    applyFieldError(textarea, message);
+    issues.push(message);
+    if (!firstInvalid) {
+      firstInvalid = textarea;
+    }
+  });
+
+  if (!issues.length) {
+    return { valid: true, issues: [] };
+  }
+
+  scrollFormToTop();
+  const statusMessage = 'Não foi possível salvar. Verifique os erros abaixo.';
+  showStatus(statusMessage, { type: 'error' });
+  renderErrorSummary(
+    [
+      {
+        title: 'Descrições do projeto',
+        items: issues,
+        type: 'general',
+        focusElement: firstInvalid || null
+      }
+    ],
+    { tone: 'error', title: statusMessage }
+  );
+
+  if (focusOnError && firstInvalid && typeof firstInvalid.focus === 'function') {
+    requestAnimationFrame(() => {
+      try {
+        firstInvalid.focus({ preventScroll: true });
+      } catch (error) {
+        firstInvalid.focus();
+      }
+    });
+  }
+
+  return { valid: false, issues };
+}
+
 /**
  * Escuta eventos de input em campos de data para aplicar validações contextuais.
  * @param {Event} event - Evento disparado no formulário.
@@ -5244,6 +5363,14 @@ async function handleFormSubmit(event) {
 
   const validation = runFormValidations({ scrollOnError: true, focusFirstError: true });
   if (!validation.valid) {
+    return;
+  }
+
+  const descriptionValidation = validateProjectDescriptions({
+    minLength: DESCRIPTION_MIN_LENGTH,
+    focusOnError: true
+  });
+  if (!descriptionValidation.valid) {
     return;
   }
 
