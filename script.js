@@ -4426,29 +4426,23 @@ function calculatePepTotal() {
 }
 
 /**
- * Garante existência do elemento que exibe saldo restante dentro de um container.
- * @param {HTMLElement|null} container - Elemento pai que receberá a mensagem.
- * @param {HTMLElement|null} [reference=null] - Nó de referência para inserção antes.
+ * Garante a existência do indicador de orçamento restante junto ao título da seção.
+ * @param {HTMLLegendElement|null} legend - Legenda onde o indicador será inserido.
  * @returns {HTMLElement|null} Elemento criado ou reutilizado.
  */
-function ensurePepRemainingElement(container, reference = null) {
-  if (!container) {
+function ensurePepRemainingElement(legend) {
+  if (!legend) {
     return null;
   }
 
-  let indicator = container.querySelector('.pep-remaining');
+  let indicator = legend.querySelector('.pep-remaining');
   if (indicator) {
     return indicator;
   }
 
-  indicator = document.createElement('div');
+  indicator = document.createElement('span');
   indicator.className = 'pep-remaining';
-
-  if (reference && reference.parentNode === container) {
-    container.insertBefore(indicator, reference);
-  } else {
-    container.appendChild(indicator);
-  }
+  legend.appendChild(indicator);
 
   return indicator;
 }
@@ -4462,25 +4456,36 @@ function updatePepRemainingDisplays({ budget = getProjectBudgetValue(), total = 
   const remainingValue = hasBudget ? budget - total : 0;
   const formattedRemaining = BRL.format(Math.round(remainingValue * 100) / 100);
 
-  if (simplePepList) {
-    simplePepList.querySelectorAll('.pep-row').forEach((row) => {
-      const removeBtn = row.querySelector('.remove-row');
-      const indicator = ensurePepRemainingElement(row, removeBtn);
-      if (indicator) {
-        indicator.textContent = `Orçamento restante: ${formattedRemaining}`;
-      }
-    });
+  const legends = [];
+
+  if (simplePepSection) {
+    const legend = simplePepSection.querySelector('legend');
+    if (legend) {
+      legends.push(legend);
+    }
   }
 
-  if (milestoneList) {
-    milestoneList.querySelectorAll('.activity').forEach((activity) => {
-      const pepFieldGroup = activity.querySelector('.activity-pep-title')?.closest('.field-group');
-      const indicator = ensurePepRemainingElement(pepFieldGroup || activity);
-      if (indicator) {
-        indicator.textContent = `Orçamento restante: ${formattedRemaining}`;
-      }
-    });
+  if (keyProjectSection) {
+    const legend = keyProjectSection.querySelector('legend');
+    if (legend) {
+      legends.push(legend);
+    }
   }
+
+  legends.forEach((legend) => {
+    if (!hasBudget) {
+      const existing = legend.querySelector('.pep-remaining');
+      if (existing) {
+        existing.remove();
+      }
+      return;
+    }
+
+    const indicator = ensurePepRemainingElement(legend);
+    if (indicator) {
+      indicator.textContent = `Orçamento restante: ${formattedRemaining}`;
+    }
+  });
 }
 
 /**
