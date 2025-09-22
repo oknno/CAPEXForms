@@ -3585,60 +3585,64 @@ function renderMilestoneSummary() {
  */
 function populateSummaryGantt(options = {}) {
   const { refreshFirst = false } = options;
-  const context = activeSummaryContext;
+  const context = window.activeSummaryContext;
   const ganttSection = context?.ganttSection;
   const ganttChart = context?.ganttChart;
   if (!ganttSection || !ganttChart) return;
 
-  if (context) {
-    context.lastGanttResult = undefined;
-  }
+  // limpa estado anterior
+  if (context) context.lastGanttResult = undefined;
 
+  // se precisar, atualiza os dados antes de desenhar
   if (refreshFirst) {
-    refreshGantt();
+    if (typeof window.refreshGantt === 'function') {
+      window.refreshGantt();
+    }
     requestAnimationFrame(() => populateSummaryGantt());
     return;
   }
 
-  if (keyProjectSection.classList.contains('hidden')) {
-    ganttSection.classList.add('hidden');
-    ganttChart.innerHTML = '';
-    if (context) {
-      context.lastGanttResult = null;
-    }
+  // coleta atividades do formulário (independente da UI de edição estar visível)
+  const tasks = (typeof window.collectMilestonesForGantt === 'function')
+    ? window.collectMilestonesForGantt()
+    : [];
+
+  // mostra a seção do resumo sempre
+  ganttSection.classList?.remove('hidden');
+
+  // sem dados → mensagem amigável
+  if (!Array.isArray(tasks) || tasks.length === 0) {
+    ganttChart.innerHTML = '<p class="gantt-empty">Nenhuma atividade para exibir</p>';
+    if (context) context.lastGanttResult = null;
     return;
   }
 
   const assignResult = (result) => {
-    if (context) {
-      context.lastGanttResult = result || null;
-    }
+    if (context) context.lastGanttResult = result || null;
     return result;
   };
 
-  const drawSummary = () =>
-    assignResult(
-      drawGantt(collectMilestonesForGantt(), {
-        container: ganttSection,
-        chartElement: ganttChart,
-        titleElement: ganttSection.querySelector('h3'),
-        emptyMessage: 'Nenhuma atividade para exibir'
-      })
-    );
+  const drawSummary = () => assignResult(
+    window.drawGantt(tasks, {
+      container: ganttSection,
+      chartElement: ganttChart,
+      titleElement: ganttSection.querySelector('h3'),
+      emptyMessage: 'Nenhuma atividade para exibir'
+    })
+  );
 
-  if (ganttReady && window.google?.visualization?.Gantt) {
+  // carrega/usa Google Charts conforme disponibilidade
+  if (window.ganttReady && window.google?.visualization?.Gantt) {
     drawSummary();
-  } else if (ganttLoaderStarted && window.google?.charts) {
-    google.charts.setOnLoadCallback(drawSummary);
+  } else if (window.ganttLoaderStarted && window.google?.charts) {
+    window.google.charts.setOnLoadCallback(drawSummary);
   } else if (window.google?.charts) {
-    initGantt();
-    google.charts.setOnLoadCallback(drawSummary);
+    if (typeof window.initGantt === 'function') window.initGantt();
+    window.google.charts.setOnLoadCallback(drawSummary);
   } else {
-    ganttSection.classList.remove('hidden');
+    // fallback: mantém a seção com mensagem
     ganttChart.innerHTML = '<p class="gantt-empty">Nenhuma atividade para exibir</p>';
-    if (context) {
-      context.lastGanttResult = null;
-    }
+    if (context) context.lastGanttResult = null;
   }
 }
 
