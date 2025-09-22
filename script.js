@@ -4620,17 +4620,17 @@ function validatePepBudget(options = {}) {
 
 function parseDateInputValue(value) {
   if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return null;
+  const [_, y, mo, d] = m.map(Number);
+  return new Date(y, mo - 1, d, 0, 0, 0, 0);
 }
 
-function normalizeDateOnly(dateLike) {
-  const date = dateLike instanceof Date ? new Date(dateLike.getTime()) : new Date(dateLike);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  date.setHours(0, 0, 0, 0);
-  return date;
+function yyyyMmDdLocal(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function getDateRangePairs() {
@@ -4774,7 +4774,7 @@ function updateProjectDateWarning(message = '') {
 function applyProjectStartMinConstraint() {
   const input = projectStartDateInput || document.getElementById('startDate');
   if (!input) return;
-  input.min = new Date().toISOString().split('T')[0];
+  input.min = yyyyMmDdLocal(new Date());
 }
 
 function validateProjectStartDateMinimum(options = {}) {
@@ -4791,15 +4791,15 @@ function validateProjectStartDateMinimum(options = {}) {
     return true;
   }
 
-  const startDate = new Date(startValue);
-  if (Number.isNaN(startDate.getTime())) {
+  const start = parseDateInputValue(startValue);
+  if (!start) {
     return true;
   }
 
-  const normalizedStart = normalizeDateOnly(startDate);
-  const today = normalizeDateOnly(new Date());
+  const today = new Date();
+  const today0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-  if (normalizedStart && today && normalizedStart < today) {
+  if (start < today0) {
     projectStartDateInput.setCustomValidity(PROJECT_START_MIN_ERROR_MESSAGE);
     updateProjectDateWarning(PROJECT_START_MIN_ERROR_MESSAGE);
     if (report && typeof projectStartDateInput.reportValidity === 'function') {
