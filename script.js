@@ -1633,6 +1633,13 @@ const investmentLevelSelect = document.getElementById('investmentLevel');
 const projectStartDateInput = document.getElementById('startDate');
 const projectEndDateInput = document.getElementById('endDate');
 
+const businessNeedField = document.getElementById('businessNeed');
+const proposedSolutionField = document.getElementById('proposedSolution');
+const businessNeedFeedback = document.querySelector('#businessNeed + .comment-feedback');
+const proposedSolutionFeedback = document.querySelector('#proposedSolution + .comment-feedback');
+
+const COMMENT_FEEDBACK_CLASSES = ['danger', 'warning', 'success'];
+
 const simplePepTemplate = document.getElementById('simplePepTemplate');
 const milestoneTemplate = document.getElementById('milestoneTemplate');
 const activityTemplate = document.getElementById('activityTemplate');
@@ -2251,6 +2258,20 @@ function bindEvents() {
   if (projectSearch) {
     projectSearch.addEventListener('input', () => renderProjectList({ defer: true }));
   }
+
+  [
+    { field: businessNeedField, feedback: businessNeedFeedback },
+    { field: proposedSolutionField, feedback: proposedSolutionFeedback }
+  ].forEach(({ field, feedback }) => {
+    if (!field || !feedback) {
+      return;
+    }
+    const handler = () => updateCommentFeedback(field, feedback);
+    field.addEventListener('input', handler);
+    field.addEventListener('keyup', handler);
+  });
+
+  refreshCommentFeedback();
 
   projectForm.addEventListener('submit', handleFormSubmit);
   projectForm.addEventListener('focusin', handleFormFocusCapture);
@@ -3192,6 +3213,7 @@ function applyStatusBehavior(status) {
  */
 function openProjectForm(mode, detail = null) {
   projectForm.reset();
+  refreshCommentFeedback();
   resetFormStatus();
   resetValidationState();
   projectForm.dataset.mode = mode;
@@ -3276,6 +3298,7 @@ function fillFormWithProject(detail) {
 
   document.getElementById('businessNeed').value = project.businessNeed || '';
   document.getElementById('proposedSolution').value = project.proposedSolution || '';
+  refreshCommentFeedback();
 
   document.getElementById('kpiType').value = project.kpiType || '';
   document.getElementById('kpiName').value = project.kpiName || '';
@@ -4083,6 +4106,37 @@ function setSectionInteractive(section, enabled) {
 // ============================================================================
 // Validações de formulário
 // ============================================================================
+function resolveCommentFeedbackState(length) {
+  if (length > 300) {
+    return { tone: 'success', message: 'Ótima descrição' };
+  }
+  if (length >= 100) {
+    return { tone: 'warning', message: 'Boa descrição' };
+  }
+  if (length > 0) {
+    return { tone: 'danger', message: 'Abaixo de 100 caracteres: sujeito a reprovação' };
+  }
+  return { tone: '', message: '' };
+}
+
+function updateCommentFeedback(field, feedback) {
+  if (!field || !feedback) {
+    return;
+  }
+  const length = field.value.trim().length;
+  const { tone, message } = resolveCommentFeedbackState(length);
+  COMMENT_FEEDBACK_CLASSES.forEach((className) => feedback.classList.remove(className));
+  if (tone) {
+    feedback.classList.add(tone);
+  }
+  feedback.textContent = message;
+}
+
+function refreshCommentFeedback() {
+  updateCommentFeedback(businessNeedField, businessNeedFeedback);
+  updateCommentFeedback(proposedSolutionField, proposedSolutionFeedback);
+}
+
 function resetFormStatus() {
   if (!formStatus) return;
   formStatus.textContent = '';
@@ -4888,6 +4942,7 @@ function runFormValidations(options = {}) {
   const { scrollOnError = false, focusFirstError = false } = options;
 
   clearFieldErrors();
+  refreshCommentFeedback();
 
   const pepValid = validatePepBudget();
   const activityValid = validateActivityDates();
@@ -4895,6 +4950,21 @@ function runFormValidations(options = {}) {
   const projectStartMinValid = validateProjectStartDateMinimum();
 
   const invalidFields = collectInvalidFields();
+  [businessNeedField, proposedSolutionField]
+    .filter(Boolean)
+    .forEach((field) => {
+      const trimmedLength = field.value.trim().length;
+      if (trimmedLength > 0 && trimmedLength < 30) {
+        const label = getFieldLabel(field);
+        const message = `${label} deve ter pelo menos 30 caracteres.`;
+        invalidFields.push({
+          element: field,
+          label,
+          message,
+          type: 'general'
+        });
+      }
+    });
   invalidFields.forEach((issue) => {
     applyFieldError(issue.element, issue.message);
   });
