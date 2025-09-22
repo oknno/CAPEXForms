@@ -2284,7 +2284,13 @@ function bindEvents() {
     updateBudgetSections();
     validatePepBudget();
   }, 180);
-  projectBudgetInput.addEventListener('input', debouncedBudgetRecalculation);
+  projectBudgetInput.addEventListener('input', (event) => {
+    const sanitized = sanitizeNumericInputValue(event.target.value);
+    if (event.target.value !== sanitized) {
+      event.target.value = sanitized;
+    }
+    debouncedBudgetRecalculation();
+  });
 
   const scheduleActivityDateValidation = debounce((input) => {
     if (input) {
@@ -2338,6 +2344,10 @@ function bindEvents() {
 
   simplePepList.addEventListener('input', (event) => {
     if (event.target.classList?.contains('pep-amount')) {
+      const sanitized = sanitizeNumericInputValue(event.target.value);
+      if (event.target.value !== sanitized) {
+        event.target.value = sanitized;
+      }
       schedulePepBudgetValidation(event.target);
     }
   });
@@ -2381,6 +2391,10 @@ function bindEvents() {
       scheduleActivityDateValidation(event.target);
     }
     if (event.target.classList?.contains('activity-pep-amount')) {
+      const sanitized = sanitizeNumericInputValue(event.target.value);
+      if (event.target.value !== sanitized) {
+        event.target.value = sanitized;
+      }
       schedulePepBudgetValidation(event.target);
     }
     queueGanttRefresh();
@@ -4277,79 +4291,31 @@ function rememberFieldPreviousValue(element) {
 }
 
 /**
- * Normaliza strings numéricas aceitando formatos com vírgula/ponto.
+ * Normaliza strings numéricas aceitando apenas dígitos.
+ * Remove espaços, pontos, vírgulas e quaisquer caracteres não numéricos.
  * @param {*} value - Valor bruto informado pelo usuário.
- * @returns {string} Representação normalizada.
+ * @returns {string} Representação numérica apenas com dígitos.
  */
 function normalizeNumericString(value) {
   if (value === null || value === undefined) {
     return '';
   }
 
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value.toString() : '';
-  }
-
-  let text = String(value).trim();
+  const text = String(value).trim();
   if (!text) {
     return '';
   }
 
-  let sanitized = text.replace(/\s+/g, '');
-  let sign = '';
-  if (sanitized.startsWith('-')) {
-    sign = '-';
-    sanitized = sanitized.slice(1);
-  }
+  const withoutWhitespace = text.replace(/\s+/g, '');
+  const digitsOnly = withoutWhitespace
+    .replace(/[.,]/g, '')
+    .replace(/[^0-9]/g, '');
 
-  sanitized = sanitized.replace(/[^0-9.,]/g, '');
-  if (!sanitized) {
-    return '';
-  }
-
-  const separators = sanitized.match(/[.,]/g) || [];
-  const uniqueSeparators = new Set(separators);
-  const lastComma = sanitized.lastIndexOf(',');
-  const lastDot = sanitized.lastIndexOf('.');
-  let decimalIndex = Math.max(lastComma, lastDot);
-  let decimalSeparator = decimalIndex >= 0 ? sanitized[decimalIndex] : null;
-  let integerPart = sanitized;
-  let fractionalPart = '';
-
-  if (decimalSeparator) {
-    integerPart = sanitized.slice(0, decimalIndex);
-    fractionalPart = sanitized.slice(decimalIndex + 1);
-
-    if (
-      fractionalPart.length > 2 &&
-      separators.length > 1 &&
-      uniqueSeparators.size === 1
-    ) {
-      decimalSeparator = null;
-      integerPart = sanitized;
-      fractionalPart = '';
-    }
-  }
-
-  integerPart = integerPart.replace(/[.,]/g, '');
-  if (!integerPart) {
-    integerPart = '0';
-  }
-
-  if (!decimalSeparator) {
-    return sign + integerPart;
-  }
-
-  fractionalPart = fractionalPart.replace(/[.,]/g, '');
-  if (!fractionalPart) {
-    return sign + integerPart;
-  }
-
-  return `${sign}${integerPart}.${fractionalPart}`;
+  return digitsOnly;
 }
 
 /**
- * Converte valores variados em número de ponto flutuante, respeitando normalização.
+ * Converte valores variados em inteiro não negativo, respeitando normalização para dígitos.
  * @param {*} value - Valor a converter.
  * @returns {number} Número coerente ou NaN.
  */
@@ -4358,12 +4324,13 @@ function coerceNumericValue(value) {
   if (!normalized) {
     return NaN;
   }
-  const number = Number.parseFloat(normalized);
+
+  const number = Number.parseInt(normalized, 10);
   return Number.isFinite(number) ? number : NaN;
 }
 
 /**
- * Gera string numérica pronta para setar em inputs tipo number/text.
+ * Gera string numérica pronta para setar em inputs, mantendo apenas inteiros não negativos.
  * @param {*} value - Valor de origem.
  * @returns {string} Valor sanitizado ou vazio.
  */
@@ -4373,7 +4340,7 @@ function sanitizeNumericInputValue(value) {
 }
 
 /**
- * Interpreta valor numérico a partir de input ou string.
+ * Interpreta valor numérico a partir de input ou string, devolvendo inteiros sanitizados.
  * @param {HTMLInputElement|number|string} source - Fonte do valor.
  * @returns {number} Número válido ou 0.
  */
@@ -4381,9 +4348,6 @@ function parseNumericInputValue(source) {
   if (!source) return 0;
 
   if (typeof source === 'object' && source !== null) {
-    if (typeof source.valueAsNumber === 'number' && !Number.isNaN(source.valueAsNumber)) {
-      return source.valueAsNumber;
-    }
     const numericValue = coerceNumericValue(source.value);
     return Number.isFinite(numericValue) ? numericValue : 0;
   }
@@ -5788,7 +5752,7 @@ function showStatus(message, options = {}) {
  * @returns {number|null} Inteiro válido.
  */
 function parseNumber(value) {
-  const number = parseInt(value, 10);
+  const number = coerceNumericValue(value);
   return Number.isFinite(number) ? number : null;
 }
 
