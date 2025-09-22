@@ -1985,6 +1985,11 @@ function collectMilestonesForGantt() {
   return { rows, minDate, maxDate };
 }
 
+let ganttLoaderStarted = false;
+let ganttLoaded = false;
+let ganttRefreshScheduled = false;
+let summaryGanttRefreshScheduled = false;
+
 // ===== Desenha o Gantt (edição/criação por padrão) =====
 function drawGantt(rows, { container, chartElement, titleElement } = {}) {
   const fallbackContainer  = document.getElementById('ganttSection') || document.body;
@@ -2081,9 +2086,17 @@ function drawGantt(rows, { container, chartElement, titleElement } = {}) {
   return { rowCount: safeRows.length, minDate, maxDate, chart };
 }
 
+function refreshGantt() {
+  if (!ganttLoaded || !window.google?.visualization?.Gantt) {
+    return { rowCount: 0, minDate: null, maxDate: null, chart: null };
+  }
+  const data = collectMilestonesForGantt();
+  return drawGantt(data.rows);
+}
+
 // ===== Desenha o Gantt no RESUMO usando os containers do resumo =====
-function populateSummaryGantt() {
-  const { rows } = collectMilestonesForGantt();
+function populateSummaryGantt(options = {}) {
+  const { refreshFirst = false } = options;
   const container   = document.getElementById('summaryGanttSection');
   const chartEl     = document.getElementById('summaryGanttChart');
   const titleEl     = document.getElementById('summaryGanttTitle');
@@ -2091,12 +2104,19 @@ function populateSummaryGantt() {
   if (!container || !chartEl) {
     return { rowCount: 0, minDate: null, maxDate: null, chart: null };
   }
+  if (!window.google?.visualization?.Gantt) {
+    return { rowCount: 0, minDate: null, maxDate: null, chart: null };
+  }
+
+  if (refreshFirst && chartEl) {
+    chartEl.innerHTML = '';
+  }
+
+  const { rows } = collectMilestonesForGantt();
   return drawGantt(rows, { container, chartElement: chartEl, titleElement: titleEl });
 }
 
 // ===== Carregamento Google Charts/Gantt (uma única vez) =====
-let ganttLoaderStarted = false;
-let ganttLoaded        = false;
 function initGantt() {
   if (ganttLoaded || ganttLoaderStarted) return;
   ganttLoaderStarted = true;
@@ -2120,19 +2140,61 @@ function initGantt() {
   }
 }
 
-// ===== Agenda/redesenha Gantt com *debounce* seguro =====
-let ganttRefreshTimer = null;
+// ===== Agenda/redesenha Gantt com requestAnimationFrame duplo =====
 function queueGanttRefresh({ forSummary = false } = {}) {
   if (!ganttLoaded) return;
-  clearTimeout(ganttRefreshTimer);
-  ganttRefreshTimer = setTimeout(() => {
-    if (forSummary) {
-      populateSummaryGantt();
-    } else {
-      const data = collectMilestonesForGantt();
-      drawGantt(data.rows);
-    }
-  }, 80);
+
+  if (forSummary) {
+    if (summaryGanttRefreshScheduled) return;
+    summaryGanttRefreshScheduled = true;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        summaryGanttRefreshScheduled = false;
+        populateSummaryGantt({ refreshFirst: true });
+      });
+    });
+    return;
+  }
+
+  if (ganttRefreshScheduled) return;
+  ganttRefreshScheduled = true;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      ganttRefreshScheduled = false;
+      refreshGantt();
+    });
+  });
+}
+
+// ===== Redraw do Gantt conforme tamanho/visibilidade =====
+let __ganttRO;
+function setupGanttRedrawObservers() {
+  const targets = [
+    document.getElementById('ganttContainer'),
+    document.getElementById('summaryGanttSection'),
+    document.getElementById('formSummaryGanttSection')
+  ].filter(Boolean);
+
+  const triggerRedraw = () => {
+    queueGanttRefresh();
+    populateSummaryGantt({ refreshFirst: true });
+  };
+
+  if ('ResizeObserver' in window) {
+    __ganttRO?.disconnect?.();
+    __ganttRO = new ResizeObserver(() => {
+      triggerRedraw();
+    });
+    targets.forEach(t => __ganttRO.observe(t));
+  }
+
+  window.addEventListener('resize', triggerRedraw);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupGanttRedrawObservers, { once: true });
+} else {
+  setupGanttRedrawObservers();
 }
 
 // ============================================================================
