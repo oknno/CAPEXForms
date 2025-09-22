@@ -1585,14 +1585,22 @@ const keyProjectSection = document.getElementById('keyProjectSection');
 const milestoneList = document.getElementById('milestoneList');
 const addMilestoneBtn = document.getElementById('addMilestoneBtn');
 
-const ganttContainer = document.getElementById('ganttContainer');
-const ganttTitleEl = document.getElementById('ganttChartTitle');
+const ganttContainer = document.getElementById('ganttSection') || document.getElementById('ganttContainer');
+const ganttTitleEl = document.getElementById('ganttTitle') || document.getElementById('ganttChartTitle');
 const ganttChartEl = document.getElementById('ganttChart');
+
+if (ganttContainer && !document.getElementById('ganttSection')) {
+  ganttContainer.id = 'ganttSection';
+}
+if (ganttTitleEl && !document.getElementById('ganttTitle')) {
+  ganttTitleEl.id = 'ganttTitle';
+}
 
 const summaryOverlay = document.getElementById('summaryOverlay');
 const summarySections = document.getElementById('summarySections');
 const summaryGanttSection = document.getElementById('summaryGanttSection');
 const summaryGanttChart = document.getElementById('summaryGanttChart');
+const summaryGanttTitleEl = document.getElementById('summaryGanttTitle') || summaryGanttSection?.querySelector('h3') || null;
 const summaryConfirmBtn = document.getElementById('summaryConfirmBtn');
 const summaryEditBtn = document.getElementById('summaryEditBtn');
 
@@ -1603,6 +1611,10 @@ const formSummarySections = document.getElementById('formSummarySections');
 const formSummaryGanttSection = document.getElementById('formSummaryGanttSection');
 const formSummaryGanttChart = document.getElementById('formSummaryGanttChart');
 const formSummaryCloseBtn = document.getElementById('formSummaryCloseBtn');
+
+if (summaryGanttTitleEl && !summaryGanttTitleEl.id) {
+  summaryGanttTitleEl.id = 'summaryGanttTitle';
+}
 
 if (summaryTitle && !summaryTitle.hasAttribute('tabindex')) {
   summaryTitle.setAttribute('tabindex', '-1');
@@ -1760,290 +1772,249 @@ function clearSummaryContent(context) {
   }
 }
 
+function ensureActivityRowClasses(root = document) {
+  const list = root?.classList?.contains?.('activity')
+    ? [root, ...root.querySelectorAll('.activity')]
+    : root.querySelectorAll('.activity');
+
+  list.forEach((activity) => {
+    if (!activity.classList.contains('activity-row')) {
+      activity.classList.add('activity-row');
+    }
+    const titleInput = activity.querySelector('.activity-title');
+    if (titleInput && !titleInput.classList.contains('activity-name')) {
+      titleInput.classList.add('activity-name');
+    }
+  });
+}
+
 // ============================================================================
 // Gantt Chart
 // ============================================================================
-let ganttLoaderStarted = false;
-let ganttReady = false;
-let ganttRefreshScheduled = false;
 let summaryTriggerButton = null;
 
-/**
- * Inicializa carregamento do pacote Google Charts para o gráfico de Gantt.
- * Evita requisições duplicadas utilizando flags locais.
- */
-function initGantt() {
-  if (ganttLoaderStarted) return;
-  if (!window.google || !google.charts) return;
-  ganttLoaderStarted = true;
-  google.charts.load('current', { packages: ['gantt'] });
-  google.charts.setOnLoadCallback(() => {
-    ganttReady = true;
-    refreshGantt();
-  });
-}
-
-/**
- * Agenda atualização do Gantt usando requestAnimationFrame para otimizar repaints.
- */
-function queueGanttRefresh() {
-  if (ganttRefreshScheduled) return;
-  ganttRefreshScheduled = true;
-  requestAnimationFrame(() => {
-    ganttRefreshScheduled = false;
-    refreshGantt();
-  });
-}
-
-/**
- * Atualiza visualização do gráfico de Gantt com base nas atividades cadastradas.
- * Oculta o container quando não há dados válidos.
- */
-function refreshGantt() {
-  if (!ganttContainer) return;
-  if (keyProjectSection.classList.contains('hidden')) {
-    ganttContainer.classList.add('hidden');
-    if (ganttChartEl) {
-      ganttChartEl.innerHTML = '';
+// ===== Utilitário seguro de datas =====
+function parseDateSafe(v) {
+  if (!v) return null;
+  if (v instanceof Date && !isNaN(v.valueOf())) return v;
+  if (typeof v === 'number') {
+    const d = new Date(v);
+    return isNaN(d.valueOf()) ? null : d;
+  }
+  if (typeof v === 'string') {
+    const m = v.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) {
+      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      return isNaN(d.valueOf()) ? null : d;
     }
-    return;
+    const d = new Date(v);
+    return isNaN(d.valueOf()) ? null : d;
   }
-
-  const milestones = collectMilestonesForGantt();
-  const draw = () => drawGantt(milestones);
-
-  if (ganttReady && window.google?.visualization?.Gantt) {
-    draw();
-  } else if (ganttLoaderStarted && window.google?.charts) {
-    google.charts.setOnLoadCallback(draw);
-  } else {
-    initGantt();
-  }
+  return null;
 }
 
-/**
- * Varre o DOM para construir estrutura mínima de marcos e atividades usada pelo Gantt.
- * @returns {Array<{nome:string, atividades:Array}>} Lista de marcos com atividades.
- */
+// ===== Coleta as linhas do Gantt a partir do formulário =====
 function collectMilestonesForGantt() {
-  const milestones = [];
-  if (!milestoneList) return milestones;
-
-  milestoneList.querySelectorAll('.milestone').forEach((milestoneEl, index) => {
-    const titleInput = milestoneEl.querySelector('.milestone-title');
-    const nome = titleInput?.value.trim() || `Marco ${index + 1}`;
-    const atividades = [];
-
-    milestoneEl.querySelectorAll('.activity').forEach((activityEl, actIndex) => {
-      const title = activityEl.querySelector('.activity-title')?.value.trim() || `Atividade ${actIndex + 1}`;
-      const inicio = activityEl.querySelector('.activity-start')?.value || null;
-      const fim = activityEl.querySelector('.activity-end')?.value || null;
-      const anual = [];
-      const ano = parseNumber(activityEl.querySelector('.activity-pep-year')?.value);
-      const amountRaw = parseNumericInputValue(activityEl.querySelector('.activity-pep-amount'));
-      const amount = Number.isFinite(amountRaw) ? amountRaw : 0;
-      const descricao = activityEl.querySelector('.activity-pep-title')?.value.trim() || '';
-
-      if (descricao || ano || amount > 0) {
-        anual.push({
-          ano,
-          capex_brl: amount,
-          descricao
-        });
-      }
-
-      atividades.push({
-        titulo: title,
-        inicio,
-        fim,
-        anual
-      });
-    });
-
-    milestones.push({
-      nome,
-      atividades
-    });
-  });
-
-  return milestones;
-}
-
-/**
- * Renderiza gráfico de Gantt no container informado.
- * @param {Array} milestones - Estrutura gerada por collectMilestonesForGantt.
- * @param {Object} [options={}] - Permite customizar elementos e mensagens.
- * @returns {Object|null} Informações sobre datas e linhas renderizadas.
- */
-function drawGantt(milestones, options = {}) {
-  const {
-    container = ganttContainer,
-    chartElement = ganttChartEl,
-    titleElement = ganttTitleEl,
-    emptyMessage = 'Nenhuma atividade para exibir'
-  } = options;
-
-  if (!container || !chartElement) return null;
-  if (!window.google?.visualization?.DataTable || !window.google?.visualization?.Gantt) {
-    return null;
-  }
-
-  const parseDate = (value, { isStart } = {}) => {
-    if (!value) return null;
-    const suffix = isStart ? 'T00:00:00' : 'T23:59:59';
-    const date = new Date(`${value}${suffix}`);
-    return Number.isNaN(date.getTime()) ? null : date;
-  };
-
   const rows = [];
-  let idCounter = 0;
   let minDate = null;
   let maxDate = null;
 
-  const safeMilestones = Array.isArray(milestones) ? milestones : [];
+  // 1) Atividades
+  document.querySelectorAll('.activity-row').forEach((row, idx) => {
+    const name = row.querySelector('.activity-name')?.value?.trim() || `Atividade ${idx+1}`;
+    const start = parseDateSafe(row.querySelector('.activity-start')?.value);
+    const end   = parseDateSafe(row.querySelector('.activity-end')?.value);
+    if (!start || !end || end < start) return;
 
-  safeMilestones.forEach((milestone) => {
-    if (!milestone) return;
+    minDate = (!minDate || start < minDate) ? start : minDate;
+    maxDate = (!maxDate || end   > maxDate) ? end   : maxDate;
 
-    const activities = Array.isArray(milestone.atividades) ? milestone.atividades : [];
-    const validActivities = [];
-    let milestoneStart = null;
-    let milestoneEnd = null;
-
-    activities.forEach((activity, index) => {
-      if (!activity) return;
-
-      const startDate = parseDate(activity.inicio, { isStart: true });
-      const endDate = parseDate(activity.fim, { isStart: false });
-
-      if (!startDate || !endDate || endDate < startDate) {
-        return;
-      }
-
-      if (!milestoneStart || startDate < milestoneStart) milestoneStart = startDate;
-      if (!milestoneEnd || endDate > milestoneEnd) milestoneEnd = endDate;
-
-      if (!minDate || startDate < minDate) minDate = startDate;
-      if (!maxDate || endDate > maxDate) maxDate = endDate;
-
-      const anualList = Array.isArray(activity.anual) ? activity.anual : [];
-      const totalCapex = anualList.reduce((total, year) => total + (Number(year?.capex_brl) || 0), 0);
-      const tooltipLines = anualList.map((year) => {
-        const yearLabel = year?.ano ?? 'Ano não informado';
-        const description = year?.descricao ? ` - ${year.descricao}` : '';
-        const value = Number(year?.capex_brl) || 0;
-        return `${yearLabel}: ${BRL.format(value)}${description}`;
-      });
-
-      const tooltipParts = [`CAPEX total: ${BRL.format(totalCapex)}`];
-      if (tooltipLines.length) {
-        tooltipParts.push(...tooltipLines);
-      }
-
-      validActivities.push({
-        index,
-        title: activity.titulo || `Atividade ${index + 1}`,
-        startDate,
-        endDate,
-        duration: endDate.getTime() - startDate.getTime(),
-        tooltip: tooltipParts.join('<br/>')
-      });
-    });
-
-    if (!validActivities.length) {
-      return;
-    }
-
-    idCounter += 1;
-    const milestoneId = `ms-${idCounter}`;
-    const milestoneName = milestone.nome || `Marco ${idCounter}`;
-
-    if (milestoneStart && milestoneEnd) {
-      const milestoneDuration = milestoneEnd.getTime() - milestoneStart.getTime();
-      rows.push([
-        milestoneId,
-        milestoneName,
-        'Marco',
-        milestoneStart,
-        milestoneEnd,
-        milestoneDuration,
-        0,
-        null,
-        milestoneName
-      ]);
-
-      if (!minDate || milestoneStart < minDate) minDate = milestoneStart;
-      if (!maxDate || milestoneEnd > maxDate) maxDate = milestoneEnd;
-    }
-
-    validActivities.forEach((activity) => {
-      rows.push([
-        `${milestoneId}-${activity.index}`,
-        activity.title,
-        'Atividade',
-        activity.startDate,
-        activity.endDate,
-        activity.duration,
-        0,
-        milestoneId,
-        activity.tooltip
-      ]);
-    });
+    rows.push([
+      `A${idx+1}`,  // Task ID
+      name,         // Task Name
+      'Atividade',  // Resource
+      start,        // Start Date (Date)
+      end,          // End Date (Date)
+      null,         // Duration SEMPRE null (evita bug "datefield")
+      100,          // % Complete
+      null,         // Dependencies
+      null          // Tooltip (html) - opcional
+    ]);
   });
 
-  if (!rows.length || !minDate || !maxDate) {
-    container.classList.remove('hidden');
-    if (titleElement) {
-      titleElement.classList.remove('hidden');
-    }
-    chartElement.innerHTML = `<p class="gantt-empty">${emptyMessage}</p>`;
-    return { minDate: null, maxDate: null, rowCount: 0, chart: null };
-  }
+  // 2) Marcos (opcional)
+  document.querySelectorAll('.milestone').forEach((block, idx) => {
+    const title = block.querySelector('.milestone-title')?.value?.trim();
+    const start = parseDateSafe(block.querySelector('.milestone-date')?.value);
+    if (!title || !start) return;
 
-  chartElement.innerHTML = '';
+    minDate = (!minDate || start < minDate) ? start : minDate;
+    maxDate = (!maxDate || start > maxDate) ? start : maxDate;
+
+    rows.push([
+      `M${idx+1}`,
+      title,
+      'Marco',
+      start,
+      start,  // marco: start = end
+      null,   // Duration null
+      100,
+      null,
+      null
+    ]);
+  });
+
+  return { rows, minDate, maxDate };
+}
+
+// ===== Desenha o Gantt (edição/criação por padrão) =====
+function drawGantt(rows, { container, chartElement, titleElement } = {}) {
+  const fallbackContainer  = document.getElementById('ganttSection') || document.body;
+  const fallbackChartEl    = document.getElementById('ganttChart');
+  const fallbackTitleEl    = document.getElementById('ganttTitle');
+
+  const useContainer   = container     || fallbackContainer;
+  const useChartEl     = chartElement  || fallbackChartEl;
+  const useTitleEl     = titleElement  || fallbackTitleEl;
+
+  if (!rows || !rows.length || !useChartEl) {
+    if (useChartEl) useChartEl.innerHTML = '<div class="gantt-empty">Nenhuma atividade válida para exibir.</div>';
+    if (useTitleEl) useTitleEl.classList.add('hidden');
+    if (useContainer) useContainer.classList.remove('hidden');
+    return { rowCount: 0, minDate: null, maxDate: null, chart: null };
+  }
 
   const data = new google.visualization.DataTable();
   data.addColumn('string', 'Task ID');
   data.addColumn('string', 'Task Name');
   data.addColumn('string', 'Resource');
-  data.addColumn('date', 'Start Date');
-  data.addColumn('date', 'End Date');
-  data.addColumn('number', 'Duration');
+  data.addColumn('date',   'Start Date');
+  data.addColumn('date',   'End Date');
+  data.addColumn('number', 'Duration');         // manter a coluna, mas usar null
   data.addColumn('number', 'Percent Complete');
   data.addColumn('string', 'Dependencies');
   data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
-  data.addRows(rows);
 
-  const chart = new google.visualization.Gantt(chartElement);
-  const chartOptions = {
-    height: Math.max(200, rows.length * 40 + 40),
+  const safeRows = rows.map(r => {
+    const start = parseDateSafe(r[3]) || null;
+    const end   = parseDateSafe(r[4]) || null;
+    return [
+      String(r[0] ?? ''),
+      String(r[1] ?? ''),
+      String(r[2] ?? ''),
+      start,
+      end,
+      null,                       // Duration forçado a null
+      Number(r[6] ?? 100) || 0,
+      r[7] ? String(r[7]) : null,
+      r[8] ?? null
+    ];
+  });
+
+  const anyValid = safeRows.some(r => r[3] instanceof Date && r[4] instanceof Date);
+  if (!anyValid) {
+    useChartEl.innerHTML = '<div class="gantt-empty">Nenhuma atividade válida para exibir.</div>';
+    if (useTitleEl) useTitleEl.classList.add('hidden');
+    useContainer.classList.remove('hidden');
+    return { rowCount: 0, minDate: null, maxDate: null, chart: null };
+  }
+
+  data.addRows(safeRows);
+
+  let minDate = null, maxDate = null;
+  for (const r of safeRows) {
+    const s = r[3], e = r[4];
+    if (s && (!minDate || s < minDate)) minDate = s;
+    if (e && (!maxDate || e > maxDate)) maxDate = e;
+  }
+
+  const chart = new google.visualization.Gantt(useChartEl);
+  const options = {
     tooltip: { isHtml: true },
     gantt: {
-      criticalPathEnabled: false,
-      arrow: {
-        angle: 0,
-        width: 0,
-        color: '#ffffff',
-        radius: 0
-      },
-      trackHeight: 30,
-      palette: [
-        { color: '#460a78', dark: '#be2846', light: '#e63c41' },
-        { color: '#f58746', dark: '#e63c41', light: '#ffbe6e' }
-      ],
-      minDate,
-      maxDate
+      trackHeight: 28,
+      innerGridHorizLine: { strokeWidth: 0.4 },
+      innerGridTrack:     { fill: '#fafafa' },
+      innerGridDarkTrack: { fill: '#f2f2f2' },
+      labelStyle: { fontName: 'Inter, Arial, sans-serif' },
+      ...(minDate ? { minDate } : {}),
+      ...(maxDate ? { maxDate } : {})
     }
   };
 
-  chart.draw(data, chartOptions);
-
-  container.classList.remove('hidden');
-  if (titleElement) {
-    titleElement.classList.remove('hidden');
+  try {
+    chart.draw(data, options);
+  } catch (err) {
+    console.warn('Gantt falhou, tentando fallback sem tooltip/duração', err);
+    const view = new google.visualization.DataView(data);
+    view.setColumns([0,1,2,3,4,5,6,7]); // sem tooltip
+    try {
+      chart.draw(view, options);
+    } catch (err2) {
+      useChartEl.innerHTML = '<div class="gantt-empty">Não foi possível renderizar o Gantt com os dados atuais.</div>';
+      if (useTitleEl) useTitleEl.classList.add('hidden');
+      useContainer.classList.remove('hidden');
+      return { rowCount: safeRows.length, minDate, maxDate, chart: null };
+    }
   }
 
-  return { minDate, maxDate, rowCount: rows.length, chart };
+  if (useTitleEl) useTitleEl.classList.remove('hidden');
+  useContainer.classList.remove('hidden');
+  return { rowCount: safeRows.length, minDate, maxDate, chart };
+}
+
+// ===== Desenha o Gantt no RESUMO usando os containers do resumo =====
+function populateSummaryGantt() {
+  const { rows } = collectMilestonesForGantt();
+  const container   = document.getElementById('summaryGanttSection');
+  const chartEl     = document.getElementById('summaryGanttChart');
+  const titleEl     = document.getElementById('summaryGanttTitle');
+
+  if (!container || !chartEl) {
+    return { rowCount: 0, minDate: null, maxDate: null, chart: null };
+  }
+  return drawGantt(rows, { container, chartElement: chartEl, titleElement: titleEl });
+}
+
+// ===== Carregamento Google Charts/Gantt (uma única vez) =====
+let ganttLoaderStarted = false;
+let ganttLoaded        = false;
+function initGantt() {
+  if (ganttLoaded || ganttLoaderStarted) return;
+  ganttLoaderStarted = true;
+
+  const start = () => {
+    google.charts.load('current', { packages: ['gantt'] });
+    google.charts.setOnLoadCallback(() => {
+      ganttLoaded = true;
+      queueGanttRefresh();
+    });
+  };
+
+  if (!window.google || !google.charts) {
+    const s = document.createElement('script');
+    s.src = 'https://www.gstatic.com/charts/loader.js';
+    s.async = true;
+    s.onload = start;
+    document.head.appendChild(s);
+  } else {
+    start();
+  }
+}
+
+// ===== Agenda/redesenha Gantt com *debounce* seguro =====
+let ganttRefreshTimer = null;
+function queueGanttRefresh({ forSummary = false } = {}) {
+  if (!ganttLoaded) return;
+  clearTimeout(ganttRefreshTimer);
+  ganttRefreshTimer = setTimeout(() => {
+    if (forSummary) {
+      populateSummaryGantt();
+    } else {
+      const data = collectMilestonesForGantt();
+      drawGantt(data.rows);
+    }
+  }, 80);
 }
 
 // ============================================================================
@@ -2071,6 +2042,7 @@ function init() {
   }
 
   bindEvents();
+  ensureActivityRowClasses();
   updateCompanyDependentFields(companySelect?.value || '');
   setApprovalYearToCurrent();
   updateInvestmentLevelField();
@@ -3246,6 +3218,9 @@ function handleSummaryConfirm() {
 function populateSummaryOverlay() {
   if (!summarySections) return;
   populateSummaryContent({ context: defaultSummaryContext, refreshGantt: true });
+  if (typeof queueGanttRefresh === 'function') {
+    queueGanttRefresh({ forSummary: true });
+  }
 }
 
 /**
@@ -3323,7 +3298,39 @@ function populateSummaryContent(options = {}) {
     });
     renderPepSummary();
     renderMilestoneSummary();
-    populateSummaryGantt({ refreshFirst: refreshGantt });
+    const hasSummaryGanttSection = context?.ganttSection && context?.ganttChart;
+    if (context === defaultSummaryContext) {
+      populateSummaryGantt();
+      if (refreshGantt) {
+        if (typeof queueGanttRefresh === 'function' && typeof initGantt === 'function') {
+          if (typeof ganttLoaded !== 'undefined' && ganttLoaded) {
+            queueGanttRefresh({ forSummary: true });
+          } else if (window.google?.charts) {
+            google.charts.setOnLoadCallback(() => queueGanttRefresh({ forSummary: true }));
+          } else {
+            initGantt();
+            let attempts = 0;
+            const maxAttempts = 50;
+            const waitForLoad = () => {
+              if (typeof ganttLoaded !== 'undefined' && ganttLoaded) {
+                queueGanttRefresh({ forSummary: true });
+              } else if (attempts < maxAttempts) {
+                attempts += 1;
+                setTimeout(waitForLoad, 120);
+              }
+            };
+            waitForLoad();
+          }
+        }
+      }
+    } else if (hasSummaryGanttSection) {
+      const { rows } = collectMilestonesForGantt();
+      drawGantt(rows, {
+        container: context.ganttSection,
+        chartElement: context.ganttChart,
+        titleElement: context.ganttSection.querySelector('h3') || null
+      });
+    }
   });
 }
 
@@ -3579,100 +3586,6 @@ function renderMilestoneSummary() {
   sections.appendChild(section);
 }
 
-/**
- * Alimenta gráfico Gantt no resumo, respeitando disponibilidade do Google Charts.
- * @param {{refreshFirst?:boolean}} [options={}] - Quando true, força refresh antes da captura.
- */
-function populateSummaryGantt(options = {}) {
-  const { refreshFirst = false } = options;
-  const context = window.activeSummaryContext;
-  const ganttSection = context?.ganttSection;
-  const ganttChart = context?.ganttChart;
-  if (!ganttSection || !ganttChart) return;
-
-  // limpa estado anterior
-  if (context) context.lastGanttResult = undefined;
-
-  // se precisar, atualiza os dados antes de desenhar
-  if (refreshFirst) {
-    if (typeof window.refreshGantt === 'function') {
-      window.refreshGantt();
-    }
-    requestAnimationFrame(() => populateSummaryGantt());
-    return;
-  }
-
-  // coleta atividades do formulário (independente da UI de edição estar visível)
-  const tasks = (typeof window.collectMilestonesForGantt === 'function')
-    ? window.collectMilestonesForGantt()
-    : [];
-
-  // mostra a seção do resumo sempre
-  ganttSection.classList?.remove('hidden');
-
-  // sem dados → mensagem amigável
-  if (!Array.isArray(tasks) || tasks.length === 0) {
-    ganttChart.innerHTML = '<p class="gantt-empty">Nenhuma atividade para exibir</p>';
-    if (context) context.lastGanttResult = null;
-    return;
-  }
-
-  const assignResult = (result) => {
-    if (context) context.lastGanttResult = result || null;
-    return result;
-  };
-
-  const drawSummary = () => assignResult(
-    window.drawGantt(tasks, {
-      container: ganttSection,
-      chartElement: ganttChart,
-      titleElement: ganttSection.querySelector('h3'),
-      emptyMessage: 'Nenhuma atividade para exibir'
-    })
-  );
-
-  // carrega/usa Google Charts conforme disponibilidade
-  if (window.ganttReady && window.google?.visualization?.Gantt) {
-    drawSummary();
-  } else if (window.ganttLoaderStarted && window.google?.charts) {
-    window.google.charts.setOnLoadCallback(drawSummary);
-  } else if (window.google?.charts) {
-    if (typeof window.initGantt === 'function') window.initGantt();
-    window.google.charts.setOnLoadCallback(drawSummary);
-  } else {
-    // fallback: mantém a seção com mensagem
-    ganttChart.innerHTML = '<p class="gantt-empty">Nenhuma atividade para exibir</p>';
-    if (context) context.lastGanttResult = null;
-  }
-}
-
-/**
- * Aguarda renderização completa do Gantt para garantir captura ou navegação suave.
- * @param {Object} context - Contexto ativo do resumo.
- * @param {{timeout?:number}} [options={}] - Tempo máximo de espera em milissegundos.
- * @returns {Promise<void>} Resolve após gráfico disparar evento 'ready' ou timeout.
- */
-async function waitForSummaryRender(context, options = {}) {
-  if (!context) return;
-  const { timeout = 2000 } = options;
-  const start = Date.now();
-
-  while (context.lastGanttResult === undefined && Date.now() - start < timeout) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-
-  const result = context.lastGanttResult;
-  if (result?.chart && window.google?.visualization?.events) {
-    await new Promise((resolve) => {
-      const listener = google.visualization.events.addListener(result.chart, 'ready', () => {
-        google.visualization.events.removeListener(listener);
-        resolve();
-      });
-    });
-  }
-
-  await new Promise((resolve) => requestAnimationFrame(() => resolve()));
-}
 
 /**
  * Monta string amigável representando período de uma atividade.
@@ -4901,6 +4814,7 @@ function addActivityBlock(milestoneElement, data = {}) {
   if (!milestoneElement) return null;
   const fragment = activityTemplate.content.cloneNode(true);
   const activity = fragment.querySelector('.activity');
+  ensureActivityRowClasses(activity);
   const startInput = activity.querySelector('.activity-start');
   const endInput = activity.querySelector('.activity-end');
   const amountInput = activity.querySelector('.activity-pep-amount');
