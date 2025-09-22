@@ -113,7 +113,7 @@
         <div class="field-group">
           <label for="projectName">Nome do Projeto</label>
           <!-- Campo obrigatório que alimenta o título em cards e resumos -->
-          <input id="projectName" name="projectName" type="text" required maxlength="255" placeholder="Título do projeto">
+          <input id="projectName" name="projectName" type="text" required maxlength="40" placeholder="Título do projeto">
         </div>
         <div class="field-group">
           <label for="projectBudget">Orçamento do Projeto em R$</label>
@@ -166,11 +166,11 @@
         <div class="field-grid">
           <div class="field-group">
             <label for="fundingSource">Origem da Verba</label>
-            <input id="fundingSource" name="fundingSource" type="text" required maxlength="160" placeholder="Digite a origem da verba">
+            <input id="fundingSource" name="fundingSource" type="text" required maxlength="40" placeholder="Digite a origem da verba">
           </div>
           <div class="field-group">
             <label for="projectFunction">Função do Projeto</label>
-            <input id="projectFunction" name="projectFunction" type="text" required maxlength="160" placeholder="Digite a função do projeto">
+            <input id="projectFunction" name="projectFunction" type="text" required maxlength="60" placeholder="Digite a função do projeto">
           </div>
         </div>
       </fieldset>
@@ -212,7 +212,7 @@
           </div>
           <div class="field-group">
             <label for="depreciationCostCenter">C. Custo Depreciação</label>
-            <input id="depreciationCostCenter" name="depreciationCostCenter" type="text" required maxlength="160" placeholder="Informe o C. Custo Depreciação">
+            <input id="depreciationCostCenter" name="depreciationCostCenter" type="text" required maxlength="20" placeholder="Informe o C. Custo Depreciação">
           </div>
           <div class="field-group">
             <label for="category">Categoria</label>
@@ -255,11 +255,11 @@
           </div>
           <div class="field-group">
             <label for="projectUser">Usuário do Projeto</label>
-            <input id="projectUser" name="projectUser" type="text" required maxlength="160" placeholder="Informe o Usuário do Projeto">
+            <input id="projectUser" name="projectUser" type="text" required maxlength="40" placeholder="Informe o Usuário do Projeto">
           </div>
           <div class="field-group">
             <label for="projectLeader">Líder do Projeto</label>
-            <input id="projectLeader" name="projectLeader" type="text" required maxlength="160" placeholder="Informe o Líder do Projeto">
+            <input id="projectLeader" name="projectLeader" type="text" required maxlength="40" placeholder="Informe o Líder do Projeto">
           </div>
         </div>
       </fieldset>
@@ -272,11 +272,11 @@
         <legend>4. Detalhamento Complementar</legend>
         <div class="field-group">
           <label for="businessNeed">Necessidade do Negócio</label>
-          <textarea id="businessNeed" name="businessNeed" rows="4" required></textarea>
+          <textarea id="businessNeed" name="businessNeed" rows="4" required maxlength="1000"></textarea>
         </div>
         <div class="field-group">
           <label for="proposedSolution">Solução da Proposta</label>
-          <textarea id="proposedSolution" name="proposedSolution" rows="4" required></textarea>
+          <textarea id="proposedSolution" name="proposedSolution" rows="4" required maxlength="1000"></textarea>
         </div>
       </fieldset>
 
@@ -309,20 +309,20 @@
           </div>
           <div class="field-group">
             <label for="kpiName">Nome do KPI</label>
-            <input id="kpiName" name="kpiName" type="text" maxlength="160" placeholder="Digite o nome do KPI" required>
+            <input id="kpiName" name="kpiName" type="text" maxlength="40" placeholder="Digite o nome do KPI" required>
           </div>
           <div class="field-group">
             <label for="kpiCurrent">KPI Atual</label>
-            <input id="kpiCurrent" name="kpiCurrent" type="text" maxlength="160" placeholder="Digite o KPI atual" required>
+            <input id="kpiCurrent" name="kpiCurrent" type="text" maxlength="30" placeholder="Digite o KPI atual" required>
           </div>
           <div class="field-group">
             <label for="kpiExpected">KPI Esperado</label>
-            <input id="kpiExpected" name="kpiExpected" type="text" maxlength="160" placeholder="Digite o KPI esperado" required>
+            <input id="kpiExpected" name="kpiExpected" type="text" maxlength="30" placeholder="Digite o KPI esperado" required>
           </div>
         </div>
         <div class="field-group">
           <label for="kpiDescription">Descrição do KPI</label>
-          <textarea id="kpiDescription" name="kpiDescription" rows="3" required></textarea>
+          <textarea id="kpiDescription" name="kpiDescription" rows="3" required maxlength="500"></textarea>
         </div>
       </fieldset>
 
@@ -432,7 +432,7 @@
       <div class="milestone-header">
         <div class="field-group full-width">
           <label>Nome do Marco</label>
-          <input type="text" class="milestone-title" maxlength="160" required>
+          <input type="text" class="milestone-title" maxlength="40" required>
         </div>
         <button type="button" class="icon-btn remove-milestone" aria-label="Remover marco">
           <span class="material-symbols-outlined" aria-hidden="true">delete</span>
