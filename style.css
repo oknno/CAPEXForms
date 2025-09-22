@@ -1176,6 +1176,13 @@ p {
   gap: 16px;
 }
 
+.pep-remaining {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 12px;
+}
+
 .pep-row,
 .activity,
 .milestone {
