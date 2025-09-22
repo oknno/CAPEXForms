@@ -3516,12 +3516,68 @@ function populateSummaryContent(options = {}) {
         }
       }
     } else if (hasSummaryGanttSection) {
-      const { rows } = collectMilestonesForGantt();
-      drawGantt(rows, {
-        container: context.ganttSection,
-        chartElement: context.ganttChart,
-        titleElement: context.ganttSection.querySelector('h3') || null
-      });
+      const section = context?.ganttSection || null;
+      const chartElement = context?.ganttChart || null;
+      if (!section || !chartElement) {
+        return;
+      }
+
+      const titleElement = section.querySelector('h3') || null;
+
+      chartElement.innerHTML = '<div class="gantt-empty">Carregando cronograma...</div>';
+      section.classList.remove('hidden');
+
+      const isGanttReady = () => Boolean(
+        typeof ganttLoaded !== 'undefined' &&
+        ganttLoaded &&
+        window.google?.visualization?.Gantt
+      );
+
+      const drawWhenReady = () => {
+        if (!isGanttReady()) return;
+        if (!document.body.contains(chartElement)) return;
+        const { rows } = collectMilestonesForGantt();
+        drawGantt(rows, {
+          container: section,
+          chartElement,
+          titleElement
+        });
+      };
+
+      const scheduleDraw = () => {
+        if (!isGanttReady()) return;
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(drawWhenReady);
+          });
+        } else {
+          setTimeout(drawWhenReady, 0);
+        }
+      };
+
+      if (isGanttReady()) {
+        scheduleDraw();
+      } else {
+        if (typeof initGantt === 'function') {
+          initGantt();
+        }
+
+        if (window.google?.charts) {
+          google.charts.setOnLoadCallback(scheduleDraw);
+        } else {
+          let attempts = 0;
+          const maxAttempts = 50;
+          const waitForGantt = () => {
+            if (isGanttReady()) {
+              scheduleDraw();
+            } else if (attempts < maxAttempts) {
+              attempts += 1;
+              setTimeout(waitForGantt, 120);
+            }
+          };
+          waitForGantt();
+        }
+      }
     }
   });
 }
