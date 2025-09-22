@@ -118,7 +118,15 @@
         <div class="field-group">
           <label for="projectBudget">Orçamento do Projeto em R$</label>
           <!-- Valor usado para definir nível de investimento e habilitar seções PEP/Key Projects -->
-          <input id="projectBudget" name="projectBudget" type="number" min="0" step="0.01" required>
+          <input
+            id="projectBudget"
+            name="projectBudget"
+            type="text"
+            required
+            inputmode="numeric"
+            pattern="^[0-9]+$"
+            placeholder="Ex: 500000 (sem pontos ou vírgulas)"
+          >
         </div>
         <div class="field-grid">
           <div class="field-group">
@@ -398,7 +406,14 @@
         </div>
         <div class="field-group">
           <label>Valor do PEP (R$)</label>
-          <input type="number" class="pep-amount" min="0" step="0.01" required>
+          <input
+            type="text"
+            class="pep-amount"
+            required
+            inputmode="numeric"
+            pattern="^[0-9]+$"
+            placeholder="Ex: 500000 (sem pontos ou vírgulas)"
+          >
         </div>
         <div class="field-group">
           <label>Ano do PEP</label>
@@ -441,7 +456,14 @@
         </div>
         <div class="field-group">
           <label>Valor da Atividade (R$)</label>
-          <input type="text" class="activity-pep-amount" inputmode="decimal" required>
+          <input
+            type="text"
+            class="activity-pep-amount"
+            required
+            inputmode="numeric"
+            pattern="^[0-9]+$"
+            placeholder="Ex: 500000 (sem pontos ou vírgulas)"
+          >
         </div>
         <div class="field-group">
           <label>Início da Atividade</label>
