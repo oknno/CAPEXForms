@@ -1282,6 +1282,23 @@ p {
   min-width: 640px;
 }
 
+.comment-feedback {
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.comment-feedback.danger {
+  color: var(--red);
+}
+
+.comment-feedback.warning {
+  color: var(--orange);
+}
+
+.comment-feedback.success {
+  color: green;
+}
+
 @media (max-width: 1080px) {
   /* Ajustes para telas intermediárias: sidebar deixa de ser fixa e layout vira coluna única */
   .app-layout {
