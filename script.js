@@ -1685,7 +1685,8 @@ const PEP_OPTIONS_BF00 = [
 // Ajuste CAPEX: resolve lista correta de PEP conforme empresa corrente.
 function getPepOptionsForCompany(companyCode) {
   const normalizedCode = (companyCode || '').toString().trim().toUpperCase();
-  return normalizedCode === 'BF00' ? PEP_OPTIONS_BF00 : PEP_OPTIONS_DEFAULT;
+  const options = normalizedCode === 'BF00' ? PEP_OPTIONS_BF00 : PEP_OPTIONS_DEFAULT;
+  return uniquePreserveOrder(options);
 }
 
 // Ajuste CAPEX: repovoa um select de PEP preservando placeholder e seleção atual.
@@ -5713,63 +5714,6 @@ function getCurrentCompanyCode() {
 }
 
 /**
- * Retorna lista de opções de PEP conforme empresa.
- * @param {string} companyCode - Código atual da empresa.
- * @returns {string[]} Lista de opções disponíveis.
- */
-function getPepOptionsForCompany(companyCode) {
-  return uniquePreserveOrder(companyCode === 'BF00' ? PEP_OPTIONS_BF00 : PEP_OPTIONS_DEFAULT);
-}
-
-/**
- * Popula SELECT com opções de PEP preservando valor atual.
- * @param {HTMLSelectElement} selectEl - Elemento SELECT alvo.
- * @param {string[]} options - Opções disponíveis.
- * @param {string} selected - Valor previamente selecionado.
- */
-function populatePepTitleSelect(selectEl, options, selected) {
-  if (!selectEl) {
-    return;
-  }
-
-  const normalizedSelected = selected == null ? '' : String(selected).trim();
-  const normalizedOptions = Array.isArray(options) ? options : [];
-
-  while (selectEl.firstChild) {
-    selectEl.removeChild(selectEl.firstChild);
-  }
-
-  const placeholder = document.createElement('option');
-  placeholder.value = '';
-  placeholder.textContent = 'Selecione…';
-  if (!normalizedSelected) {
-    placeholder.selected = true;
-  }
-  selectEl.appendChild(placeholder);
-
-  let hasSelected = false;
-
-  for (const optionValue of normalizedOptions) {
-    const option = document.createElement('option');
-    option.value = optionValue;
-    option.textContent = optionValue;
-    if (optionValue === normalizedSelected) {
-      option.selected = true;
-      hasSelected = true;
-    }
-    selectEl.appendChild(option);
-  }
-
-  if (normalizedSelected && !hasSelected) {
-    const existingOption = document.createElement('option');
-    existingOption.value = normalizedSelected;
-    existingOption.textContent = `${normalizedSelected} (existente)`;
-    existingOption.selected = true;
-    selectEl.appendChild(existingOption);
-  }
-}
-
-/**
  * Garante que o campo de título do PEP seja SELECT, preservando atributos.
  * @param {HTMLElement} el - Elemento original.
  * @returns {{select: HTMLSelectElement|null, currentValue: string}} Elemento SELECT e valor atual.
@@ -5840,8 +5784,8 @@ function initPepRow(rowEl) {
     return;
   }
 
-  const options = getPepOptionsForCompany(getCurrentCompanyCode());
-  populatePepTitleSelect(select, options, currentValue);
+  const companyCode = getCurrentCompanyCode();
+  populatePepTitleSelect(select, companyCode, currentValue);
 }
 
 /**
