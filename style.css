@@ -265,6 +265,7 @@ p {
   flex-direction: column;
   align-items: stretch;
   gap: 12px;
+  flex: 0 0 auto;
 }
 
 .sidebar-header h2 {
@@ -296,13 +297,15 @@ p {
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
   padding-right: 6px;
   scrollbar-width: thin;
   scrollbar-color: var(--purple-rgba-20) transparent;
 }
 
 .project-list::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
 
 .project-list::-webkit-scrollbar-track {
@@ -326,7 +329,8 @@ p {
   display: flex;
   align-items: center;
   gap: 16px;
-  min-height: 65px;
+  min-height: 72px;
+  flex-shrink: 0;
 }
 
 .project-card:hover {
