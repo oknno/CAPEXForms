@@ -1634,6 +1634,123 @@ const simplePepTemplate = document.getElementById('simplePepTemplate');
 const milestoneTemplate = document.getElementById('milestoneTemplate');
 const activityTemplate = document.getElementById('activityTemplate');
 
+// Ajuste CAPEX: listas de PEP segmentadas por empresa para popular selects dinamicamente.
+const PEP_OPTIONS_DEFAULT = [
+  'DESP.ENGENHARIA / DETALHAMENTO PROJETO',
+  'AQUISIÇÃO DE EQUIPAMENTOS NACIONAIS',
+  'AQUISIÇÃO DE EQUIPAMENTOS IMPORTADOS',
+  'AQUISIÇÃO DE VEÍCULOS',
+  'DESPESAS COM OBRAS CIVIS',
+  'DESP.MONTAGEM EQUIPTOS/ESTRUTURAS/OUTRAS',
+  'AQ.DE COMPONENTES/MAT.INSTAL./FERRAMENTA',
+  'DESPESAS COM MEIO AMBIENTE',
+  'DESPESAS COM SEGURANÇA',
+  'DESPESAS COM SEGUROS',
+  'DESP.CONSULTORIA INTERNA (AMS)-TEC.INFOR',
+  'DESP.CONSULTORIA EXTERNA - TEC.INFOR',
+  'AQUISIÇÃO DE HARDWARE (NOTEBOOKS, ETC)',
+  'AQUISIÇÃO DE SOFTWARE',
+  'AQUISIÇÃO DE IMÓVEIS',
+  'DESP.GERENCIAMENTO E COORDENAÇÃO',
+  'CONTINGÊNCIAS'
+];
+
+// Ajuste CAPEX: opções exclusivas para a empresa BF00.
+const PEP_OPTIONS_BF00 = [
+  'CONSTRUÇÃO/REFORMA DE FORNOS',
+  'CONSTRUÇÃO/REFORMA DE QUEIMADORES',
+  'INSTALAÇÕES INDUSTRIAIS',
+  'INSTALAÇÕES PREDIAIS',
+  'COMPUTADORES E PERIFÉRICOS',
+  'SOFTWARES',
+  'CERTIFICAÇÕES E LICENÇAS',
+  "INFRAESTRUTURA UPC'S",
+  'CONTRUÇÃO DE FORNOS',
+  'CONSTRUÇÃO QUEIMADORES',
+  'MÓDULOS MOVIMENTAÇÃO',
+  'MÓDULOS MECANIZAÇÃO',
+  'CONSTRUÇÃO DE VIVEIROS',
+  'INSTALAÇÕES PREDIAIS',
+  'MELHORIAS INDUSTRIAIS',
+  'MELHORIAS AMBIENTAIS',
+  'TECNOLOGIA DA INFORMAÇÃO',
+  'MÁQUINAS E EQUIPAMENTOS',
+  'FERRAMENTAS',
+  'IMPLEMENTOS AGRÍCOLAS',
+  'MÓVEIS E UTENSÍLIOS',
+  'VEÍCULOS LEVES',
+  'VEÍCULOS PESADOS'
+];
+
+// Ajuste CAPEX: resolve lista correta de PEP conforme empresa corrente.
+function getPepOptionsForCompany(companyCode) {
+  const normalizedCode = (companyCode || '').toString().trim().toUpperCase();
+  return normalizedCode === 'BF00' ? PEP_OPTIONS_BF00 : PEP_OPTIONS_DEFAULT;
+}
+
+// Ajuste CAPEX: repovoa um select de PEP preservando placeholder e seleção atual.
+function populatePepTitleSelect(selectEl, companyCode, selectedValue = '') {
+  if (!selectEl || selectEl.tagName !== 'SELECT') {
+    return;
+  }
+
+  const datasetPlaceholder = selectEl.dataset.placeholder;
+  const firstOption = selectEl.options?.[0];
+  const placeholderText = datasetPlaceholder
+    || (firstOption && firstOption.value === '' ? firstOption.textContent || 'Selecione...'
+    : 'Selecione...');
+  if (!selectEl.dataset.placeholder) {
+    selectEl.dataset.placeholder = placeholderText;
+  }
+
+  const normalizedSelected = selectedValue != null ? String(selectedValue).trim() : '';
+  const options = getPepOptionsForCompany(companyCode);
+  const normalizedOptions = Array.isArray(options)
+    ? options.map((option) => String(option))
+    : [];
+
+  selectEl.innerHTML = '';
+
+  const placeholderOption = document.createElement('option');
+  placeholderOption.value = '';
+  placeholderOption.textContent = selectEl.dataset.placeholder || 'Selecione...';
+  selectEl.appendChild(placeholderOption);
+
+  const fragment = document.createDocumentFragment();
+  normalizedOptions.forEach((optionText) => {
+    const option = document.createElement('option');
+    option.value = optionText;
+    option.textContent = optionText;
+    fragment.appendChild(option);
+  });
+  selectEl.appendChild(fragment);
+
+  let valueToApply = '';
+  if (normalizedSelected && normalizedOptions.includes(normalizedSelected)) {
+    valueToApply = normalizedSelected;
+  } else if (normalizedSelected) {
+    const legacyOption = document.createElement('option');
+    legacyOption.value = normalizedSelected;
+    legacyOption.textContent = normalizedSelected;
+    legacyOption.dataset.legacy = 'true';
+    selectEl.appendChild(legacyOption);
+    valueToApply = normalizedSelected;
+  }
+
+  selectEl.value = valueToApply;
+  selectEl.dataset.selected = normalizedSelected;
+}
+
+// Ajuste CAPEX: aplica lista de PEP em todos os selects ativos conforme empresa selecionada.
+function refreshAllPepDropdowns() {
+  const currentCompany = companySelect?.value || '';
+  const selects = document.querySelectorAll('.activity-pep-title, .pep-title');
+  selects.forEach((select) => {
+    const storedValue = select.dataset?.selected ?? select.value ?? '';
+    populatePepTitleSelect(select, currentCompany, storedValue);
+  });
+}
+
 const PROJECT_STATUSES = Object.freeze({
   APPROVED: 'Aprovado',
   DRAFT: 'Rascunho',
@@ -2044,6 +2161,8 @@ function init() {
   bindEvents();
   ensureActivityRowClasses();
   updateCompanyDependentFields(companySelect?.value || '');
+  // Ajuste CAPEX: garante selects de PEP alinhados com empresa atual na inicialização.
+  refreshAllPepDropdowns();
   setApprovalYearToCurrent();
   updateInvestmentLevelField();
   loadProjects();
@@ -2664,9 +2783,13 @@ function applyCenter(companyCode, centerCode, { locationEl, unitEl }) {
           unit: '',
           depreciationCostCenter: depValue
         });
+        // Ajuste CAPEX: sincroniza opções de PEP ao trocar empresa.
+        refreshAllPepDropdowns();
         return;
       }
       applyCompany(companyValue, els);
+      // Ajuste CAPEX: sincroniza opções de PEP ao trocar empresa.
+      refreshAllPepDropdowns();
     };
 
     const handleCenterChange = (e) => {
@@ -3028,6 +3151,8 @@ function openProjectForm(mode, detail = null) {
   applyStatusBehavior(statusKey);
 
   updateSimplePepYears();
+  // Ajuste CAPEX: assegura selects de PEP consistentes após abrir o formulário.
+  refreshAllPepDropdowns();
   overlay.classList.remove('hidden');
   queueGanttRefresh();
   validateAllDateRanges();
@@ -3082,9 +3207,10 @@ function fillFormWithProject(detail) {
 
   if (project.budgetBrl < BUDGET_THRESHOLD) {
     simplePeps.forEach((pep) => {
+      // Ajuste CAPEX: recria selects de PEP respeitando valores salvos no modo edição.
       const row = createSimplePepRow({
         id: pep.Id,
-        title: pep.Title,
+        pepTitle: pep.Title,
         amount: pep.amountBrl,
         year: pep.year
       });
@@ -3135,6 +3261,9 @@ function fillFormWithProject(detail) {
       ensureMilestoneBlock();
     }
   }
+
+  // Ajuste CAPEX: garante listas corretas de PEP após montar formulário de edição.
+  refreshAllPepDropdowns();
 
   queueGanttRefresh();
   validatePepBudget();
@@ -4781,11 +4910,13 @@ function resolveDatasetId(value) {
  * @param {{id?:string|number,title?:string,amount?:number|string,year?:number|string}} [param0={}] - Dados iniciais.
  * @returns {HTMLElement} Linha gerada.
  */
-function createSimplePepRow({ id = '', title = '', amount = '', year = '' } = {}) {
+function createSimplePepRow({ id = '', pepTitle = '', title = '', amount = '', year = '' } = {}) {
   const fragment = simplePepTemplate.content.cloneNode(true);
   const row = fragment.querySelector('.pep-row');
   row.dataset.pepId = resolveDatasetId(id);
-  row.querySelector('.pep-title').value = title || '';
+  const select = row.querySelector('.pep-title');
+  // Ajuste CAPEX: garante opções corretas de PEP ao criar linhas simples.
+  populatePepTitleSelect(select, companySelect?.value || '', pepTitle || title || '');
   row.querySelector('.pep-amount').value = sanitizeNumericInputValue(amount);
   row.querySelector('.pep-year').value = year ?? '';
   return row;
@@ -4843,7 +4974,8 @@ function addActivityBlock(milestoneElement, data = {}) {
   activity.querySelector('.activity-supplier').value = data.supplier || '';
   activity.querySelector('.activity-description').value = data.description || '';
   if (pepTitleInput) {
-    pepTitleInput.value = data.pepTitle || '';
+    // Ajuste CAPEX: repopula select de PEP conforme empresa ao montar atividade.
+    populatePepTitleSelect(pepTitleInput, companySelect?.value || '', data?.pepTitle || '');
   }
   if (pepYearInput) {
     const startYear = startInput?.value ? parseInt(startInput.value.substring(0, 4), 10) : null;
