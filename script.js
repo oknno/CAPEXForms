@@ -5673,55 +5673,6 @@ function parseNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-// ============================================================================
-// PEP title dropdown utilities and wiring
-// ============================================================================
-
-const PEP_OPTIONS_DEFAULT = [
-  'DESP.ENGENHARIA / DETALHAMENTO PROJETO',
-  'AQUISIÇÃO DE EQUIPAMENTOS NACIONAIS',
-  'AQUISIÇÃO DE EQUIPAMENTOS IMPORTADOS',
-  'AQUISIÇÃO DE VEÍCULOS',
-  'DESPESAS COM OBRAS CIVIS',
-  'DESP.MONTAGEM EQUIPTOS/ESTRUTURAS/OUTRAS',
-  'AQ.DE COMPONENTES/MAT.INSTAL./FERRAMENTA',
-  'DESPESAS COM MEIO AMBIENTE',
-  'DESPESAS COM SEGURANÇA',
-  'DESPESAS COM SEGUROS',
-  'DESP.CONSULTORIA INTERNA (AMS)-TEC.INFOR',
-  'DESP.CONSULTORIA EXTERNA - TEC.INFOR',
-  'AQUISIÇÃO DE HARDWARE (NOTEBOOKS, ETC)',
-  'AQUISIÇÃO DE SOFTWARE',
-  'AQUISIÇÃO DE IMÓVEIS',
-  'DESP.GERENCIAMENTO E COORDENAÇÃO',
-  'CONTINGÊNCIAS'
-];
-
-const PEP_OPTIONS_BF00 = [
-  'CONSTRUÇÃO/REFORMA DE FORNOS',
-  'CONSTRUÇÃO/REFORMA DE QUEIMADORES',
-  'INSTALAÇÕES INDUSTRIAIS',
-  'INSTALAÇÕES PREDIAIS',
-  'COMPUTADORES E PERIFÉRICOS',
-  'SOFTWARES',
-  'CERTIFICAÇÕES E LICENÇAS',
-  "INFRAESTRUTURA UPC'S",
-  'CONTRUÇÃO DE FORNOS',
-  'CONSTRUÇÃO QUEIMADORES',
-  'MÓDULOS MOVIMENTAÇÃO',
-  'MÓDULOS MECANIZAÇÃO',
-  'CONSTRUÇÃO DE VIVEIROS',
-  'MELHORIAS INDUSTRIAIS',
-  'MELHORIAS AMBIENTAIS',
-  'TECNOLOGIA DA INFORMAÇÃO',
-  'MÁQUINAS E EQUIPAMENTOS',
-  'FERRAMENTAS',
-  'IMPLEMENTOS AGRÍCOLAS',
-  'MÓVEIS E UTENSÍLIOS',
-  'VEÍCULOS LEVES',
-  'VEÍCULOS PESADOS'
-];
-
 /**
  * Remove duplicados preservando ordem e ignorando valores vazios.
  * @param {unknown[]} arr - Coleção de valores para normalizar.
