@@ -4422,6 +4422,64 @@ function calculatePepTotal() {
 }
 
 /**
+ * Garante existência do elemento que exibe saldo restante dentro de um container.
+ * @param {HTMLElement|null} container - Elemento pai que receberá a mensagem.
+ * @param {HTMLElement|null} [reference=null] - Nó de referência para inserção antes.
+ * @returns {HTMLElement|null} Elemento criado ou reutilizado.
+ */
+function ensurePepRemainingElement(container, reference = null) {
+  if (!container) {
+    return null;
+  }
+
+  let indicator = container.querySelector('.pep-remaining');
+  if (indicator) {
+    return indicator;
+  }
+
+  indicator = document.createElement('div');
+  indicator.className = 'pep-remaining';
+
+  if (reference && reference.parentNode === container) {
+    container.insertBefore(indicator, reference);
+  } else {
+    container.appendChild(indicator);
+  }
+
+  return indicator;
+}
+
+/**
+ * Atualiza mensagens de orçamento restante em PEPs simples e vinculados.
+ * @param {{budget?:number,total?:number}} [param0={}] - Valores opcionais para evitar recálculo.
+ */
+function updatePepRemainingDisplays({ budget = getProjectBudgetValue(), total = calculatePepTotal() } = {}) {
+  const hasBudget = Number.isFinite(budget);
+  const remainingValue = hasBudget ? budget - total : 0;
+  const formattedRemaining = BRL.format(Math.round(remainingValue * 100) / 100);
+
+  if (simplePepList) {
+    simplePepList.querySelectorAll('.pep-row').forEach((row) => {
+      const removeBtn = row.querySelector('.remove-row');
+      const indicator = ensurePepRemainingElement(row, removeBtn);
+      if (indicator) {
+        indicator.textContent = `Orçamento restante: ${formattedRemaining}`;
+      }
+    });
+  }
+
+  if (milestoneList) {
+    milestoneList.querySelectorAll('.activity').forEach((activity) => {
+      const pepFieldGroup = activity.querySelector('.activity-pep-title')?.closest('.field-group');
+      const indicator = ensurePepRemainingElement(pepFieldGroup || activity);
+      if (indicator) {
+        indicator.textContent = `Orçamento restante: ${formattedRemaining}`;
+      }
+    });
+  }
+}
+
+/**
  * Atualiza mensagem informativa abaixo do formulário com saldo/ excedente de orçamento.
  * @param {{budget?:number,total?:number}} [param0={}] - Valores utilizados no cálculo.
  */
@@ -4464,6 +4522,7 @@ function validatePepBudget(options = {}) {
   const total = calculatePepTotal();
 
   updateBudgetHintMessage({ budget, total });
+  updatePepRemainingDisplays({ budget, total });
 
   if (!Number.isFinite(budget)) {
     setValidationError('pepBudget', null, null);
@@ -4963,6 +5022,7 @@ function updateSimplePepYears() {
 function ensureSimplePepRow() {
   const row = createSimplePepRow({ year: parseInt(approvalYearInput.value, 10) || '' });
   simplePepList.append(row);
+  updatePepRemainingDisplays();
 }
 
 /**
@@ -5073,6 +5133,7 @@ function addActivityBlock(milestoneElement, data = {}) {
   }
   validateDateRange(startInput, endInput);
   queueGanttRefresh();
+  updatePepRemainingDisplays();
   return activity;
 }
 
