@@ -511,6 +511,7 @@ const DATE_FMT = new Intl.DateTimeFormat('pt-BR');
 const BUDGET_THRESHOLD = 1_000_000;
 const EXCHANGE_RATE = 5.6; // 1 USD = 5.6 BRL
 const DATE_RANGE_ERROR_MESSAGE = 'A data de término não pode ser anterior à data de início.';
+const PROJECT_START_MIN_ERROR_MESSAGE = 'A data de início não pode ser anterior ao dia de hoje.';
 
 const SITE_URL = window.SHAREPOINT_SITE_URL || 'https://arcelormittal.sharepoint.com/sites/controladorialongos/capex';
 const sp = new SharePointService(SITE_URL);
@@ -4242,6 +4243,9 @@ function collectInvalidFields() {
     if (validity.valueMissing) {
       type = 'required';
       message = `Preencha “${label}”.`;
+    } else if (message === PROJECT_START_MIN_ERROR_MESSAGE) {
+      type = 'date';
+      message = `${label}: ${PROJECT_START_MIN_ERROR_MESSAGE}`;
     } else if (element.dataset?.dateRangeInvalid === 'true' || message === DATE_RANGE_ERROR_MESSAGE) {
       type = 'date';
       message = `${label}: ${DATE_RANGE_ERROR_MESSAGE}`;
@@ -4667,6 +4671,41 @@ function clearDateRangeValidity() {
   });
 }
 
+function validateProjectStartDateMinimum(options = {}) {
+  const { report = false } = options;
+  if (!projectStartDateInput || typeof projectStartDateInput.setCustomValidity !== 'function') {
+    return true;
+  }
+
+  projectStartDateInput.setCustomValidity('');
+
+  const startValue = projectStartDateInput.value;
+  if (!startValue) {
+    return true;
+  }
+
+  const startDate = new Date(startValue);
+  if (Number.isNaN(startDate.getTime())) {
+    return true;
+  }
+
+  const normalizedStart = new Date(startDate);
+  normalizedStart.setHours(0, 0, 0, 0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (normalizedStart < today) {
+    projectStartDateInput.setCustomValidity(PROJECT_START_MIN_ERROR_MESSAGE);
+    if (report && typeof projectStartDateInput.reportValidity === 'function') {
+      projectStartDateInput.reportValidity();
+    }
+    return false;
+  }
+
+  return true;
+}
+
 /**
  * Atualiza mensagem informativa relacionada às datas do projeto e atividades.
  * @param {{hasProjectStart?:boolean,hasProjectEnd?:boolean,hasStartIssue?:boolean,hasEndIssue?:boolean,activityCount?:number}} [param0={}] - Indicadores para montagem do texto.
@@ -4807,6 +4846,7 @@ function runFormValidations(options = {}) {
   const pepValid = validatePepBudget();
   const activityValid = validateActivityDates();
   const dateRangesValid = validateAllDateRanges();
+  const projectStartMinValid = validateProjectStartDateMinimum();
 
   const invalidFields = collectInvalidFields();
   invalidFields.forEach((issue) => {
@@ -4879,7 +4919,7 @@ function runFormValidations(options = {}) {
     });
   }
 
-  const isValid = issues.length === 0 && pepValid && activityValid && dateRangesValid;
+  const isValid = issues.length === 0 && pepValid && activityValid && dateRangesValid && projectStartMinValid;
 
   if (isValid) {
     clearErrorSummary();
@@ -4933,6 +4973,7 @@ function handleGlobalDateInput(event) {
 
   if (target === projectStartDateInput || target === projectEndDateInput) {
     validateDateRange(projectStartDateInput, projectEndDateInput, { report: true });
+    validateProjectStartDateMinimum({ report: true });
     return;
   }
 

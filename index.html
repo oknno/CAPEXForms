@@ -499,6 +499,9 @@
   </template>
 
   <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <script>
+    document.getElementById('startDate').min = new Date().toISOString().split('T')[0];
+  </script>
   <script src="script.js" defer></script>
 </body>
 </html>
