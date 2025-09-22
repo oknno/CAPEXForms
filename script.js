@@ -5624,6 +5624,297 @@ function parseNumber(value) {
 }
 
 // ============================================================================
+// PEP title dropdown utilities and wiring
+// ============================================================================
+
+const PEP_OPTIONS_DEFAULT = [
+  'DESP.ENGENHARIA / DETALHAMENTO PROJETO',
+  'AQUISIÇÃO DE EQUIPAMENTOS NACIONAIS',
+  'AQUISIÇÃO DE EQUIPAMENTOS IMPORTADOS',
+  'AQUISIÇÃO DE VEÍCULOS',
+  'DESPESAS COM OBRAS CIVIS',
+  'DESP.MONTAGEM EQUIPTOS/ESTRUTURAS/OUTRAS',
+  'AQ.DE COMPONENTES/MAT.INSTAL./FERRAMENTA',
+  'DESPESAS COM MEIO AMBIENTE',
+  'DESPESAS COM SEGURANÇA',
+  'DESPESAS COM SEGUROS',
+  'DESP.CONSULTORIA INTERNA (AMS)-TEC.INFOR',
+  'DESP.CONSULTORIA EXTERNA - TEC.INFOR',
+  'AQUISIÇÃO DE HARDWARE (NOTEBOOKS, ETC)',
+  'AQUISIÇÃO DE SOFTWARE',
+  'AQUISIÇÃO DE IMÓVEIS',
+  'DESP.GERENCIAMENTO E COORDENAÇÃO',
+  'CONTINGÊNCIAS'
+];
+
+const PEP_OPTIONS_BF00 = [
+  'CONSTRUÇÃO/REFORMA DE FORNOS',
+  'CONSTRUÇÃO/REFORMA DE QUEIMADORES',
+  'INSTALAÇÕES INDUSTRIAIS',
+  'INSTALAÇÕES PREDIAIS',
+  'COMPUTADORES E PERIFÉRICOS',
+  'SOFTWARES',
+  'CERTIFICAÇÕES E LICENÇAS',
+  "INFRAESTRUTURA UPC'S",
+  'CONTRUÇÃO DE FORNOS',
+  'CONSTRUÇÃO QUEIMADORES',
+  'MÓDULOS MOVIMENTAÇÃO',
+  'MÓDULOS MECANIZAÇÃO',
+  'CONSTRUÇÃO DE VIVEIROS',
+  'MELHORIAS INDUSTRIAIS',
+  'MELHORIAS AMBIENTAIS',
+  'TECNOLOGIA DA INFORMAÇÃO',
+  'MÁQUINAS E EQUIPAMENTOS',
+  'FERRAMENTAS',
+  'IMPLEMENTOS AGRÍCOLAS',
+  'MÓVEIS E UTENSÍLIOS',
+  'VEÍCULOS LEVES',
+  'VEÍCULOS PESADOS'
+];
+
+/**
+ * Remove duplicados preservando ordem e ignorando valores vazios.
+ * @param {unknown[]} arr - Coleção de valores para normalizar.
+ * @returns {string[]} Lista sanitizada de strings únicas.
+ */
+function uniquePreserveOrder(arr) {
+  if (!Array.isArray(arr)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const result = [];
+
+  for (const item of arr) {
+    if (item === undefined || item === null) {
+      continue;
+    }
+
+    const normalized = String(item).trim();
+
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+
+    seen.add(normalized);
+    result.push(normalized);
+  }
+
+  return result;
+}
+
+/**
+ * Obtém o código da empresa considerando input existente.
+ * @returns {string} Código em caixa alta ou string vazia.
+ */
+function getCurrentCompanyCode() {
+  return (document.getElementById('company')?.value || '').trim().toUpperCase();
+}
+
+/**
+ * Retorna lista de opções de PEP conforme empresa.
+ * @param {string} companyCode - Código atual da empresa.
+ * @returns {string[]} Lista de opções disponíveis.
+ */
+function getPepOptionsForCompany(companyCode) {
+  return uniquePreserveOrder(companyCode === 'BF00' ? PEP_OPTIONS_BF00 : PEP_OPTIONS_DEFAULT);
+}
+
+/**
+ * Popula SELECT com opções de PEP preservando valor atual.
+ * @param {HTMLSelectElement} selectEl - Elemento SELECT alvo.
+ * @param {string[]} options - Opções disponíveis.
+ * @param {string} selected - Valor previamente selecionado.
+ */
+function populatePepTitleSelect(selectEl, options, selected) {
+  if (!selectEl) {
+    return;
+  }
+
+  const normalizedSelected = selected == null ? '' : String(selected).trim();
+  const normalizedOptions = Array.isArray(options) ? options : [];
+
+  while (selectEl.firstChild) {
+    selectEl.removeChild(selectEl.firstChild);
+  }
+
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Selecione…';
+  if (!normalizedSelected) {
+    placeholder.selected = true;
+  }
+  selectEl.appendChild(placeholder);
+
+  let hasSelected = false;
+
+  for (const optionValue of normalizedOptions) {
+    const option = document.createElement('option');
+    option.value = optionValue;
+    option.textContent = optionValue;
+    if (optionValue === normalizedSelected) {
+      option.selected = true;
+      hasSelected = true;
+    }
+    selectEl.appendChild(option);
+  }
+
+  if (normalizedSelected && !hasSelected) {
+    const existingOption = document.createElement('option');
+    existingOption.value = normalizedSelected;
+    existingOption.textContent = `${normalizedSelected} (existente)`;
+    existingOption.selected = true;
+    selectEl.appendChild(existingOption);
+  }
+}
+
+/**
+ * Garante que o campo de título do PEP seja SELECT, preservando atributos.
+ * @param {HTMLElement} el - Elemento original.
+ * @returns {{select: HTMLSelectElement|null, currentValue: string}} Elemento SELECT e valor atual.
+ */
+function ensurePepTitleSelect(el) {
+  if (!el) {
+    return { select: null, currentValue: '' };
+  }
+
+  if (el.tagName && el.tagName.toUpperCase() === 'SELECT') {
+    return { select: /** @type {HTMLSelectElement} */ (el), currentValue: el.value != null ? String(el.value) : '' };
+  }
+
+  const currentValue = el.value != null ? String(el.value) : '';
+  const select = document.createElement('select');
+
+  for (const attr of Array.from(el.attributes)) {
+    if (attr.name === 'type' || attr.name === 'value') {
+      continue;
+    }
+
+    if (attr.name === 'class') {
+      select.className = el.className || '';
+    } else {
+      select.setAttribute(attr.name, attr.value);
+    }
+  }
+
+  if (!select.className && el.className) {
+    select.className = el.className;
+  }
+
+  if (el.dataset) {
+    for (const [key, value] of Object.entries(el.dataset)) {
+      select.dataset[key] = value;
+    }
+  }
+
+  if (typeof el.required === 'boolean' && el.required) {
+    select.required = true;
+  }
+
+  if (typeof el.disabled === 'boolean') {
+    select.disabled = el.disabled;
+  }
+
+  el.replaceWith(select);
+
+  return { select, currentValue };
+}
+
+/**
+ * Inicializa uma linha de PEP convertendo e populando o título.
+ * @param {Element} rowEl - Linha de PEP alvo.
+ */
+function initPepRow(rowEl) {
+  if (!rowEl) {
+    return;
+  }
+
+  const control = rowEl.querySelector('.pep-title, [name="pepTitle"]');
+  if (!control) {
+    return;
+  }
+
+  const { select, currentValue } = ensurePepTitleSelect(/** @type {HTMLElement} */ (control));
+  if (!select) {
+    return;
+  }
+
+  const options = getPepOptionsForCompany(getCurrentCompanyCode());
+  populatePepTitleSelect(select, options, currentValue);
+}
+
+/**
+ * Atualiza todas as linhas de PEP existentes.
+ */
+function refreshAllPepTitleSelects() {
+  const rows = document.querySelectorAll('.pep-row');
+  rows.forEach(initPepRow);
+}
+
+let boundCompanyElement = null;
+let pepRowsObserver = null;
+
+function bindCompanyChangeListener() {
+  const companyField = document.getElementById('company');
+  if (!companyField || companyField === boundCompanyElement) {
+    return;
+  }
+
+  if (boundCompanyElement) {
+    boundCompanyElement.removeEventListener('change', refreshAllPepTitleSelects);
+  }
+
+  companyField.addEventListener('change', refreshAllPepTitleSelects);
+  boundCompanyElement = companyField;
+}
+
+function observePepRowMutations() {
+  if (pepRowsObserver || typeof MutationObserver !== 'function' || !document.body) {
+    return;
+  }
+
+  pepRowsObserver = new MutationObserver((mutations) => {
+    let shouldRebindCompany = false;
+
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (!(node instanceof Element)) {
+          continue;
+        }
+
+        if (!shouldRebindCompany && (node.id === 'company' || node.querySelector('#company'))) {
+          shouldRebindCompany = true;
+        }
+
+        if (node.classList.contains('pep-row')) {
+          initPepRow(node);
+        }
+
+        node.querySelectorAll('.pep-row').forEach(initPepRow);
+      }
+    }
+
+    if (shouldRebindCompany) {
+      bindCompanyChangeListener();
+    }
+  });
+
+  pepRowsObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+function bootstrapPepTitleDropdowns() {
+  bindCompanyChangeListener();
+  refreshAllPepTitleSelects();
+  observePepRowMutations();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootstrapPepTitleDropdowns, { once: true });
+} else {
+  bootstrapPepTitleDropdowns();
+}
+
+// ============================================================================
 // Execução
 // ============================================================================
 init();
