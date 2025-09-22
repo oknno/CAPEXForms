@@ -511,7 +511,7 @@ const DATE_FMT = new Intl.DateTimeFormat('pt-BR');
 const BUDGET_THRESHOLD = 1_000_000;
 const EXCHANGE_RATE = 5.6; // 1 USD = 5.6 BRL
 const DATE_RANGE_ERROR_MESSAGE = 'A data de término não pode ser anterior à data de início.';
-const PROJECT_START_MIN_ERROR_MESSAGE = 'A data de início não pode ser anterior ao dia de hoje.';
+const PROJECT_START_MIN_ERROR_MESSAGE = 'A data de início não pode ser anterior a hoje';
 
 const SITE_URL = window.SHAREPOINT_SITE_URL || 'https://arcelormittal.sharepoint.com/sites/controladorialongos/capex';
 const sp = new SharePointService(SITE_URL);
@@ -1566,6 +1566,8 @@ const projectList = document.getElementById('projectList');
 const projectDetails = document.getElementById('projectDetails');
 const overlay = document.getElementById('formOverlay');
 const projectForm = document.getElementById('projectForm');
+const projectSectionLegend = projectForm?.querySelector('fieldset.form-section legend') || null;
+let projectDateWarningEl = projectSectionLegend?.querySelector('.date-warning') || null;
 const formTitle = document.getElementById('formTitle');
 const closeFormBtn = document.getElementById('closeFormBtn');
 const floatingCloseBtn = document.querySelector('.form-close-btn');
@@ -4676,6 +4678,42 @@ function clearDateRangeValidity() {
   });
 }
 
+function ensureProjectDateWarningElement() {
+  if (projectDateWarningEl && projectDateWarningEl.isConnected) {
+    return projectDateWarningEl;
+  }
+  const legend = projectSectionLegend || projectForm?.querySelector('fieldset.form-section legend');
+  if (!legend) {
+    return null;
+  }
+  projectDateWarningEl = legend.querySelector('.date-warning');
+  if (!projectDateWarningEl) {
+    projectDateWarningEl = document.createElement('span');
+    projectDateWarningEl.className = 'date-warning';
+    projectDateWarningEl.hidden = true;
+    legend.appendChild(projectDateWarningEl);
+  }
+  return projectDateWarningEl;
+}
+
+function updateProjectDateWarning(message = '') {
+  const warningEl = ensureProjectDateWarningElement();
+  if (!warningEl) return;
+  if (message) {
+    warningEl.textContent = message;
+    warningEl.hidden = false;
+  } else {
+    warningEl.textContent = '';
+    warningEl.hidden = true;
+  }
+}
+
+function applyProjectStartMinConstraint() {
+  const input = projectStartDateInput || document.getElementById('startDate');
+  if (!input) return;
+  input.min = new Date().toISOString().split('T')[0];
+}
+
 function validateProjectStartDateMinimum(options = {}) {
   const { report = false } = options;
   if (!projectStartDateInput || typeof projectStartDateInput.setCustomValidity !== 'function') {
@@ -4683,6 +4721,7 @@ function validateProjectStartDateMinimum(options = {}) {
   }
 
   projectStartDateInput.setCustomValidity('');
+  updateProjectDateWarning('');
 
   const startValue = projectStartDateInput.value;
   if (!startValue) {
@@ -4702,12 +4741,14 @@ function validateProjectStartDateMinimum(options = {}) {
 
   if (normalizedStart < today) {
     projectStartDateInput.setCustomValidity(PROJECT_START_MIN_ERROR_MESSAGE);
+    updateProjectDateWarning(PROJECT_START_MIN_ERROR_MESSAGE);
     if (report && typeof projectStartDateInput.reportValidity === 'function') {
       projectStartDateInput.reportValidity();
     }
     return false;
   }
 
+  updateProjectDateWarning('');
   return true;
 }
 
@@ -6043,8 +6084,18 @@ function bootstrapPepTitleDropdowns() {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', bootstrapPepTitleDropdowns, { once: true });
+  document.addEventListener(
+    'DOMContentLoaded',
+    () => {
+      applyProjectStartMinConstraint();
+      updateProjectDateWarning('');
+      bootstrapPepTitleDropdowns();
+    },
+    { once: true }
+  );
 } else {
+  applyProjectStartMinConstraint();
+  updateProjectDateWarning('');
   bootstrapPepTitleDropdowns();
 }
 
