@@ -4577,6 +4577,32 @@ function updateBudgetHintMessage({ budget = getProjectBudgetValue(), total = cal
 }
 
 /**
+ * Garante que o somatório dos PEPs corresponda ao orçamento do projeto antes de persistir os dados.
+ * @param {{budgetBrl?:number}} project - Dados do projeto contendo o orçamento em reais.
+ * @param {Pep[]} peps - Lista de PEPs simples e vinculados a atividades.
+ * @throws {Error} Quando o somatório dos PEPs divergir do orçamento informado.
+ */
+function validateBudgetDistribution(project, peps) {
+  const totalBudget = Number.isFinite(Number(project?.budgetBrl)) ? Number(project.budgetBrl) : 0;
+  const totalAllocated = Array.isArray(peps)
+    ? peps.reduce((sum, pep) => {
+        const amount = Number(pep?.amountBrl);
+        return sum + (Number.isFinite(amount) ? amount : 0);
+      }, 0)
+    : 0;
+
+  if (totalAllocated !== totalBudget) {
+    const formattedBudget = totalBudget.toLocaleString('pt-BR');
+    const formattedAllocated = totalAllocated.toLocaleString('pt-BR');
+    throw new Error(
+      `O orçamento do projeto é R$ ${formattedBudget}, ` +
+        `mas a soma dos PEPs é R$ ${formattedAllocated}. ` +
+        'É necessário distribuir 100% do valor antes de salvar ou enviar para aprovação.'
+    );
+  }
+}
+
+/**
  * Valida se somatório de PEP está dentro do orçamento informado.
  * @param {{changedInput?:HTMLInputElement}} [options={}] - Campo modificado recentemente.
  * @returns {boolean} True quando orçamento e PEP estão consistentes.
@@ -5326,12 +5352,27 @@ async function handleFormSubmit(event) {
   const normalizedStatus = isApproval
     ? PROJECT_STATUSES.IN_APPROVAL
     : PROJECT_STATUSES.DRAFT;
-  statusField.value = normalizedStatus;
 
   const payload = collectProjectData();
   payload.status = normalizedStatus;
 
+  const simplePeps = collectSimplePepDataForSummary();
+  const milestones = collectMilestonesForSummary();
+  const activities = collectActivitiesForSummary(milestones);
+  const pepList = collectPepEntriesForSummary(simplePeps, activities);
+
   scrollFormToTop();
+
+  try {
+    validateBudgetDistribution(payload, pepList);
+  } catch (validationError) {
+    console.error('Erro na distribuição do orçamento do projeto', validationError);
+    showStatus(validationError.message, { type: 'error' });
+    projectForm.dataset.submitIntent = 'save';
+    return;
+  }
+
+  statusField.value = normalizedStatus;
   showStatus(isApproval ? 'Enviando para aprovação…' : 'Salvando…', { type: 'info' });
 
   let resolvedId = Number(projectId) || null;
