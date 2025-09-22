@@ -389,7 +389,8 @@ p {
 .project-card-title {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2; /* máx. 2 linhas (pode ajustar p/ 3 em telas pequenas) */
+  -webkit-line-clamp: 2;
+  line-clamp: 2;/* máx. 2 linhas (pode ajustar p/ 3 em telas pequenas) */
   overflow: hidden;
   line-height: 1.25;
   font-weight: 600;
@@ -424,7 +425,8 @@ p {
   }
 
   .project-card-title {
-    -webkit-line-clamp: 3; /* em telas pequenas, permite 3 linhas */
+    -webkit-line-clamp: 3;
+    line-clamp: 3;   /* em telas pequenas, permite 3 linhas */
   }
 }
 
