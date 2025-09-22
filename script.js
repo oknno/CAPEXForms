@@ -4624,6 +4624,15 @@ function parseDateInputValue(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function normalizeDateOnly(dateLike) {
+  const date = dateLike instanceof Date ? new Date(dateLike.getTime()) : new Date(dateLike);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 function getDateRangePairs() {
   const pairs = [];
 
@@ -4787,13 +4796,10 @@ function validateProjectStartDateMinimum(options = {}) {
     return true;
   }
 
-  const normalizedStart = new Date(startDate);
-  normalizedStart.setHours(0, 0, 0, 0);
+  const normalizedStart = normalizeDateOnly(startDate);
+  const today = normalizeDateOnly(new Date());
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  if (normalizedStart < today) {
+  if (normalizedStart && today && normalizedStart < today) {
     projectStartDateInput.setCustomValidity(PROJECT_START_MIN_ERROR_MESSAGE);
     updateProjectDateWarning(PROJECT_START_MIN_ERROR_MESSAGE);
     if (report && typeof projectStartDateInput.reportValidity === 'function') {
