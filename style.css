@@ -373,6 +373,61 @@ p {
   color: var(--muted);
 }
 
+/* ===== Robustez da sidebar de projetos ===== */
+
+/* O card precisa engolir qualquer overflow interno */
+.project-card {
+  overflow: hidden; /* impede vazamento de conteúdo para fora das bordas */
+}
+
+/* Essencial para clamp/ellipsis funcionar dentro de flex/grid */
+.project-card-content {
+  min-width: 0;
+}
+
+/* Título do projeto: até 2 linhas; depois reticências */
+.project-card-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; /* máx. 2 linhas (pode ajustar p/ 3 em telas pequenas) */
+  overflow: hidden;
+  line-height: 1.25;
+  font-weight: 600;
+  word-break: break-word; /* fallback */
+  overflow-wrap: anywhere; /* fallback */
+}
+
+/* Rodapé do card (status/valor) sempre em 1 linha legível */
+.project-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+/* Evita quebra feia de moeda/valores */
+.project-card-meta {
+  white-space: nowrap;
+}
+
+/* A lista pode ficar alta; deixa rolar sem “puxar” a página */
+.project-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Ajustes para telas estreitas */
+@media (max-width: 480px) {
+  .project-card {
+    padding: 14px 16px;
+  }
+
+  .project-card-title {
+    -webkit-line-clamp: 3; /* em telas pequenas, permite 3 linhas */
+  }
+}
+
 .details {
   background: var(--card);
   border-radius: 22px;
