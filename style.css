@@ -979,23 +979,6 @@ p {
   min-height: 120px;
 }
 
-.comment-feedback {
-  font-size: 13px;
-  margin-top: 6px;
-}
-
-.comment-feedback.danger {
-  color: var(--red);
-}
-
-.comment-feedback.warning {
-  color: var(--orange);
-}
-
-.comment-feedback.success {
-  color: green;
-}
-
 .field-group input:focus,
 .field-group select:focus,
 .field-group textarea:focus {
