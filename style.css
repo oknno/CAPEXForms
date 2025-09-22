@@ -1172,6 +1172,13 @@ p {
   gap: 16px;
 }
 
+#ganttContainer,
+#summaryGanttSection,
+#formSummaryGanttSection {
+  width: 100%;
+  min-width: 0; /* evita corte em grids/flex */
+}
+
 .gantt-container {
   /* Moldura do gráfico Gantt exibida quando há atividades válidas */
   margin-top: 12px;
@@ -1190,9 +1197,10 @@ p {
 }
 
 .gantt-chart {
-  /* Área onde Google Charts renderiza o Gantt; overflow-x permite navegação em cronogramas longos */
+  /* Área onde Google Charts renderiza o Gantt; overflow permite navegação em cronogramas extensos */
   width: 100%;
-  overflow-x: auto;
+  min-height: 260px; /* confortável para 3–4 linhas */
+  overflow: auto;    /* scroll quando necessário nos eixos X e Y */
   border-radius: 8px;
   background: #fff;
   padding: 4px;
@@ -1200,7 +1208,7 @@ p {
 }
 
 .gantt-chart > div {
-  min-width: 480px;
+  min-width: 640px;
 }
 
 @media (max-width: 1080px) {
