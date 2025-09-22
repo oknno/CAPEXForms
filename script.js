@@ -3081,26 +3081,19 @@ function fillFormWithProject(detail) {
   updateBudgetSections({ preserve: true });
 
   if (project.budgetBrl < BUDGET_THRESHOLD) {
-    const pepSource = Array.isArray(project?.peps) && project.peps.length
-      ? project.peps
-      : Array.isArray(simplePeps)
-        ? simplePeps
-        : [];
-
-    populateSimplePepsFromData(pepSource);
-
-    const rows = simplePepList.querySelectorAll('.pep-row');
-    if (!rows.length) {
+    simplePeps.forEach((pep) => {
+      const row = createSimplePepRow({
+        id: pep.Id,
+        title: pep.Title,
+        amount: pep.amountBrl,
+        year: pep.year
+      });
+      simplePepList.append(row);
+      state.editingSnapshot.simplePeps.add(Number(pep.Id));
+    });
+    if (!simplePeps.length) {
       ensureSimplePepRow();
     }
-
-    rows.forEach((row) => {
-      const rawId = row.dataset.pepId;
-      const idValue = rawId ? Number(rawId) : NaN;
-      if (rawId && Number.isFinite(idValue)) {
-        state.editingSnapshot.simplePeps.add(idValue);
-      }
-    });
   } else {
     milestones.forEach((milestone) => {
       const block = createMilestoneBlock({
@@ -4756,7 +4749,8 @@ function updateSimplePepYears() {
  * Garante ao menos uma linha de PEP simples pronta para preenchimento.
  */
 function ensureSimplePepRow() {
-  createSimplePepRow({ year: parseInt(approvalYearInput.value, 10) || '' });
+  const row = createSimplePepRow({ year: parseInt(approvalYearInput.value, 10) || '' });
+  simplePepList.append(row);
 }
 
 /**
@@ -4787,94 +4781,14 @@ function resolveDatasetId(value) {
  * @param {{id?:string|number,title?:string,amount?:number|string,year?:number|string}} [param0={}] - Dados iniciais.
  * @returns {HTMLElement} Linha gerada.
  */
-function createSimplePepRow(pep = {}) {
-  // pep: { id?, title?, amountBrl?, year? }
-  if (!simplePepTemplate || !simplePepList) return;
-
-  const clone = simplePepTemplate.content.cloneNode(true);
-  const row = clone.querySelector('.pep-row');
-
-  if (pep.id != null) row.dataset.pepId = String(pep.id);
-
-  // pega os controles do template
-  let titleControl = row.querySelector('.pep-title, [name="pepTitle"]');
-  const amountInput = row.querySelector('.pep-amount');
-  const yearInput = row.querySelector('.pep-year');
-
-  // garante SELECT (converte input → select se necessário)
-  const conv = ensurePepTitleSelect(titleControl);
-  const titleSelect = conv?.select || titleControl;
-  const currentValue = (pep.title ?? conv?.currentValue ?? '').trim();
-
-  // popula opções conforme empresa
-  const company = getCurrentCompanyCode();
-  const options = getPepOptionsForCompany(company);
-  populatePepTitleSelect(titleSelect, options, currentValue);
-
-  // demais campos
-  const amountValue =
-    typeof pep.amountBrl === 'number' && Number.isFinite(pep.amountBrl)
-      ? String(pep.amountBrl)
-      : pep.amountBrl != null && pep.amountBrl !== ''
-        ? String(pep.amountBrl)
-        : '';
-  if (amountValue !== '' && amountInput) amountInput.value = amountValue;
-
-  if (pep.year != null && pep.year !== '' && yearInput) {
-    yearInput.value = String(pep.year);
-  } else if (yearInput && pep.year === '') {
-    yearInput.value = '';
-  }
-
-  // anexa
-  simplePepList.appendChild(clone);
-
-  // dispara change para validações/eventos já existentes
-  (row.querySelector('.pep-title') || titleSelect)
-    ?.dispatchEvent(new Event('change', { bubbles: true }));
-}
-
-function populateSimplePepsFromData(peps = []) {
-  if (!simplePepList) return;
-  simplePepList.innerHTML = '';
-  (Array.isArray(peps) ? peps : []).forEach((p) => {
-    if (!p) {
-      return;
-    }
-
-    const rawAmountText =
-      typeof p.amountText === 'string' && p.amountText
-        ? String(p.amountText)
-        : '';
-    let normalizedAmount = null;
-    if (typeof p.amountBrl === 'number' && Number.isFinite(p.amountBrl)) {
-      normalizedAmount = p.amountBrl;
-    } else if (rawAmountText) {
-      const parsed = Number(rawAmountText.replace(/\./g, '').replace(',', '.'));
-      normalizedAmount = Number.isFinite(parsed) ? parsed : rawAmountText;
-    } else if (p.amountBrl != null && p.amountBrl !== '') {
-      normalizedAmount = p.amountBrl;
-    }
-
-    const rawYearText =
-      p.yearText != null && p.yearText !== ''
-        ? String(p.yearText)
-        : '';
-    let normalizedYear = null;
-    if (p.year != null && p.year !== '') {
-      normalizedYear = p.year;
-    } else if (rawYearText) {
-      const parsedYear = Number(rawYearText);
-      normalizedYear = Number.isFinite(parsedYear) ? parsedYear : rawYearText;
-    }
-
-    createSimplePepRow({
-      id: p.id ?? p.PepId ?? p.Id ?? null,
-      title: p.title ?? p.titleDisplay ?? p.Title ?? '',
-      amountBrl: normalizedAmount,
-      year: normalizedYear ?? ''
-    });
-  });
+function createSimplePepRow({ id = '', title = '', amount = '', year = '' } = {}) {
+  const fragment = simplePepTemplate.content.cloneNode(true);
+  const row = fragment.querySelector('.pep-row');
+  row.dataset.pepId = resolveDatasetId(id);
+  row.querySelector('.pep-title').value = title || '';
+  row.querySelector('.pep-amount').value = sanitizeNumericInputValue(amount);
+  row.querySelector('.pep-year').value = year ?? '';
+  return row;
 }
 
 /**
@@ -4970,10 +4884,6 @@ async function handleFormSubmit(event) {
     return;
   }
 
-  if (!validatePepsBeforeSubmit({ report: true })) {
-    return;
-  }
-
   const normalizedStatus = isApproval
     ? PROJECT_STATUSES.IN_APPROVAL
     : PROJECT_STATUSES.DRAFT;
@@ -4981,7 +4891,6 @@ async function handleFormSubmit(event) {
 
   const payload = collectProjectData();
   payload.status = normalizedStatus;
-  payload.peps = collectSimplePeps();
 
   scrollFormToTop();
   showStatus(isApproval ? 'Enviando para aprovação…' : 'Salvando…', { type: 'info' });
@@ -5157,54 +5066,6 @@ async function persistRelatedRecords(projectId, projectData) {
     await persistSimplePeps(projectId, approvalYear);
     await cleanupKeyProjects();
   }
-}
-
-function collectSimplePeps() {
-  if (!simplePepList) return [];
-  const rows = [...simplePepList.querySelectorAll('.pep-row')];
-
-  const peps = rows
-    .map((row) => {
-      const id = row.dataset.pepId ? Number(row.dataset.pepId) : null;
-
-      const titleEl =
-        row.querySelector('.pep-title') ||
-        row.querySelector('select.pep-title') ||
-        row.querySelector('input.pep-title');
-      const title = (titleEl?.value || '').trim();
-
-      const amountEl = row.querySelector('.pep-amount');
-      const yearEl = row.querySelector('.pep-year');
-
-      const rawAmount = (amountEl?.value || '').toString();
-      const amountBrl = Number(rawAmount.replace(/\./g, '').replace(',', '.')) || 0;
-      const yearRaw = yearEl?.value ?? '';
-      const year = Number(yearRaw || '') || null;
-
-      const hasTitle = Boolean(title);
-      const hasAmount = amountBrl > 0;
-      const hasYear = yearRaw.trim() !== '';
-      const isUsed = hasTitle || hasAmount || (hasYear && (hasTitle || hasAmount));
-      if (!isUsed) {
-        return null;
-      }
-
-      return { id, title, amountBrl, year, type: 'simple' };
-    })
-    .filter(Boolean);
-
-  return peps;
-}
-
-function validatePepsBeforeSubmit({ report = false } = {}) {
-  const peps = collectSimplePeps();
-  const invalid = peps.find(
-    (pep) => (pep.title && pep.amountBrl <= 0) || (!pep.title && pep.amountBrl > 0)
-  );
-  if (invalid && report) {
-    alert('Preencha TÍTULO e VALOR em cada PEP utilizado (ou deixe a linha totalmente vazia).');
-  }
-  return !invalid;
 }
 
 /**
@@ -5451,30 +5312,9 @@ async function persistSimplePeps(projectId, approvalYear) {
 
   for (const row of simplePepList.querySelectorAll('.pep-row')) {
     const id = row.dataset.pepId;
-    const title = row.querySelector('.pep-title')?.value.trim() || '';
+    const title = row.querySelector('.pep-title').value.trim();
     const amount = parseNumericInputValue(row.querySelector('.pep-amount')) || 0;
-    const yearInput = row.querySelector('.pep-year');
-    const yearRaw = yearInput?.value ?? '';
-    let year = parseNumber(yearRaw);
-    const hasTitle = Boolean(title);
-    const hasAmount = amount > 0;
-    const hasYear = yearRaw.trim() !== '';
-    const hasData = hasTitle || hasAmount || (hasYear && (hasTitle || hasAmount));
-
-    if (!hasData) {
-      if (id) {
-        row.dataset.pepId = '';
-      }
-      continue;
-    }
-
-    if (!hasYear && approvalYear) {
-      year = approvalYear;
-      if (yearInput) {
-        yearInput.value = String(year);
-      }
-    }
-
+    const year = parseNumber(row.querySelector('.pep-year').value) || approvalYear;
     const payload = {
       Title: title,
       amountBrl: amount,
@@ -5498,15 +5338,6 @@ async function persistSimplePeps(projectId, approvalYear) {
   const toDelete = [...state.editingSnapshot.simplePeps].filter((id) => !currentIds.has(id));
   for (const id of toDelete) {
     await sp.deleteItem('Peps', Number(id));
-  }
-
-  if (state.editingSnapshot?.simplePeps instanceof Set) {
-    state.editingSnapshot.simplePeps.clear();
-    currentIds.forEach((id) => {
-      if (Number.isFinite(id)) {
-        state.editingSnapshot.simplePeps.add(Number(id));
-      }
-    });
   }
 }
 
@@ -5714,15 +5545,6 @@ function parseNumber(value) {
 // PEP title dropdown utilities and wiring
 // ============================================================================
 
-function uniquePreserveOrder(arr) {
-  const seen = new Set(); const out = [];
-  for (const v of arr || []) {
-    const k = String(v ?? '').trim();
-    if (k && !seen.has(k)) { seen.add(k); out.push(k); }
-  }
-  return out;
-}
-
 const PEP_OPTIONS_DEFAULT = [
   'DESP.ENGENHARIA / DETALHAMENTO PROJETO',
   'AQUISIÇÃO DE EQUIPAMENTOS NACIONAIS',
@@ -5768,114 +5590,246 @@ const PEP_OPTIONS_BF00 = [
   'VEÍCULOS PESADOS'
 ];
 
+/**
+ * Remove duplicados preservando ordem e ignorando valores vazios.
+ * @param {unknown[]} arr - Coleção de valores para normalizar.
+ * @returns {string[]} Lista sanitizada de strings únicas.
+ */
+function uniquePreserveOrder(arr) {
+  if (!Array.isArray(arr)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const result = [];
+
+  for (const item of arr) {
+    if (item === undefined || item === null) {
+      continue;
+    }
+
+    const normalized = String(item).trim();
+
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+
+    seen.add(normalized);
+    result.push(normalized);
+  }
+
+  return result;
+}
+
+/**
+ * Obtém o código da empresa considerando input existente.
+ * @returns {string} Código em caixa alta ou string vazia.
+ */
 function getCurrentCompanyCode() {
   return (document.getElementById('company')?.value || '').trim().toUpperCase();
 }
 
-if (typeof window.getPepOptionsForCompany !== 'function') {
-  window.getPepOptionsForCompany = function getPepOptionsForCompany(company) {
-    const list = (String(company).trim().toUpperCase() === 'BF00')
-      ? PEP_OPTIONS_BF00
-      : PEP_OPTIONS_DEFAULT;
-    return uniquePreserveOrder(list);
-  };
-}
-const getPepOptionsForCompany = window.getPepOptionsForCompany;
-
-function ensurePepTitleSelect(el) {
-  if (!el) return null;
-  if (el.tagName === 'SELECT') return { select: el, currentValue: el.value || '' };
-
-  // cria select com mesmas classes/ids/names
-  const select = document.createElement('select');
-  select.className = el.className || 'pep-title';
-  select.name = el.name || 'pepTitle';
-  select.id = el.id || '';
-  select.required = true;
-
-  const currentValue = (el.value || '').trim();
-  el.replaceWith(select);
-  return { select, currentValue };
+/**
+ * Retorna lista de opções de PEP conforme empresa.
+ * @param {string} companyCode - Código atual da empresa.
+ * @returns {string[]} Lista de opções disponíveis.
+ */
+function getPepOptionsForCompany(companyCode) {
+  return uniquePreserveOrder(companyCode === 'BF00' ? PEP_OPTIONS_BF00 : PEP_OPTIONS_DEFAULT);
 }
 
+/**
+ * Popula SELECT com opções de PEP preservando valor atual.
+ * @param {HTMLSelectElement} selectEl - Elemento SELECT alvo.
+ * @param {string[]} options - Opções disponíveis.
+ * @param {string} selected - Valor previamente selecionado.
+ */
 function populatePepTitleSelect(selectEl, options, selected) {
-  if (!selectEl) return;
-  const prev = (selected ?? selectEl.value ?? '').trim();
-  const list = uniquePreserveOrder(options);
+  if (!selectEl) {
+    return;
+  }
 
-  selectEl.innerHTML = '<option value="">Selecione…</option>';
-  list.forEach((txt) => {
-    const opt = document.createElement('option');
-    opt.value = txt; opt.textContent = txt;
-    if (txt === prev) opt.selected = true;
-    selectEl.appendChild(opt);
-  });
+  const normalizedSelected = selected == null ? '' : String(selected).trim();
+  const normalizedOptions = Array.isArray(options) ? options : [];
 
-  // mantém valor existente que não está na lista (não perder dado em edição)
-  if (prev && !list.includes(prev)) {
-    const legacy = document.createElement('option');
-    legacy.value = prev; legacy.textContent = prev + ' (existente)';
-    legacy.selected = true; legacy.dataset.legacy = 'true';
-    selectEl.appendChild(legacy);
+  while (selectEl.firstChild) {
+    selectEl.removeChild(selectEl.firstChild);
+  }
+
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Selecione…';
+  if (!normalizedSelected) {
+    placeholder.selected = true;
+  }
+  selectEl.appendChild(placeholder);
+
+  let hasSelected = false;
+
+  for (const optionValue of normalizedOptions) {
+    const option = document.createElement('option');
+    option.value = optionValue;
+    option.textContent = optionValue;
+    if (optionValue === normalizedSelected) {
+      option.selected = true;
+      hasSelected = true;
+    }
+    selectEl.appendChild(option);
+  }
+
+  if (normalizedSelected && !hasSelected) {
+    const existingOption = document.createElement('option');
+    existingOption.value = normalizedSelected;
+    existingOption.textContent = `${normalizedSelected} (existente)`;
+    existingOption.selected = true;
+    selectEl.appendChild(existingOption);
   }
 }
 
-document.getElementById('company')?.addEventListener('change', () => {
-  const company = getCurrentCompanyCode();
-  const opts = getPepOptionsForCompany(company);
-  document.querySelectorAll('#simplePepList .pep-row').forEach((row) => {
-    const sel = row.querySelector('.pep-title');
-    if (!sel) return;
-    const current = (sel.value || '').trim();
-    populatePepTitleSelect(sel, opts, current);
-    sel.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-});
+/**
+ * Garante que o campo de título do PEP seja SELECT, preservando atributos.
+ * @param {HTMLElement} el - Elemento original.
+ * @returns {{select: HTMLSelectElement|null, currentValue: string}} Elemento SELECT e valor atual.
+ */
+function ensurePepTitleSelect(el) {
+  if (!el) {
+    return { select: null, currentValue: '' };
+  }
 
+  if (el.tagName && el.tagName.toUpperCase() === 'SELECT') {
+    return { select: /** @type {HTMLSelectElement} */ (el), currentValue: el.value != null ? String(el.value) : '' };
+  }
+
+  const currentValue = el.value != null ? String(el.value) : '';
+  const select = document.createElement('select');
+
+  for (const attr of Array.from(el.attributes)) {
+    if (attr.name === 'type' || attr.name === 'value') {
+      continue;
+    }
+
+    if (attr.name === 'class') {
+      select.className = el.className || '';
+    } else {
+      select.setAttribute(attr.name, attr.value);
+    }
+  }
+
+  if (!select.className && el.className) {
+    select.className = el.className;
+  }
+
+  if (el.dataset) {
+    for (const [key, value] of Object.entries(el.dataset)) {
+      select.dataset[key] = value;
+    }
+  }
+
+  if (typeof el.required === 'boolean' && el.required) {
+    select.required = true;
+  }
+
+  if (typeof el.disabled === 'boolean') {
+    select.disabled = el.disabled;
+  }
+
+  el.replaceWith(select);
+
+  return { select, currentValue };
+}
+
+/**
+ * Inicializa uma linha de PEP convertendo e populando o título.
+ * @param {Element} rowEl - Linha de PEP alvo.
+ */
+function initPepRow(rowEl) {
+  if (!rowEl) {
+    return;
+  }
+
+  const control = rowEl.querySelector('.pep-title, [name="pepTitle"]');
+  if (!control) {
+    return;
+  }
+
+  const { select, currentValue } = ensurePepTitleSelect(/** @type {HTMLElement} */ (control));
+  if (!select) {
+    return;
+  }
+
+  const options = getPepOptionsForCompany(getCurrentCompanyCode());
+  populatePepTitleSelect(select, options, currentValue);
+}
+
+/**
+ * Atualiza todas as linhas de PEP existentes.
+ */
 function refreshAllPepTitleSelects() {
-  document.querySelectorAll('.pep-row').forEach((row) => {
-    const ctrl = row.querySelector('.pep-title, [name="pepTitle"]');
-    if (!ctrl) return;
-    const conv = ensurePepTitleSelect(ctrl);
-    const sel = conv?.select || ctrl;
-    const current = conv?.currentValue || sel.value || '';
-    populatePepTitleSelect(sel, getPepOptionsForCompany(getCurrentCompanyCode()), current);
+  const rows = document.querySelectorAll('.pep-row');
+  rows.forEach(initPepRow);
+}
+
+let boundCompanyElement = null;
+let pepRowsObserver = null;
+
+function bindCompanyChangeListener() {
+  const companyField = document.getElementById('company');
+  if (!companyField || companyField === boundCompanyElement) {
+    return;
+  }
+
+  if (boundCompanyElement) {
+    boundCompanyElement.removeEventListener('change', refreshAllPepTitleSelects);
+  }
+
+  companyField.addEventListener('change', refreshAllPepTitleSelects);
+  boundCompanyElement = companyField;
+}
+
+function observePepRowMutations() {
+  if (pepRowsObserver || typeof MutationObserver !== 'function' || !document.body) {
+    return;
+  }
+
+  pepRowsObserver = new MutationObserver((mutations) => {
+    let shouldRebindCompany = false;
+
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (!(node instanceof Element)) {
+          continue;
+        }
+
+        if (!shouldRebindCompany && (node.id === 'company' || node.querySelector('#company'))) {
+          shouldRebindCompany = true;
+        }
+
+        if (node.classList.contains('pep-row')) {
+          initPepRow(node);
+        }
+
+        node.querySelectorAll('.pep-row').forEach(initPepRow);
+      }
+    }
+
+    if (shouldRebindCompany) {
+      bindCompanyChangeListener();
+    }
   });
+
+  pepRowsObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+function bootstrapPepTitleDropdowns() {
+  bindCompanyChangeListener();
+  refreshAllPepTitleSelects();
+  observePepRowMutations();
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', refreshAllPepTitleSelects, { once: true });
+  document.addEventListener('DOMContentLoaded', bootstrapPepTitleDropdowns, { once: true });
 } else {
-  refreshAllPepTitleSelects();
-}
-
-if (typeof MutationObserver === 'function' && document?.body) {
-  const pepObserver = new MutationObserver((mutations) => {
-    for (const m of mutations) {
-      m.addedNodes.forEach((n) => {
-        if (n.nodeType !== 1) return;
-        if (n.classList?.contains('pep-row')) {
-          // inicializa só a nova linha
-          const ctrl = n.querySelector('.pep-title, [name="pepTitle"]');
-          if (!ctrl) return;
-          const conv = ensurePepTitleSelect(ctrl);
-          const sel = conv?.select || ctrl;
-          const current = conv?.currentValue || sel.value || '';
-          populatePepTitleSelect(sel, getPepOptionsForCompany(getCurrentCompanyCode()), current);
-        } else {
-          n.querySelectorAll?.('.pep-row').forEach((r) => {
-            const ctrl = r.querySelector('.pep-title, [name="pepTitle"]');
-            if (!ctrl) return;
-            const conv = ensurePepTitleSelect(ctrl);
-            const sel = conv?.select || ctrl;
-            const current = conv?.currentValue || sel.value || '';
-            populatePepTitleSelect(sel, getPepOptionsForCompany(getCurrentCompanyCode()), current);
-          });
-        }
-      });
-    }
-  });
-  pepObserver.observe(document.body, { childList: true, subtree: true });
+  bootstrapPepTitleDropdowns();
 }
 
 // ============================================================================
