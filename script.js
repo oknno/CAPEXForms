@@ -2607,6 +2607,43 @@ async function resolveUserUnits(service, currentUser) {
   try {
     unitGroups = await service.getItems(UNIT_GROUPS_LIST_NAME, {
       select: 'Id,Title,unit,unit/Id,unit/Title,members/Id,members/Name,members/Title,members/EMail',
+  }
+
+  if (!currentUser || (!currentUser.id && !currentUser.login && !currentUser.email)) {
+    return emptyResult;
+  }
+
+  const targetIds = new Set();
+  const targetLogins = new Set();
+  const targetEmails = new Set();
+
+  const normalizedId = Number(currentUser.id);
+  if (!Number.isNaN(normalizedId)) {
+    targetIds.add(normalizedId);
+  }
+
+  if (typeof currentUser.login === 'string') {
+    const trimmedLogin = currentUser.login.trim();
+    if (trimmedLogin) {
+      targetLogins.add(trimmedLogin.toLowerCase());
+    }
+  }
+
+  if (typeof currentUser.email === 'string') {
+    const trimmedEmail = currentUser.email.trim();
+    if (trimmedEmail) {
+      targetEmails.add(trimmedEmail.toLowerCase());
+    }
+  }
+
+  if (!targetIds.size && !targetLogins.size && !targetEmails.size) {
+    return emptyResult;
+  }
+
+  let unitGroups;
+  try {
+    unitGroups = await service.getItems(UNIT_GROUPS_LIST_NAME, {
+      select: 'Id,Title,unit,unit/Id,unit/Title,members/Id,members/LoginName,members/EMail',
       expand: 'unit,members',
       top: 5000
     });
@@ -2684,6 +2721,78 @@ async function resolveUserUnits(service, currentUser) {
         if (targetLogins.has(normalized)) {
           return true;
         }
+      }
+    }
+
+    return false;
+  };
+
+  for (let index = 0; index < unitGroups.length; index += 1) {
+    const item = unitGroups[index];
+    const members = normalizeMembers(item?.members);
+
+    if (!members.length) {
+      continue;
+    }
+
+    const hasAccess = members.some(matchesCurrentUser);
+    if (hasAccess) {
+      itemsWithAccess.push(item);
+    }
+  }
+
+  }
+
+  if (!Array.isArray(unitGroups) || unitGroups.length === 0) {
+    return emptyResult;
+  }
+
+  const itemsWithAccess = [];
+
+  const normalizeMembers = (members) => {
+    if (!members) {
+      return [];
+    }
+
+    if (Array.isArray(members)) {
+      return members.filter(Boolean);
+    }
+
+    if (Array.isArray(members.results)) {
+      return members.results.filter(Boolean);
+    }
+
+    if (typeof members === 'object') {
+      return [members];
+    }
+
+    return [];
+  };
+
+  const matchesCurrentUser = (member) => {
+    if (!member) {
+      return false;
+    }
+
+    if (targetIds.size && member.Id !== undefined && member.Id !== null) {
+      const memberId = Number(member.Id);
+      if (!Number.isNaN(memberId) && targetIds.has(memberId)) {
+        return true;
+      }
+    }
+
+    if (targetLogins.size && member.LoginName) {
+      const loginNormalized = String(member.LoginName).trim().toLowerCase();
+      if (loginNormalized && targetLogins.has(loginNormalized)) {
+        return true;
+      }
+    }
+
+    const memberEmail = member.EMail || member.Email || member.Mail;
+    if (targetEmails.size && memberEmail) {
+      const emailNormalized = String(memberEmail).trim().toLowerCase();
+      if (emailNormalized && targetEmails.has(emailNormalized)) {
+        return true;
       }
     }
 
