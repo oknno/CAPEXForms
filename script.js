@@ -2486,70 +2486,152 @@ function createUnitAccessSettings(rawConfig) {
  */
 async function resolveUserUnits(userContext) {
   const normalizedUser = normalizeUserContext(userContext);
+  const hasUserIdentifiers =
+    normalizedUser.id != null || normalizedUser.login != null || normalizedUser.email != null;
 
-  if (!UNIT_ACCESS_SETTINGS.listName) {
+  if (!hasUserIdentifiers) {
     return [];
   }
 
   const listName = UNIT_ACCESS_SETTINGS.listName;
-  const usersField = UNIT_ACCESS_SETTINGS.usersField;
-  const selectFields = new Set(['Id']);
-  if (UNIT_ACCESS_SETTINGS.unitField) {
-    selectFields.add(UNIT_ACCESS_SETTINGS.unitField);
+  if (!listName) {
+    return [];
   }
-  if (usersField) {
-    selectFields.add(`${usersField}/Id`);
-    selectFields.add(`${usersField}/EMail`);
-    selectFields.add(`${usersField}/LoginName`);
-    selectFields.add(`${usersField}/UserPrincipalName`);
-    selectFields.add(`${usersField}/Title`);
+
+  const membersField = UNIT_ACCESS_SETTINGS.usersField;
+  const unitField = UNIT_ACCESS_SETTINGS.unitField;
+
+  const selectFields = new Set(['Id', 'Title']);
+  if (unitField && unitField !== 'Title') {
+    selectFields.add(unitField);
+  }
+  if (membersField) {
+    selectFields.add(`${membersField}/Id`);
+    selectFields.add(`${membersField}/LoginName`);
+    selectFields.add(`${membersField}/EMail`);
   }
 
   const query = {
-    orderby: 'Id asc'
+    orderby: 'Id asc',
+    top: '5000'
   };
 
   if (selectFields.size) {
     query.select = Array.from(selectFields).join(',');
   }
-  if (usersField) {
-    query.expand = usersField;
+  if (membersField) {
+    query.expand = membersField;
   }
-  query.top = '5000';
 
+  let records;
   try {
-    const records = await sp.getItems(listName, query);
-    const unitsFromList = extractUnitsFromRecords(records, normalizedUser);
-    return unitsFromList;
+    records = await sp.getItems(listName, query);
   } catch (error) {
     console.warn('Não foi possível carregar grupos de unidade', error);
     return [];
   }
+
+  return collectUnitsFromRecords(records, {
+    user: normalizedUser,
+    membersField,
+    unitField
+  });
 }
 
 /**
- * Extrai unidades válidas dos registros retornados do SharePoint.
- * @param {any[]} records - Registros da lista de grupos.
- * @param {{id:number|null, login:string|null, email:string|null}} userContext - Usuário logado normalizado.
- * @returns {string[]} Unidades às quais o usuário pertence.
+ * Consolida unidades pertencentes ao usuário dentro dos registros de grupos.
+ * @param {any[]} records - Registros retornados do SharePoint.
+ * @param {{user:{id:number|null, login:string|null, email:string|null}, membersField:string|null, unitField:string|null}} options
+ * @returns {string[]} Lista de unidades únicas.
  */
-function extractUnitsFromRecords(records, userContext) {
+function collectUnitsFromRecords(records, options) {
   if (!Array.isArray(records) || !records.length) {
     return [];
   }
 
+  const membersField = options.membersField;
+  const unitField = options.unitField;
+  const user = options.user;
   const units = new Set();
+
   records.forEach((record) => {
-    const unit = extractUnitValue(record);
-    if (!unit) return;
-    const members = extractMembers(record);
-    if (!members.length) return;
-    const belongsToUnit = members.some((member) => compareUsers(member, userContext));
-    if (belongsToUnit) {
-      units.add(unit);
+    if (!record || typeof record !== 'object') {
+      return;
+    }
+
+    if (!recordContainsUser(record, membersField, user)) {
+      return;
+    }
+
+    const unitName = extractUnitName(record, unitField);
+    if (unitName) {
+      units.add(unitName);
     }
   });
+
   return Array.from(units);
+}
+
+/**
+ * Verifica se o usuário informado está entre os membros do registro.
+ * @param {Object} record - Item retornado da lista de grupos.
+ * @param {string|null} membersField - Campo configurado com pessoas/grupos.
+ * @param {{id:number|null, login:string|null, email:string|null}} user - Usuário atual normalizado.
+ * @returns {boolean} Verdadeiro quando o usuário pertence ao grupo.
+ */
+function recordContainsUser(record, membersField, user) {
+  if (!membersField || !record || typeof record !== 'object') {
+    return false;
+  }
+
+  const rawValues = [
+    record[membersField],
+    record[`${membersField}Id`],
+    record[`${membersField}ID`],
+    record[`${membersField}Ids`],
+    record[`${membersField}IDs`],
+    record[`${membersField}_Id`],
+    record[`${membersField}_ID`]
+  ];
+
+  const members = [];
+  rawValues.forEach((value) => {
+    toArray(value).forEach((entry) => {
+      const normalized = normalizeUserCandidate(entry);
+      if (normalized) {
+        members.push(normalized);
+      }
+    });
+  });
+
+  if (!members.length) {
+    return false;
+  }
+
+  return members.some((member) => compareUsers(member, user));
+}
+
+/**
+ * Recupera o nome da unidade de um registro respeitando o campo configurado.
+ * @param {Object} record - Item retornado do SharePoint.
+ * @param {string|null} unitField - Nome do campo configurado para unidade.
+ * @returns {string|null} Unidade identificada ou null.
+ */
+function extractUnitName(record, unitField) {
+  const candidates = [];
+  if (unitField) {
+    candidates.push(record[unitField]);
+  }
+  candidates.push(record.Title, record.title);
+
+  for (const candidate of candidates) {
+    const resolved = resolveTextCandidate(candidate);
+    if (resolved) {
+      return resolved;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -2568,32 +2650,6 @@ function normalizeUserContext(userContext = {}) {
  * Extrai valor textual da unidade considerando diferentes formatos de retorno.
  * @param {Object} record - Registro retornado do SharePoint.
  * @returns {string|null} Valor textual normalizado.
- */
-function extractUnitValue(record) {
-  if (!record || typeof record !== 'object') {
-    return null;
-  }
-
-  const candidates = [];
-  if (UNIT_ACCESS_SETTINGS.unitField) {
-    candidates.push(record[UNIT_ACCESS_SETTINGS.unitField]);
-  }
-  candidates.push(record.Title, record.title);
-
-  for (const candidate of candidates) {
-    const value = resolveTextCandidate(candidate);
-    if (value) {
-      return value;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Resolve texto em diferentes estruturas retornadas pelo SharePoint.
- * @param {any} candidate - Valor bruto.
- * @returns {string|null} Texto normalizado ou null.
  */
 function resolveTextCandidate(candidate) {
   if (candidate == null) {
@@ -2631,43 +2687,9 @@ function resolveTextCandidate(candidate) {
 }
 
 /**
- * Extrai membros do registro respeitando variações do SharePoint.
- * @param {Object} record - Registro retornado da lista de grupos.
- * @returns {{id:number|null, login:string|null, email:string|null}[]} Usuários normalizados.
- */
-function extractMembers(record) {
-  if (!record || typeof record !== 'object') {
-    return [];
-  }
-
-  const membersField = UNIT_ACCESS_SETTINGS.usersField;
-  if (!membersField) {
-    return [];
-  }
-
-  const candidates = [];
-  candidates.push(record[membersField]);
-  candidates.push(record[`${membersField}Id`], record[`${membersField}ID`]);
-  candidates.push(record[`${membersField}Ids`], record[`${membersField}IDs`]);
-  candidates.push(record[`${membersField}_Id`], record[`${membersField}_ID`]);
-
-  const normalized = [];
-  candidates.forEach((candidate) => {
-    toArray(candidate).forEach((value) => {
-      const user = normalizeUserCandidate(value);
-      if (user) {
-        normalized.push(user);
-      }
-    });
-  });
-
-  return normalized;
-}
-
-/**
- * Converte valores arbitrários em um array.
- * @param {any} value - Valor retornado pelo SharePoint.
- * @returns {any[]} Array normalizado.
+ * Converte valores heterogêneos retornados pelo SharePoint em um array simples.
+ * @param {any} value - Valor retornado da API (array, objeto com results, string delimitada, etc.).
+ * @returns {any[]} Lista padronizada pronta para iteração.
  */
 function toArray(value) {
   if (value == null) {
@@ -2746,25 +2768,54 @@ function compareUsers(candidate, current) {
 }
 
 /**
- * Monta filtro OR no formato esperado pelo SharePoint.
- * @param {string[]} clauses - Lista de cláusulas OData.
- * @returns {string} Cláusula combinada.
+ * Gera a cláusula OData que combina autoria e unidades do usuário.
+ * @param {{userId:number|null, units:string[], unitField:string|null}} options - Dados usados na composição.
+ * @returns {string} Cláusula OData pronta para ser aplicada na consulta.
  */
-function buildOrFilter(clauses) {
-  return clauses
-    .map((clause) => clause?.trim())
-    .filter(Boolean)
-    .map((clause) => `(${clause})`)
-    .join(' or ');
+function createProjectAccessFilter(options) {
+  const userId = options?.userId != null ? Number(options.userId) : null;
+  const unitField = typeof options?.unitField === 'string' ? options.unitField.trim() : '';
+  const rawUnits = Array.isArray(options?.units) ? options.units : [];
+
+  const clauses = [];
+
+  if (userId != null && !Number.isNaN(userId)) {
+    clauses.push(`AuthorId eq ${userId}`);
+  }
+
+  const normalizedUnits = Array.from(
+    new Set(
+      rawUnits
+        .map((unit) => resolveTextCandidate(unit))
+        .filter((unit) => typeof unit === 'string' && unit.trim())
+        .map((unit) => unit.trim())
+    )
+  );
+
+  if (unitField && normalizedUnits.length) {
+    const unitClauses = normalizedUnits.map(
+      (unit) => `${unitField} eq ${formatODataText(unit)}`
+    );
+    if (unitClauses.length === 1) {
+      clauses.push(unitClauses[0]);
+    } else {
+      clauses.push(unitClauses.map((clause) => `(${clause})`).join(' or '));
+    }
+  }
+
+  if (!clauses.length) {
+    return '';
+  }
+
+  if (clauses.length === 1) {
+    return clauses[0];
+  }
+
+  return clauses.map((clause) => `(${clause})`).join(' or ');
 }
 
-/**
- * Sanitiza strings para uso em filtros OData.
- * @param {string} value - Valor a ser sanitizado.
- * @returns {string} Valor seguro para interpolação.
- */
-function sanitizeForOData(value) {
-  return String(value ?? '').replace(/'/g, "''");
+function formatODataText(value) {
+  return `'${String(value).replace(/'/g, "''")}'`;
 }
 
 /**
@@ -2919,18 +2970,6 @@ async function loadProjects() {
 
     const unitKeys = new Set(userUnits.map((unit) => normalizeUnitKey(unit)).filter(Boolean));
 
-    const clauses = [];
-    if (currentUserId != null) {
-      clauses.push(`AuthorId eq ${currentUserId}`);
-    }
-
-    if (unitKeys.size && UNIT_ACCESS_SETTINGS.projectUnitField) {
-      const field = UNIT_ACCESS_SETTINGS.projectUnitField;
-      userUnits.forEach((unit) => {
-        clauses.push(`${field} eq '${sanitizeForOData(unit)}'`);
-      });
-    }
-
     if (currentUserId == null && unitKeys.size === 0) {
       console.warn('Usuário atual sem identificadores válidos. Nenhum projeto será retornado.');
       state.projects = [];
@@ -2939,7 +2978,11 @@ async function loadProjects() {
     }
 
     const query = { orderby: 'Created desc', top: '5000' };
-    const filter = buildOrFilter(clauses);
+    const filter = createProjectAccessFilter({
+      userId: currentUserId,
+      units: userUnits,
+      unitField: UNIT_ACCESS_SETTINGS.projectUnitField
+    });
     if (filter) {
       query.filter = filter;
     }
