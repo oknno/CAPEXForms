@@ -2759,6 +2759,40 @@ function buildOrFilter(clauses) {
 }
 
 /**
+ * Monta filtro combinando cláusulas de autoria e unidade para a lista de projetos.
+ * @param {{userId:number|null, units:string[], unitField:string|null}} options - Dados necessários.
+ * @returns {string} Cláusula OData pronta para uso.
+ */
+function buildProjectAccessFilter(options) {
+  const userId = options?.userId != null ? Number(options.userId) : null;
+  const unitField = options?.unitField;
+  const units = Array.isArray(options?.units) ? options.units : [];
+
+  const clauses = [];
+  if (userId != null && !Number.isNaN(userId)) {
+    clauses.push(`AuthorId eq ${userId}`);
+  }
+
+  if (unitField) {
+    const uniqueUnits = Array.from(
+      new Set(
+        units
+          .map((unit) => resolveTextCandidate(unit))
+          .filter((unit) => typeof unit === 'string' && unit.trim())
+      )
+    );
+
+    const unitClauses = uniqueUnits.map((unit) => `${unitField} eq '${sanitizeForOData(unit)}'`);
+    const unitFilter = buildOrFilter(unitClauses);
+    if (unitFilter) {
+      clauses.push(unitFilter);
+    }
+  }
+
+  return buildOrFilter(clauses);
+}
+
+/**
  * Sanitiza strings para uso em filtros OData.
  * @param {string} value - Valor a ser sanitizado.
  * @returns {string} Valor seguro para interpolação.
@@ -2919,18 +2953,6 @@ async function loadProjects() {
 
     const unitKeys = new Set(userUnits.map((unit) => normalizeUnitKey(unit)).filter(Boolean));
 
-    const clauses = [];
-    if (currentUserId != null) {
-      clauses.push(`AuthorId eq ${currentUserId}`);
-    }
-
-    if (unitKeys.size && UNIT_ACCESS_SETTINGS.projectUnitField) {
-      const field = UNIT_ACCESS_SETTINGS.projectUnitField;
-      userUnits.forEach((unit) => {
-        clauses.push(`${field} eq '${sanitizeForOData(unit)}'`);
-      });
-    }
-
     if (currentUserId == null && unitKeys.size === 0) {
       console.warn('Usuário atual sem identificadores válidos. Nenhum projeto será retornado.');
       state.projects = [];
@@ -2939,7 +2961,11 @@ async function loadProjects() {
     }
 
     const query = { orderby: 'Created desc', top: '5000' };
-    const filter = buildOrFilter(clauses);
+    const filter = buildProjectAccessFilter({
+      userId: currentUserId,
+      units: userUnits,
+      unitField: UNIT_ACCESS_SETTINGS.projectUnitField
+    });
     if (filter) {
       query.filter = filter;
     }
