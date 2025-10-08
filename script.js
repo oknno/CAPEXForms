@@ -514,10 +514,18 @@ const DATE_RANGE_ERROR_MESSAGE = 'A data de término não pode ser anterior à d
 const PROJECT_START_MIN_ERROR_MESSAGE = 'A data de início não pode ser anterior a hoje';
 
 const SITE_URL = window.SHAREPOINT_SITE_URL || 'https://arcelormittal.sharepoint.com/sites/controladorialongos/capex';
+const PROJECTS_LIST_NAME = (typeof window !== 'undefined' && window.CAPEX_PROJECTS_LIST_NAME)
+  ? window.CAPEX_PROJECTS_LIST_NAME
+  : 'Projects';
+const UNIT_ACCESS_SETTINGS = createUnitAccessSettings(
+  typeof window !== 'undefined' ? window.CAPEX_UNIT_ACCESS : undefined
+);
+
 const sp = new SharePointService(SITE_URL);
 
 const state = {
   projects: [],
+  userUnits: [],
   selectedProjectId: null,
   currentDetails: null,
   editingSnapshot: {
@@ -2432,17 +2440,399 @@ function bindEvents() {
 // Carregamento e renderização da lista de projetos
 // ============================================================================
 /**
- * Recupera projetos do SharePoint filtrando pelo autor logado e atualiza o estado local.
+ * Normaliza configurações vindas via window.CAPEX_UNIT_ACCESS.
+ * Permite customizar apenas nomes de lista/campos usados para recuperar grupos no SharePoint.
+ * @param {any} rawConfig - Objeto de configuração opcional vindo do host.
+ * @returns {{listName:string|null, unitField:string, usersField:string, projectUnitField:string}}
+ */
+function createUnitAccessSettings(rawConfig) {
+  const defaults = {
+    listName: 'UnitGroups',
+    unitField: 'unit',
+    usersField: 'members',
+    projectUnitField: 'unit'
+  };
+
+  if (!rawConfig || typeof rawConfig !== 'object') {
+    return defaults;
+  }
+
+  const normalized = { ...defaults };
+  if (rawConfig.listName === null) {
+    normalized.listName = null;
+  } else if (typeof rawConfig.listName === 'string' && rawConfig.listName.trim()) {
+    normalized.listName = rawConfig.listName.trim();
+  }
+
+  if (typeof rawConfig.unitField === 'string' && rawConfig.unitField.trim()) {
+    normalized.unitField = rawConfig.unitField.trim();
+  }
+
+  if (typeof rawConfig.usersField === 'string' && rawConfig.usersField.trim()) {
+    normalized.usersField = rawConfig.usersField.trim();
+  }
+
+  if (typeof rawConfig.projectUnitField === 'string' && rawConfig.projectUnitField.trim()) {
+    normalized.projectUnitField = rawConfig.projectUnitField.trim();
+  }
+
+  return normalized;
+}
+
+/**
+ * Resolve unidades acessíveis ao usuário corrente consultando a lista de grupos no SharePoint.
+ * @param {{id?:number, login?:string, email?:string}} userContext - Dados básicos do usuário logado.
+ * @returns {Promise<string[]>} Lista de unidades às quais o usuário pertence.
+ */
+async function resolveUserUnits(userContext) {
+  const normalizedUser = normalizeUserContext(userContext);
+
+  if (!UNIT_ACCESS_SETTINGS.listName) {
+    return [];
+  }
+
+  const listName = UNIT_ACCESS_SETTINGS.listName;
+  const usersField = UNIT_ACCESS_SETTINGS.usersField;
+  const selectFields = new Set(['Id']);
+  if (UNIT_ACCESS_SETTINGS.unitField) {
+    selectFields.add(UNIT_ACCESS_SETTINGS.unitField);
+  }
+  if (usersField) {
+    selectFields.add(`${usersField}/Id`);
+    selectFields.add(`${usersField}/EMail`);
+    selectFields.add(`${usersField}/LoginName`);
+    selectFields.add(`${usersField}/UserPrincipalName`);
+    selectFields.add(`${usersField}/Title`);
+  }
+
+  const query = {
+    orderby: 'Id asc'
+  };
+
+  if (selectFields.size) {
+    query.select = Array.from(selectFields).join(',');
+  }
+  if (usersField) {
+    query.expand = usersField;
+  }
+
+  try {
+    const records = await sp.getItems(listName, query);
+    const unitsFromList = extractUnitsFromRecords(records, normalizedUser);
+    return unitsFromList;
+  } catch (error) {
+    console.warn('Não foi possível carregar grupos de unidade', error);
+    return [];
+  }
+}
+
+/**
+ * Extrai unidades válidas dos registros retornados do SharePoint.
+ * @param {any[]} records - Registros da lista de grupos.
+ * @param {{id:number|null, login:string|null, email:string|null}} userContext - Usuário logado normalizado.
+ * @returns {string[]} Unidades às quais o usuário pertence.
+ */
+function extractUnitsFromRecords(records, userContext) {
+  if (!Array.isArray(records) || !records.length) {
+    return [];
+  }
+
+  const units = new Set();
+  records.forEach((record) => {
+    const unit = extractUnitValue(record);
+    if (!unit) return;
+    const members = extractMembers(record);
+    if (!members.length) return;
+    const belongsToUnit = members.some((member) => compareUsers(member, userContext));
+    if (belongsToUnit) {
+      units.add(unit);
+    }
+  });
+  return Array.from(units);
+}
+
+/**
+ * Normaliza contexto do usuário corrente para comparações.
+ * @param {{id?:number, login?:string, email?:string}} userContext - Dados do usuário logado.
+ * @returns {{id:number|null, login:string|null, email:string|null}}
+ */
+function normalizeUserContext(userContext = {}) {
+  const id = userContext.id != null ? Number(userContext.id) : null;
+  const login = typeof userContext.login === 'string' ? userContext.login.toLowerCase() : null;
+  const email = typeof userContext.email === 'string' ? userContext.email.toLowerCase() : null;
+  return { id, login, email };
+}
+
+/**
+ * Extrai valor textual da unidade considerando diferentes formatos de retorno.
+ * @param {Object} record - Registro retornado do SharePoint.
+ * @returns {string|null} Valor textual normalizado.
+ */
+function extractUnitValue(record) {
+  if (!record || typeof record !== 'object') {
+    return null;
+  }
+
+  const candidates = [];
+  if (UNIT_ACCESS_SETTINGS.unitField) {
+    candidates.push(record[UNIT_ACCESS_SETTINGS.unitField]);
+  }
+  candidates.push(record.Title, record.title);
+
+  for (const candidate of candidates) {
+    const value = resolveTextCandidate(candidate);
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Resolve texto em diferentes estruturas retornadas pelo SharePoint.
+ * @param {any} candidate - Valor bruto.
+ * @returns {string|null} Texto normalizado ou null.
+ */
+function resolveTextCandidate(candidate) {
+  if (candidate == null) {
+    return null;
+  }
+  if (typeof candidate === 'string') {
+    const trimmed = candidate.trim();
+    return trimmed || null;
+  }
+  if (typeof candidate === 'number') {
+    return String(candidate);
+  }
+  if (Array.isArray(candidate)) {
+    for (const item of candidate) {
+      const resolved = resolveTextCandidate(item);
+      if (resolved) return resolved;
+    }
+    return null;
+  }
+  if (candidate && typeof candidate === 'object') {
+    if (Array.isArray(candidate.results)) {
+      return resolveTextCandidate(candidate.results);
+    }
+    const nested =
+      candidate.Value ?? candidate.value ??
+      candidate.Title ?? candidate.title ??
+      candidate.Name ?? candidate.name ??
+      candidate.Label ?? candidate.label ??
+      candidate.LookupValue ?? candidate.lookupValue;
+    if (nested != null) {
+      return resolveTextCandidate(nested);
+    }
+  }
+  return null;
+}
+
+/**
+ * Extrai membros do registro respeitando variações do SharePoint.
+ * @param {Object} record - Registro retornado da lista de grupos.
+ * @returns {{id:number|null, login:string|null, email:string|null}[]} Usuários normalizados.
+ */
+function extractMembers(record) {
+  if (!record || typeof record !== 'object') {
+    return [];
+  }
+
+  const membersField = UNIT_ACCESS_SETTINGS.usersField;
+  if (!membersField) {
+    return [];
+  }
+
+  const candidates = [];
+  candidates.push(record[membersField]);
+  candidates.push(record[`${membersField}Id`], record[`${membersField}ID`]);
+  candidates.push(record[`${membersField}Ids`], record[`${membersField}IDs`]);
+  candidates.push(record[`${membersField}_Id`], record[`${membersField}_ID`]);
+
+  const normalized = [];
+  candidates.forEach((candidate) => {
+    toArray(candidate).forEach((value) => {
+      const user = normalizeUserCandidate(value);
+      if (user) {
+        normalized.push(user);
+      }
+    });
+  });
+
+  return normalized;
+}
+
+/**
+ * Converte valores arbitrários em um array.
+ * @param {any} value - Valor retornado pelo SharePoint.
+ * @returns {any[]} Array normalizado.
+ */
+function toArray(value) {
+  if (value == null) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === 'object' && Array.isArray(value.results)) {
+    return value.results;
+  }
+  if (typeof value === 'string') {
+    const parts = value.split(/;#|[,;]/).map((part) => part.trim()).filter(Boolean);
+    return parts.length ? parts : [value];
+  }
+  return [value];
+}
+
+/**
+ * Normaliza estrutura de usuário retornada pelo SharePoint.
+ * @param {any} candidate - Valor bruto do usuário.
+ * @returns {{id:number|null, login:string|null, email:string|null}|null}
+ */
+function normalizeUserCandidate(candidate) {
+  if (candidate == null) {
+    return null;
+  }
+  if (typeof candidate === 'number') {
+    return { id: Number(candidate), login: null, email: null };
+  }
+  if (typeof candidate === 'string') {
+    const trimmed = candidate.trim();
+    if (!trimmed) return null;
+    if (/^\d+$/.test(trimmed)) {
+      return { id: Number(trimmed), login: null, email: null };
+    }
+    const lowered = trimmed.toLowerCase();
+    return { id: null, login: lowered, email: lowered };
+  }
+  if (typeof candidate === 'object') {
+    const id = candidate.Id ?? candidate.ID ?? candidate.id ?? candidate.UserId ?? candidate.UserID ?? null;
+    const login =
+      candidate.LoginName ?? candidate.loginName ??
+      candidate.UserPrincipalName ?? candidate.AccountName ??
+      candidate.Name ?? candidate.UserName ?? null;
+    const email = candidate.EMail ?? candidate.Email ?? candidate.email ?? candidate.mail ?? null;
+    return {
+      id: id != null ? Number(id) : null,
+      login: typeof login === 'string' ? login.toLowerCase() : null,
+      email: typeof email === 'string' ? email.toLowerCase() : null
+    };
+  }
+  return null;
+}
+
+/**
+ * Compara dois usuários normalizados considerando múltiplos identificadores.
+ * @param {{id:number|null, login:string|null, email:string|null}} candidate - Usuário da lista de grupos.
+ * @param {{id:number|null, login:string|null, email:string|null}} current - Usuário logado.
+ * @returns {boolean} Indica se representam a mesma pessoa.
+ */
+function compareUsers(candidate, current) {
+  if (!candidate || !current) {
+    return false;
+  }
+  if (candidate.id != null && current.id != null && Number(candidate.id) === Number(current.id)) {
+    return true;
+  }
+  if (candidate.login && current.login && candidate.login === current.login) {
+    return true;
+  }
+  if (candidate.email && current.email && candidate.email === current.email) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Monta filtro OR no formato esperado pelo SharePoint.
+ * @param {string[]} clauses - Lista de cláusulas OData.
+ * @returns {string} Cláusula combinada.
+ */
+function buildOrFilter(clauses) {
+  return clauses
+    .map((clause) => clause?.trim())
+    .filter(Boolean)
+    .map((clause) => `(${clause})`)
+    .join(' or ');
+}
+
+/**
+ * Sanitiza strings para uso em filtros OData.
+ * @param {string} value - Valor a ser sanitizado.
+ * @returns {string} Valor seguro para interpolação.
+ */
+function sanitizeForOData(value) {
+  return String(value ?? '').replace(/'/g, "''");
+}
+
+/**
+ * Remove duplicidades de projetos retornados pelo SharePoint.
+ * @param {Project[]} projects - Lista de projetos retornada da API.
+ * @returns {Project[]} Lista sem duplicidades por ID.
+ */
+function dedupeProjects(projects) {
+  if (!Array.isArray(projects)) {
+    return [];
+  }
+  const seen = new Set();
+  return projects.filter((project) => {
+    const id = project?.Id ?? project?.ID ?? project?.id;
+    if (id == null) {
+      return true;
+    }
+    if (seen.has(id)) {
+      return false;
+    }
+    seen.add(id);
+    return true;
+  });
+}
+
+/**
+ * Recupera projetos acessíveis ao usuário com base em autoria e pertencimento às unidades.
  * @returns {Promise<void>} Promessa resolvida após renderizar lista.
  */
 async function loadProjects() {
   try {
-    const currentUserId = _spPageContextInfo.userId; // pega o ID do usuário logado
-    const results = await sp.getItems('Projects', {
-      orderby: 'Created desc',
-      filter: `AuthorId eq ${currentUserId}`
+    const currentUserId = _spPageContextInfo?.userId;
+    const currentUserLogin = _spPageContextInfo?.userLoginName;
+    const currentUserEmail = _spPageContextInfo?.userEmail;
+
+    const userUnits = await resolveUserUnits({
+      id: currentUserId,
+      login: currentUserLogin,
+      email: currentUserEmail
     });
-    state.projects = results;
+    state.userUnits = userUnits;
+
+    const clauses = [];
+    if (currentUserId != null) {
+      clauses.push(`AuthorId eq ${currentUserId}`);
+    }
+
+    if (userUnits.length && UNIT_ACCESS_SETTINGS.projectUnitField) {
+      const field = UNIT_ACCESS_SETTINGS.projectUnitField;
+      userUnits.forEach((unit) => {
+        clauses.push(`${field} eq '${sanitizeForOData(unit)}'`);
+      });
+    }
+
+    if (!clauses.length) {
+      console.warn('Usuário atual sem identificadores válidos. Nenhum projeto será retornado.');
+      state.projects = [];
+      renderProjectList();
+      return;
+    }
+
+    const query = { orderby: 'Created desc' };
+    const filter = buildOrFilter(clauses);
+    if (filter) {
+      query.filter = filter;
+    }
+
+    const results = await sp.getItems(PROJECTS_LIST_NAME, query);
+    state.projects = dedupeProjects(results);
     renderProjectList();
   } catch (error) {
     console.error('Erro ao carregar projetos', error);
