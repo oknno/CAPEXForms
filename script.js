@@ -2432,21 +2432,71 @@ function bindEvents() {
 // Carregamento e renderização da lista de projetos
 // ============================================================================
 /**
- * Recupera projetos do SharePoint filtrando pelo autor logado e atualiza o estado local.
+ * Recupera as unidades do usuário logado a partir da lista UnitGroups.
+ * @returns {Promise<string[]>} Lista com os nomes (Title) das unidades.
+ */
+async function getUserUnits() {
+  const userId = _spPageContextInfo?.userId;
+  if (!userId) {
+    console.warn('Usuário atual não identificado ao buscar unidades.');
+    return [];
+  }
+
+  try {
+    const items = await sp.getItems('UnitGroups', {
+      select: 'Id,Title,members/Id',
+      expand: 'members',
+      filter: `members/Id eq ${userId}`,
+      top: 5000
+    });
+
+    return items
+      .map((item) => (typeof item?.Title === 'string' ? item.Title.trim() : ''))
+      .filter(Boolean);
+  } catch (error) {
+    console.warn('Erro ao carregar unidades do usuário', error);
+    return [];
+  }
+}
+
+/**
+ * Recupera projetos do SharePoint filtrando pelo autor logado e unidades associadas.
  * @returns {Promise<void>} Promessa resolvida após renderizar lista.
  */
 async function loadProjects() {
-  try {
-    const currentUserId = _spPageContextInfo.userId; // pega o ID do usuário logado
-    const results = await sp.getItems('Projects', {
-      orderby: 'Created desc',
-      filter: `AuthorId eq ${currentUserId}`
-    });
-    state.projects = results;
+  const currentUserId = _spPageContextInfo?.userId;
+  if (!currentUserId) {
+    console.warn('Usuário atual não identificado ao carregar projetos.');
+    state.projects = [];
     renderProjectList();
-  } catch (error) {
-    console.error('Erro ao carregar projetos', error);
+    return;
   }
+
+  const userUnits = await getUserUnits();
+  const clauses = [`AuthorId eq ${currentUserId}`];
+
+  if (userUnits.length) {
+    const unitClauses = userUnits.map((unitName) => {
+      const sanitized = unitName.replace(/'/g, "''");
+      return `unit eq '${sanitized}'`;
+    });
+    clauses.push(`(${unitClauses.join(' or ')})`);
+  }
+
+  const query = {
+    orderby: 'Created desc',
+    filter: clauses.join(' or ')
+  };
+
+  try {
+    const results = await sp.getItems('Projects', query);
+    state.projects = Array.isArray(results) ? results : [];
+  } catch (error) {
+    console.warn('Erro ao carregar projetos', error);
+    state.projects = [];
+  }
+
+  renderProjectList();
 }
 
 /**
