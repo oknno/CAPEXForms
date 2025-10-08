@@ -2849,6 +2849,40 @@ function buildProjectAccessFilter(options) {
 }
 
 /**
+ * Monta filtro OR no formato esperado pelo SharePoint.
+ * @param {string[]|undefined|null} clauses - Lista de cláusulas OData.
+ * @returns {string} Cláusula combinada.
+ */
+function buildOrFilter(clauses) {
+  if (!Array.isArray(clauses) || clauses.length === 0) {
+    return '';
+  }
+
+  const normalized = clauses
+    .map((clause) => (typeof clause === 'string' ? clause.trim() : ''))
+    .filter(Boolean);
+
+  if (normalized.length === 0) {
+    return '';
+  }
+
+  if (normalized.length === 1) {
+    return normalized[0];
+  }
+
+  return normalized.map((clause) => `(${clause})`).join(' or ');
+}
+
+/**
+ * Formata texto para uso seguro em filtros OData.
+ * @param {string} value - Valor original.
+ * @returns {string} Texto entre aspas simples e sanitizado.
+ */
+function formatODataText(value) {
+  return `'${sanitizeForOData(value)}'`;
+}
+
+/**
  * Sanitiza strings para uso em filtros OData.
  * @param {string} value - Valor a ser sanitizado.
  * @returns {string} Valor seguro para interpolação.
