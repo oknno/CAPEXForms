@@ -2814,8 +2814,47 @@ function createProjectAccessFilter(options) {
   return clauses.map((clause) => `(${clause})`).join(' or ');
 }
 
-function formatODataText(value) {
-  return `'${String(value).replace(/'/g, "''")}'`;
+/**
+ * Monta filtro combinando cláusulas de autoria e unidade para a lista de projetos.
+ * @param {{userId:number|null, units:string[], unitField:string|null}} options - Dados necessários.
+ * @returns {string} Cláusula OData pronta para uso.
+ */
+function buildProjectAccessFilter(options) {
+  const userId = options?.userId != null ? Number(options.userId) : null;
+  const unitField = options?.unitField;
+  const units = Array.isArray(options?.units) ? options.units : [];
+
+  const clauses = [];
+  if (userId != null && !Number.isNaN(userId)) {
+    clauses.push(`AuthorId eq ${userId}`);
+  }
+
+  if (unitField) {
+    const uniqueUnits = Array.from(
+      new Set(
+        units
+          .map((unit) => resolveTextCandidate(unit))
+          .filter((unit) => typeof unit === 'string' && unit.trim())
+      )
+    );
+
+    const unitClauses = uniqueUnits.map((unit) => `${unitField} eq '${sanitizeForOData(unit)}'`);
+    const unitFilter = buildOrFilter(unitClauses);
+    if (unitFilter) {
+      clauses.push(unitFilter);
+    }
+  }
+
+  return buildOrFilter(clauses);
+}
+
+/**
+ * Sanitiza strings para uso em filtros OData.
+ * @param {string} value - Valor a ser sanitizado.
+ * @returns {string} Valor seguro para interpolação.
+ */
+function sanitizeForOData(value) {
+  return String(value ?? '').replace(/'/g, "''");
 }
 
 /**
@@ -2978,7 +3017,7 @@ async function loadProjects() {
     }
 
     const query = { orderby: 'Created desc', top: '5000' };
-    const filter = createProjectAccessFilter({
+    const filter = buildProjectAccessFilter({
       userId: currentUserId,
       units: userUnits,
       unitField: UNIT_ACCESS_SETTINGS.projectUnitField
