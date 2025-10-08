@@ -515,6 +515,8 @@ const PROJECT_START_MIN_ERROR_MESSAGE = 'A data de início não pode ser anterio
 
 const SITE_URL = window.SHAREPOINT_SITE_URL || 'https://arcelormittal.sharepoint.com/sites/controladorialongos/capex';
 const sp = new SharePointService(SITE_URL);
+const PROJECTS_LIST_NAME = 'Projects';
+const UNIT_GROUPS_LIST_NAME = 'UnitGroups';
 
 const state = {
   projects: [],
@@ -2432,21 +2434,296 @@ function bindEvents() {
 // Carregamento e renderização da lista de projetos
 // ============================================================================
 /**
+ * Normaliza informações básicas do usuário logado a partir do _spPageContextInfo.
+ * @returns {{id:number|null, login:string, email:string}} Contexto mínimo do usuário.
+ */
+function getCurrentUserContext() {
+  if (typeof _spPageContextInfo === 'undefined' || !_spPageContextInfo) {
+    console.warn('Contexto SharePoint não disponível (_spPageContextInfo indefinido).');
+    return { id: null, login: '', email: '' };
+  }
+
+  const userId = Number(_spPageContextInfo.userId);
+  return {
+    id: Number.isFinite(userId) ? userId : null,
+    login: _spPageContextInfo.userLoginName || '',
+    email: _spPageContextInfo.userEmail || ''
+  };
+}
+
+/**
+ * Sanitiza valores para uso em filtros OData, duplicando apóstrofos quando necessário.
+ * @param {string} value - Texto alvo.
+ * @returns {string} Valor seguro para filtros.
+ */
+function sanitizeForOData(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value).replace(/'/g, "''").trim();
+}
+
+/**
+ * Remove duplicidades de projetos preservando apenas IDs únicos.
+ * @param {Object[]} projects - Coleção recebida da API.
+ * @returns {Object[]} Lista filtrada.
+ */
+function dedupeProjects(projects) {
+  if (!Array.isArray(projects) || !projects.length) {
+    return [];
+  }
+  const unique = [];
+  const seen = new Set();
+  projects.forEach((project) => {
+    const identifier = project?.Id;
+    if (identifier === undefined || identifier === null || seen.has(identifier)) {
+      return;
+    }
+    seen.add(identifier);
+    unique.push(project);
+  });
+  return unique;
+}
+
+/**
+ * Extrai valores de unidade a partir dos itens retornados da lista UnitGroups.
+ * @param {Object[]} groupItems - Itens da lista UnitGroups.
+ * @returns {{units:string[], hasLookup:boolean, hasText:boolean}} Valores encontrados e metadados.
+ */
+function extractUnitMetadata(groupItems) {
+  const values = new Set();
+  let hasLookup = false;
+  let hasText = false;
+
+  if (!Array.isArray(groupItems)) {
+    return { units: [], hasLookup, hasText };
+  }
+
+  groupItems.forEach((item) => {
+    const unitField = item?.unit;
+
+    if (typeof unitField === 'string') {
+      const trimmed = unitField.trim();
+      if (trimmed) {
+        values.add(trimmed);
+        hasText = true;
+      }
+      return;
+    }
+
+    if (unitField && typeof unitField === 'object') {
+      if (Array.isArray(unitField.results)) {
+        unitField.results.forEach((entry) => {
+          if (!entry) return;
+          if (typeof entry === 'string') {
+            const trimmed = entry.trim();
+            if (trimmed) {
+              values.add(trimmed);
+              hasText = true;
+            }
+            return;
+          }
+          if (entry.Title) {
+            const trimmed = String(entry.Title).trim();
+            if (trimmed) {
+              values.add(trimmed);
+              hasLookup = true;
+            }
+          }
+        });
+        hasLookup = true;
+        return;
+      }
+
+      if (unitField.Title) {
+        const trimmed = String(unitField.Title).trim();
+        if (trimmed) {
+          values.add(trimmed);
+          hasLookup = true;
+        }
+        return;
+      }
+
+      const fallbackValue = unitField.Value || unitField.Label || unitField.Name;
+      if (fallbackValue) {
+        const trimmed = String(fallbackValue).trim();
+        if (trimmed) {
+          values.add(trimmed);
+          hasText = true;
+        }
+      }
+    }
+  });
+
+  return { units: Array.from(values), hasLookup, hasText };
+}
+
+/**
+ * Busca todas as unidades nas quais o usuário está cadastrado na lista UnitGroups.
+ * @param {SharePointService} service - Serviço SharePoint configurado.
+ * @param {{id:number|null, login:string, email:string}} currentUser - Usuário logado.
+ * @returns {Promise<{units:string[], hasLookup:boolean, hasText:boolean}>} Resultado consolidado.
+ */
+async function resolveUserUnits(service, currentUser) {
+  if (!currentUser?.id && !currentUser?.login && !currentUser?.email) {
+    return { units: [], hasLookup: false, hasText: false };
+  }
+
+  const memberFilters = [];
+  if (currentUser.id) {
+    memberFilters.push(`members/Id eq ${currentUser.id}`);
+  }
+  if (currentUser.login) {
+    memberFilters.push(`members/LoginName eq '${sanitizeForOData(currentUser.login)}'`);
+  }
+  if (currentUser.email) {
+    memberFilters.push(`members/EMail eq '${sanitizeForOData(currentUser.email)}'`);
+  }
+
+  const filterExpression = memberFilters.join(' or ');
+
+  try {
+    const unitGroups = await service.getItems(UNIT_GROUPS_LIST_NAME, {
+      select: 'Id,unit,unit/Id,unit/Title,members/Id,members/LoginName,members/EMail',
+      expand: 'unit,members',
+      filter: filterExpression,
+      top: 5000
+    });
+    return extractUnitMetadata(unitGroups);
+  } catch (error) {
+    console.warn('Não foi possível carregar unidades do usuário na lista UnitGroups.', error);
+    return { units: [], hasLookup: false, hasText: false };
+  }
+}
+
+/**
+ * Descobre o tipo do campo "unit" na lista Projects para ajustar o filtro dinamicamente.
+ * @returns {Promise<'Lookup'|'LookupMulti'|'Text'|'Unknown'>} Tipo principal identificado.
+ */
+async function determineProjectUnitFieldType() {
+  try {
+    const url = sp.buildUrl(PROJECTS_LIST_NAME, "/fields/getbyinternalnameortitle('unit')");
+    const headers = { Accept: 'application/json;odata=verbose' };
+    const data = await sp.request(url, { headers });
+    const type = data?.d?.TypeAsString;
+    if (type === 'Lookup' || type === 'LookupMulti') {
+      return type;
+    }
+    if (type === 'Text') {
+      return 'Text';
+    }
+    return 'Unknown';
+  } catch (error) {
+    console.warn('Não foi possível determinar o tipo do campo unit na lista Projects.', error);
+    return 'Unknown';
+  }
+}
+
+/**
+ * Monta a expressão OData final combinando autor e unidades disponíveis.
+ * @param {number|null} currentUserId - Identificador do usuário logado.
+ * @param {string[]} units - Lista de unidades únicas.
+ * @param {'Lookup'|'LookupMulti'|'Text'|'Unknown'} unitFieldType - Tipo detectado na lista Projects.
+ * @returns {string} Expressão filter para a chamada REST.
+ */
+function buildProjectsFilter(currentUserId, units, unitFieldType) {
+  const expressions = [];
+
+  if (currentUserId !== null && currentUserId !== undefined) {
+    expressions.push(`AuthorId eq ${currentUserId}`);
+  }
+
+  const sanitizedUnits = Array.isArray(units)
+    ? units
+        .map(sanitizeForOData)
+        .filter((value) => Boolean(value))
+    : [];
+
+  if (sanitizedUnits.length) {
+    let unitComparisons = [];
+    if (unitFieldType === 'Lookup' || unitFieldType === 'LookupMulti') {
+      unitComparisons = sanitizedUnits.map((value) => `unit/Title eq '${value}'`);
+    } else if (unitFieldType === 'Text') {
+      unitComparisons = sanitizedUnits.map((value) => `unit eq '${value}'`);
+    } else {
+      // Tipo desconhecido: prioriza comparação por título e, se falhar, o fallback via texto será tentado.
+      unitComparisons = sanitizedUnits.map((value) => `unit/Title eq '${value}'`);
+    }
+
+    if (unitComparisons.length) {
+      expressions.push(`(${unitComparisons.join(' or ')})`);
+    }
+  }
+
+  if (!expressions.length && currentUserId !== null && currentUserId !== undefined) {
+    return `AuthorId eq ${currentUserId}`;
+  }
+
+  return expressions.join(' or ');
+}
+
+/**
+ * Recupera projetos do SharePoint aplicando regras de visibilidade por unidade.
+ * @returns {Promise<void>} Promessa resolvida após renderizar lista.
+ */
+async function loadProjectsByUnitAccess() {
+  // captura dados do usuário autenticado
+  const currentUser = getCurrentUserContext();
+  // carrega unidades do usuário consultando lista UnitGroups
+  const unitResolution = await resolveUserUnits(sp, currentUser);
+  // descobre dinamicamente se o campo unit é texto ou lookup na lista Projects
+  const unitFieldType = await determineProjectUnitFieldType();
+  // monta filtro OData combinando autor e unidades encontradas
+  const filterExpression = buildProjectsFilter(currentUser.id, unitResolution.units, unitFieldType);
+
+  if (!filterExpression) {
+    console.warn('Não foi possível montar filtro seguro para carregar projetos. Nenhum dado será exibido.');
+    state.projects = [];
+    renderProjectList();
+    return;
+  }
+
+  const query = { orderby: 'Created desc' };
+  if (filterExpression) {
+    query.filter = filterExpression;
+  }
+
+  let results = [];
+  try {
+    // executa consulta principal de projetos com base no filtro calculado
+    results = await sp.getItems(PROJECTS_LIST_NAME, query);
+  } catch (error) {
+    console.warn('Falha ao carregar projetos com filtro por unidade. Tentando fallback via campo de texto.', error);
+
+    if (unitFieldType === 'Lookup' || unitFieldType === 'Unknown') {
+      const fallbackFilter = buildProjectsFilter(currentUser.id, unitResolution.units, 'Text');
+      const fallbackQuery = { orderby: 'Created desc' };
+      if (fallbackFilter) {
+        fallbackQuery.filter = fallbackFilter;
+      }
+      try {
+        // fallback seguro caso a lista esteja configurada como texto simples
+        results = await sp.getItems(PROJECTS_LIST_NAME, fallbackQuery);
+      } catch (fallbackError) {
+        console.warn('Fallback de carregamento de projetos também falhou.', fallbackError);
+        results = [];
+      }
+    }
+  }
+
+  // elimina duplicidades e atualiza estado global
+  state.projects = dedupeProjects(results);
+  // atualiza painel lateral
+  renderProjectList();
+}
+
+/**
  * Recupera projetos do SharePoint filtrando pelo autor logado e atualiza o estado local.
+ * Mantido como wrapper para compatibilidade retroativa.
  * @returns {Promise<void>} Promessa resolvida após renderizar lista.
  */
 async function loadProjects() {
-  try {
-    const currentUserId = _spPageContextInfo.userId; // pega o ID do usuário logado
-    const results = await sp.getItems('Projects', {
-      orderby: 'Created desc',
-      filter: `AuthorId eq ${currentUserId}`
-    });
-    state.projects = results;
-    renderProjectList();
-  } catch (error) {
-    console.error('Erro ao carregar projetos', error);
-  }
+  await loadProjectsByUnitAccess();
 }
 
 /**
