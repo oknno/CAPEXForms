@@ -2460,6 +2460,79 @@ async function getUserUnits() {
 }
 
 /**
+ * Fragmenta um array em blocos menores para evitar URLs muito longas.
+ * @template T
+ * @param {T[]} items - Lista a ser dividida.
+ * @param {number} size - Tamanho máximo de cada bloco.
+ * @returns {T[][]} Conjunto de blocos respeitando o tamanho informado.
+ */
+function chunkArray(items, size) {
+  if (!Array.isArray(items) || size <= 0) {
+    return [];
+  }
+
+  const chunks = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+/**
+ * Remove itens duplicados (por Id) mantendo o primeiro encontrado.
+ * @param {Project[]} projects - Conjunto de projetos retornados da API.
+ * @returns {Project[]} Lista sem duplicidades.
+ */
+function dedupeProjects(projects) {
+  if (!Array.isArray(projects)) {
+    return [];
+  }
+
+  const map = new Map();
+  for (const project of projects) {
+    if (project && !map.has(project.Id)) {
+      map.set(project.Id, project);
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+/**
+ * Executa consulta na lista Projects para um bloco específico de unidades.
+ * @param {string[]} unitsChunk - Grupo de até 10 unidades.
+ * @param {number} currentUserId - Identificador do usuário logado.
+ * @returns {Promise<Project[]>} Projetos retornados para o bloco informado.
+ */
+async function fetchProjectsByUnitsChunk(unitsChunk, currentUserId) {
+  const clauses = [`AuthorId eq ${currentUserId}`];
+
+  if (Array.isArray(unitsChunk) && unitsChunk.length) {
+    const unitClauses = unitsChunk
+      .map((unitName) => (typeof unitName === 'string' ? unitName.trim() : ''))
+      .filter(Boolean)
+      .map((unitName) => `unit eq '${unitName.replace(/'/g, "''")}'`);
+
+    if (unitClauses.length) {
+      clauses.push(`(${unitClauses.join(' or ')})`);
+    }
+  }
+
+  const query = {
+    orderby: 'Created desc',
+    filter: clauses.join(' or ')
+  };
+
+  try {
+    const response = await sp.getItems('Projects', query);
+    return Array.isArray(response) ? response : [];
+  } catch (error) {
+    console.warn('Erro ao carregar projetos para bloco de unidades', unitsChunk, error);
+    return [];
+  }
+}
+
+/**
  * Recupera projetos do SharePoint filtrando pelo autor logado e unidades associadas.
  * @returns {Promise<void>} Promessa resolvida após renderizar lista.
  */
@@ -2473,26 +2546,25 @@ async function loadProjects() {
   }
 
   const userUnits = await getUserUnits();
-  const clauses = [`AuthorId eq ${currentUserId}`];
-
-  if (userUnits.length) {
-    const unitClauses = userUnits.map((unitName) => {
-      const sanitized = unitName.replace(/'/g, "''");
-      return `unit eq '${sanitized}'`;
-    });
-    clauses.push(`(${unitClauses.join(' or ')})`);
-  }
-
-  const query = {
-    orderby: 'Created desc',
-    filter: clauses.join(' or ')
-  };
+  const unitChunks = chunkArray(userUnits, 10);
+  const chunksToFetch = unitChunks.length ? unitChunks : [[]];
 
   try {
-    const results = await sp.getItems('Projects', query);
-    state.projects = Array.isArray(results) ? results : [];
+    const results = await Promise.all(
+      chunksToFetch.map((chunk) => fetchProjectsByUnitsChunk(chunk, currentUserId))
+    );
+    const merged = results.flat();
+    const deduped = dedupeProjects(merged);
+
+    deduped.sort((a, b) => {
+      const dateA = a?.Created ? new Date(a.Created).getTime() : 0;
+      const dateB = b?.Created ? new Date(b.Created).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    state.projects = deduped;
   } catch (error) {
-    console.warn('Erro ao carregar projetos', error);
+    console.warn('Erro inesperado ao consolidar projetos', error);
     state.projects = [];
   }
 
