@@ -2515,6 +2515,7 @@ async function resolveUserUnits(userContext) {
   if (usersField) {
     query.expand = usersField;
   }
+  query.top = '5000';
 
   try {
     const records = await sp.getItems(listName, query);
@@ -2790,6 +2791,116 @@ function dedupeProjects(projects) {
 }
 
 /**
+ * Normaliza texto de unidade para comparações case-insensitive.
+ * @param {string|null|undefined} value - Texto bruto da unidade.
+ * @returns {string|null} Valor normalizado ou null.
+ */
+function normalizeUnitKey(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.toLowerCase();
+}
+
+/**
+ * Tenta resolver o valor textual da unidade armazenada no projeto considerando variações comuns.
+ * @param {Project} project - Registro retornado do SharePoint.
+ * @returns {string|null} Unidade em formato textual ou null quando inexistente.
+ */
+function extractProjectUnit(project) {
+  if (!project || typeof project !== 'object') {
+    return null;
+  }
+
+  const candidates = [];
+  const unitField = UNIT_ACCESS_SETTINGS.projectUnitField;
+  if (unitField) {
+    candidates.push(project[unitField]);
+    candidates.push(project[`${unitField}Value`], project[`${unitField}Text`]);
+    candidates.push(project[`${unitField}Label`], project[`${unitField}Display`]);
+  }
+
+  candidates.push(
+    project.unit,
+    project.Unit,
+    project.unitValue,
+    project.unitText,
+    project.UnitText,
+    project.unitDisplay,
+    project.UnitDisplay,
+    project.unitLabel,
+    project.UnitLabel
+  );
+
+  for (const candidate of candidates) {
+    const value = resolveTextCandidate(candidate);
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Determina se o usuário atual é o autor do projeto considerando variações de campo.
+ * @param {Project} project - Item retornado do SharePoint.
+ * @param {number|null} userId - Identificador do usuário atual.
+ * @returns {boolean} Verdadeiro quando o projeto foi criado pelo usuário.
+ */
+function isProjectAuthor(project, userId) {
+  if (userId == null || !project || typeof project !== 'object') {
+    return false;
+  }
+
+  const candidates = [
+    project.AuthorId,
+    project.AuthorID,
+    project.authorId,
+    project.authorID,
+    project.Author?.Id,
+    project.Author?.ID,
+    project.author?.Id,
+    project.author?.ID
+  ];
+
+  return candidates.some((candidate) => candidate != null && Number(candidate) === Number(userId));
+}
+
+/**
+ * Filtra projetos mantendo apenas aqueles autorizados ao usuário pelo critério de autoria ou unidade.
+ * @param {Project[]} projects - Lista retornada do SharePoint.
+ * @param {{id:number|null}} currentUser - Dados básicos do usuário atual.
+ * @param {Set<string>} unitKeys - Unidades normalizadas às quais o usuário pertence.
+ * @returns {Project[]} Projetos visíveis ao usuário.
+ */
+function filterAccessibleProjects(projects, currentUser, unitKeys) {
+  if (!Array.isArray(projects) || !projects.length) {
+    return [];
+  }
+
+  const hasUnits = unitKeys.size > 0;
+
+  return projects.filter((project) => {
+    if (isProjectAuthor(project, currentUser.id)) {
+      return true;
+    }
+
+    if (!hasUnits) {
+      return false;
+    }
+
+    const unitValue = extractProjectUnit(project);
+    const normalizedUnit = normalizeUnitKey(unitValue);
+    return normalizedUnit != null && unitKeys.has(normalizedUnit);
+  });
+}
+
+/**
  * Recupera projetos acessíveis ao usuário com base em autoria e pertencimento às unidades.
  * @returns {Promise<void>} Promessa resolvida após renderizar lista.
  */
@@ -2806,33 +2917,57 @@ async function loadProjects() {
     });
     state.userUnits = userUnits;
 
+    const unitKeys = new Set(userUnits.map((unit) => normalizeUnitKey(unit)).filter(Boolean));
+
     const clauses = [];
     if (currentUserId != null) {
       clauses.push(`AuthorId eq ${currentUserId}`);
     }
 
-    if (userUnits.length && UNIT_ACCESS_SETTINGS.projectUnitField) {
+    if (unitKeys.size && UNIT_ACCESS_SETTINGS.projectUnitField) {
       const field = UNIT_ACCESS_SETTINGS.projectUnitField;
       userUnits.forEach((unit) => {
         clauses.push(`${field} eq '${sanitizeForOData(unit)}'`);
       });
     }
 
-    if (!clauses.length) {
+    if (currentUserId == null && unitKeys.size === 0) {
       console.warn('Usuário atual sem identificadores válidos. Nenhum projeto será retornado.');
       state.projects = [];
       renderProjectList();
       return;
     }
 
-    const query = { orderby: 'Created desc' };
+    const query = { orderby: 'Created desc', top: '5000' };
     const filter = buildOrFilter(clauses);
     if (filter) {
       query.filter = filter;
     }
 
-    const results = await sp.getItems(PROJECTS_LIST_NAME, query);
-    state.projects = dedupeProjects(results);
+    let results = [];
+    try {
+      results = await sp.getItems(PROJECTS_LIST_NAME, query);
+    } catch (error) {
+      console.warn('Falha ao aplicar filtro de projetos. Tentando consulta sem filtro.', error);
+      results = await sp.getItems(PROJECTS_LIST_NAME, { orderby: 'Created desc', top: '5000' });
+    }
+
+    let accessibleProjects = filterAccessibleProjects(results, { id: currentUserId }, unitKeys);
+
+    const containsSharedProjects = accessibleProjects.some((project) => !isProjectAuthor(project, currentUserId));
+    if (!containsSharedProjects && unitKeys.size) {
+      try {
+        const fallbackResults = await sp.getItems(PROJECTS_LIST_NAME, { orderby: 'Created desc', top: '5000' });
+        const fallbackAccessible = filterAccessibleProjects(fallbackResults, { id: currentUserId }, unitKeys);
+        accessibleProjects = dedupeProjects([...accessibleProjects, ...fallbackAccessible]);
+      } catch (fallbackError) {
+        console.warn('Falha ao executar fallback sem filtro para projetos.', fallbackError);
+      }
+    } else {
+      accessibleProjects = dedupeProjects(accessibleProjects);
+    }
+
+    state.projects = accessibleProjects;
     renderProjectList();
   } catch (error) {
     console.error('Erro ao carregar projetos', error);
