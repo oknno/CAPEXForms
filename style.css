@@ -1291,6 +1291,18 @@ p {
   margin-top: 6px;
 }
 
+.roce-value {
+  margin: 6px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--purple);
+}
+
+.roce-value[data-state='pending'] {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .comment-feedback.danger {
   color: var(--red);
 }
