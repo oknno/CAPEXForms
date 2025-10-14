@@ -37,6 +37,12 @@
  * @property {string} [kpiDescription]
  * @property {string|number} [kpiCurrent]
  * @property {string|number} [kpiExpected]
+ * @property {number} [roceGain]
+ * @property {string} [roceGainDescription]
+ * @property {number} [roceLoss]
+ * @property {string} [roceLossDescription]
+ * @property {string} [roceClassification]
+ * @property {number} [roceValue]
  * @property {string} [category]
  * @property {string} [investmentType]
  * @property {string} [assetType]
@@ -1632,6 +1638,12 @@ const projectBudgetInput = document.getElementById('projectBudget');
 const investmentLevelSelect = document.getElementById('investmentLevel');
 const projectStartDateInput = document.getElementById('startDate');
 const projectEndDateInput = document.getElementById('endDate');
+const roceGainInput = document.getElementById('roceGain');
+const roceLossInput = document.getElementById('roceLoss');
+const roceClassificationField = document.getElementById('roceClassification');
+const roceGainDescriptionField = document.getElementById('roceGainDescription');
+const roceLossDescriptionField = document.getElementById('roceLossDescription');
+const roceValueDisplay = document.getElementById('roceValueDisplay');
 
 const businessNeedField = document.getElementById('businessNeed');
 const proposedSolutionField = document.getElementById('proposedSolution');
@@ -1643,6 +1655,31 @@ const COMMENT_FEEDBACK_CLASSES = ['danger', 'warning', 'success'];
 const simplePepTemplate = document.getElementById('simplePepTemplate');
 const milestoneTemplate = document.getElementById('milestoneTemplate');
 const activityTemplate = document.getElementById('activityTemplate');
+
+/**
+ * Atualiza campos visuais da seção de ROCE com base nos valores atuais.
+ * @returns {{gain:number,loss:number,budget:number,value:number,classification:string}} Métricas calculadas.
+ */
+function updateRoceMetrics() {
+  const metrics = computeRoceMetrics({
+    gain: roceGainInput,
+    loss: roceLossInput,
+    budget: projectBudgetInput
+  });
+
+  if (roceClassificationField) {
+    const classificationText = resolveRoceClassificationLabel(metrics);
+    roceClassificationField.value = classificationText;
+  }
+
+  if (roceValueDisplay) {
+    const percentageText = formatRocePercentage(metrics.value);
+    roceValueDisplay.textContent = `ROCE: ${percentageText}`;
+    roceValueDisplay.dataset.state = Number.isFinite(metrics.value) ? 'calculated' : 'pending';
+  }
+
+  return metrics;
+}
 
 // Ajuste CAPEX: listas de PEP segmentadas por empresa para popular selects dinamicamente.
 const PEP_OPTIONS_DEFAULT = [
@@ -2232,6 +2269,7 @@ function init() {
   }
 
   bindEvents();
+  updateRoceMetrics();
   ensureActivityRowClasses();
   updateCompanyDependentFields(companySelect?.value || '');
   // Ajuste CAPEX: garante selects de PEP alinhados com empresa atual na inicialização.
@@ -2314,7 +2352,24 @@ function bindEvents() {
       event.target.value = sanitized;
     }
     debouncedBudgetRecalculation();
+    updateRoceMetrics();
   });
+
+  const handleRoceNumericInput = (event) => {
+    const sanitized = sanitizeNumericInputValue(event.target.value);
+    if (event.target.value !== sanitized) {
+      event.target.value = sanitized;
+    }
+    updateRoceMetrics();
+  };
+
+  if (roceGainInput) {
+    roceGainInput.addEventListener('input', handleRoceNumericInput);
+  }
+
+  if (roceLossInput) {
+    roceLossInput.addEventListener('input', handleRoceNumericInput);
+  }
 
   const scheduleActivityDateValidation = debounce((input) => {
     if (input) {
@@ -3380,6 +3435,7 @@ function openProjectForm(mode, detail = null) {
   overlay.classList.remove('hidden');
   queueGanttRefresh();
   validateAllDateRanges();
+  updateRoceMetrics();
 }
 
 /**
@@ -3428,7 +3484,30 @@ function fillFormWithProject(detail) {
   document.getElementById('kpiCurrent').value = project.kpiCurrent ?? '';
   document.getElementById('kpiExpected').value = project.kpiExpected ?? '';
 
+  if (roceGainInput) {
+    const gainValue = sanitizeNumericInputValue(project.roceGain);
+    roceGainInput.value = gainValue !== '' ? gainValue : '0';
+  }
+
+  if (roceLossInput) {
+    const lossValue = sanitizeNumericInputValue(project.roceLoss);
+    roceLossInput.value = lossValue !== '' ? lossValue : '0';
+  }
+
+  if (roceGainDescriptionField) {
+    roceGainDescriptionField.value = project.roceGainDescription || '';
+  }
+
+  if (roceLossDescriptionField) {
+    roceLossDescriptionField.value = project.roceLossDescription || '';
+  }
+
+  if (roceClassificationField && project.roceClassification) {
+    roceClassificationField.value = project.roceClassification;
+  }
+
   updateBudgetSections({ preserve: true });
+  updateRoceMetrics();
 
   if (project.budgetBrl < BUDGET_THRESHOLD) {
     simplePeps.forEach((pep) => {
@@ -3582,6 +3661,16 @@ function populateSummaryOverlay() {
  * @returns {Array<{title:string, entries:Array}>} Conjunto de seções e campos.
  */
 function getSummarySectionsData() {
+  const roceMetrics = computeRoceMetrics({
+    gain: roceGainInput,
+    loss: roceLossInput,
+    budget: projectBudgetInput
+  });
+  const roceClassificationDisplay = resolveRoceClassificationLabel(roceMetrics);
+  const rocePercentDisplay = Number.isFinite(roceMetrics.value)
+    ? formatRocePercentage(roceMetrics.value)
+    : '—';
+
   return [
     {
       title: 'Sobre o Projeto',
@@ -3631,6 +3720,17 @@ function getSummarySectionsData() {
         { label: 'KPI Atual', value: formatNumberField('kpiCurrent') },
         { label: 'KPI Esperado', value: formatNumberField('kpiExpected') },
         { label: 'Descrição do KPI', value: getFieldDisplayValue('kpiDescription'), fullWidth: true }
+      ]
+    },
+    {
+      title: 'ROCE',
+      entries: [
+        { label: 'Ganho', value: formatCurrencyField('roceGain') },
+        { label: 'Perda', value: formatCurrencyField('roceLoss') },
+        { label: 'Classificação', value: roceClassificationDisplay },
+        { label: 'ROCE Calculado', value: rocePercentDisplay },
+        { label: 'Descrição do ganho', value: getFieldDisplayValue('roceGainDescription'), fullWidth: true },
+        { label: 'Descrição da perda', value: getFieldDisplayValue('roceLossDescription'), fullWidth: true }
       ]
     }
   ];
@@ -4074,6 +4174,22 @@ function formatCurrencyField(fieldId) {
     return '';
   }
   return BRL.format(value);
+}
+
+/**
+ * Formata um valor decimal como porcentagem seguindo o locale pt-BR.
+ * @param {number} value - Valor decimal (ex.: 0.12 para 12%).
+ * @returns {string} Percentual formatado ou '—' quando inválido.
+ */
+function formatRocePercentage(value) {
+  if (!Number.isFinite(value)) {
+    return '—';
+  }
+  return value.toLocaleString('pt-BR', {
+    style: 'percent',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  });
 }
 
 /**
@@ -4536,6 +4652,78 @@ function parseNumericInputValue(source) {
 
   const numericValue = coerceNumericValue(source);
   return Number.isFinite(numericValue) ? numericValue : 0;
+}
+
+/**
+ * Normaliza diferentes fontes de valor numérico, retornando NaN quando não houver número válido.
+ * @param {*} source - Valor de origem (input, string ou número).
+ * @returns {number} Valor numérico ou NaN.
+ */
+function readNumericValue(source) {
+  if (source === null || source === undefined) {
+    return NaN;
+  }
+
+  if (typeof source === 'number') {
+    return Number.isFinite(source) ? source : NaN;
+  }
+
+  if (typeof source === 'object' && 'value' in source) {
+    return readNumericValue(source.value);
+  }
+
+  const coerced = coerceNumericValue(source);
+  return Number.isFinite(coerced) ? coerced : NaN;
+}
+
+/**
+ * Calcula os indicadores de ROCE a partir de ganho, perda e orçamento informados.
+ * @param {{gain?:*, loss?:*, budget?:*}} [param0={}] - Valores de entrada para cálculo.
+ * @returns {{gain:number, loss:number, budget:number, value:number, classification:string}} Métricas calculadas.
+ */
+function computeRoceMetrics({ gain, loss, budget } = {}) {
+  const gainValue = readNumericValue(gain);
+  const lossValue = readNumericValue(loss);
+  const budgetValue = readNumericValue(budget);
+
+  const safeGain = Number.isFinite(gainValue) ? gainValue : 0;
+  const safeLoss = Number.isFinite(lossValue) ? lossValue : 0;
+
+  if (!Number.isFinite(budgetValue) || budgetValue <= 0) {
+    return {
+      gain: safeGain,
+      loss: safeLoss,
+      budget: Number.isFinite(budgetValue) ? budgetValue : NaN,
+      value: NaN,
+      classification: ''
+    };
+  }
+
+  const value = (safeGain - safeLoss) / budgetValue;
+  const classification = value >= 0.1 ? 'Estratégico' : 'Regular';
+
+  return {
+    gain: safeGain,
+    loss: safeLoss,
+    budget: budgetValue,
+    value,
+    classification
+  };
+}
+
+/**
+ * Resolve o texto apresentado para a classificação do ROCE conforme orçamento disponível.
+ * @param {{budget:number, classification:string}} metrics - Resultado de computeRoceMetrics.
+ * @returns {string} Texto final para classificação.
+ */
+function resolveRoceClassificationLabel(metrics) {
+  if (!metrics) {
+    return '';
+  }
+  if (!Number.isFinite(metrics.budget) || metrics.budget <= 0) {
+    return 'Aguardando orçamento válido';
+  }
+  return metrics.classification || 'Regular';
 }
 
 /**
@@ -5477,6 +5665,7 @@ async function handleFormSubmit(event) {
 
   const payload = collectProjectData();
   payload.status = normalizedStatus;
+  const sharePointProjectPayload = buildProjectSharePointPayload(payload);
 
   const simplePeps = collectSimplePepDataForSummary();
   const milestones = collectMilestonesForSummary();
@@ -5502,10 +5691,10 @@ async function handleFormSubmit(event) {
   try {
     let savedProjectId = projectId;
     if (mode === 'create') {
-      const result = await sp.createItem('Projects', payload);
+      const result = await sp.createItem('Projects', sharePointProjectPayload);
       savedProjectId = result?.Id;
     } else {
-      await sp.updateItem('Projects', Number(projectId), payload);
+      await sp.updateItem('Projects', Number(projectId), sharePointProjectPayload);
     }
 
     resolvedId = Number(savedProjectId || projectId);
@@ -5535,7 +5724,12 @@ async function handleFormSubmit(event) {
         Title: payload.Title,
         status: payload.status,
         budgetBrl: payload.budgetBrl,
-        investmentLevel: payload.investmentLevel
+        investmentLevel: payload.investmentLevel,
+        roceGain: payload.roceGain,
+        roceLoss: payload.roceLoss,
+        roceGainDescription: payload.roceGainDescription,
+        roceLossDescription: payload.roceLossDescription,
+        roceClassification: payload.roceClassification
       });
       renderProjectList();
       if (state.currentDetails?.project?.Id === resolvedId) {
@@ -5546,7 +5740,12 @@ async function handleFormSubmit(event) {
             Title: payload.Title,
             status: payload.status,
             budgetBrl: payload.budgetBrl,
-            investmentLevel: payload.investmentLevel
+            investmentLevel: payload.investmentLevel,
+            roceGain: payload.roceGain,
+            roceLoss: payload.roceLoss,
+            roceGainDescription: payload.roceGainDescription,
+            roceLossDescription: payload.roceLossDescription,
+            roceClassification: payload.roceClassification
           }
         };
         renderProjectDetails(state.currentDetails);
@@ -5620,6 +5819,23 @@ function collectProjectData() {
   const investmentLevelValue = determineInvestmentLevel(budgetValue);
   const depField = document.getElementById('depreciationCostCenter');
   const depreciationValue = depField?.value || '';
+  const roceGainValue = readNumericValue(roceGainInput);
+  const roceLossValue = readNumericValue(roceLossInput);
+  const roceGainDescription = (roceGainDescriptionField?.value || '').trim();
+  const roceLossDescription = (roceLossDescriptionField?.value || '').trim();
+
+  const normalizedRoceGain = Number.isFinite(roceGainValue) ? roceGainValue : 0;
+  const normalizedRoceLoss = Number.isFinite(roceLossValue) ? roceLossValue : 0;
+  const roceMetrics = computeRoceMetrics({
+    gain: normalizedRoceGain,
+    loss: normalizedRoceLoss,
+    budget: budgetBrl
+  });
+  const roceClassification = resolveRoceClassificationLabel(roceMetrics);
+
+  if (roceClassificationField) {
+    roceClassificationField.value = roceClassification;
+  }
 
   const data = {
     Title: document.getElementById('projectName').value.trim(),
@@ -5646,9 +5862,41 @@ function collectProjectData() {
     kpiName: document.getElementById('kpiName').value.trim(),
     kpiDescription: document.getElementById('kpiDescription').value.trim(),
     kpiCurrent: document.getElementById('kpiCurrent').value.trim(),
-    kpiExpected: document.getElementById('kpiExpected').value.trim()
+    kpiExpected: document.getElementById('kpiExpected').value.trim(),
+    roceGain: normalizedRoceGain,
+    roceGainDescription,
+    roceLoss: normalizedRoceLoss,
+    roceLossDescription,
+    roceClassification
   };
   return data;
+}
+
+/**
+ * Ajusta campos do payload do projeto para respeitar tipos esperados pelo SharePoint.
+ * @param {Project} projectData - Dados coletados do formulário.
+ * @returns {Object} Payload pronto para envio à lista Projects.
+ */
+function buildProjectSharePointPayload(projectData) {
+  if (!projectData || typeof projectData !== 'object') {
+    return {};
+  }
+
+  const payload = { ...projectData };
+
+  if ('approvalYear' in payload) {
+    const yearValue = payload.approvalYear;
+    if (Number.isFinite(yearValue)) {
+      payload.approvalYear = yearValue.toString();
+    } else if (typeof yearValue === 'string') {
+      const trimmed = yearValue.trim();
+      payload.approvalYear = trimmed || null;
+    } else {
+      payload.approvalYear = null;
+    }
+  }
+
+  return payload;
 }
 
 /**
@@ -5862,6 +6110,14 @@ function collectPepEntriesForSummary(simplePeps, activities) {
 function collectProjectDisplayValues() {
   const depField = document.getElementById('depreciationCostCenter');
   const depValue = depField?.value || '';
+  const roceMetrics = computeRoceMetrics({
+    gain: roceGainInput,
+    loss: roceLossInput,
+    budget: projectBudgetInput
+  });
+  const rocePercentDisplay = Number.isFinite(roceMetrics.value)
+    ? formatRocePercentage(roceMetrics.value)
+    : '';
   return {
     investmentLevel: getSelectOptionText(investmentLevelSelect),
     company: getSelectOptionText(companySelect),
@@ -5872,7 +6128,9 @@ function collectProjectDisplayValues() {
     category: getSelectOptionText(document.getElementById('category')),
     investmentType: getSelectOptionText(document.getElementById('investmentType')),
     assetType: getSelectOptionText(document.getElementById('assetType')),
-    kpiType: getSelectOptionText(document.getElementById('kpiType'))
+    kpiType: getSelectOptionText(document.getElementById('kpiType')),
+    roceClassification: resolveRoceClassificationLabel(roceMetrics),
+    roceValue: rocePercentDisplay
   };
 }
 
@@ -5888,16 +6146,27 @@ function buildApprovalSummary(projectId, projectData = {}) {
   const activities = collectActivitiesForSummary(milestones);
   const peps = collectPepEntriesForSummary(simplePeps, activities);
   const displayValues = collectProjectDisplayValues();
+  const roceMetrics = computeRoceMetrics({
+    gain: projectData.roceGain,
+    loss: projectData.roceLoss,
+    budget: projectData.budgetBrl
+  });
+  const roceClassification = resolveRoceClassificationLabel(roceMetrics);
+  const roceValue = Number.isFinite(roceMetrics.value) ? roceMetrics.value : null;
 
   const numericId = Number(projectId);
   const resolvedId = Number.isFinite(numericId) ? numericId : projectId;
 
+  const projectSummary = {
+    id: resolvedId,
+    ...projectData,
+    roceClassification,
+    roceValue,
+    displayValues
+  };
+
   return {
-    project: {
-      id: resolvedId,
-      ...projectData,
-      displayValues
-    },
+    project: projectSummary,
     milestones,
     activities,
     peps
