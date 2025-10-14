@@ -5817,8 +5817,10 @@ function collectProjectData() {
   const budgetValue = getProjectBudgetValue();
   const budgetBrl = Number.isFinite(budgetValue) ? budgetValue : 0;
   const investmentLevelValue = determineInvestmentLevel(budgetValue);
+
   const depField = document.getElementById('depreciationCostCenter');
   const depreciationValue = depField?.value || '';
+
   const roceGainValue = readNumericValue(roceGainInput);
   const roceLossValue = readNumericValue(roceLossInput);
   const roceGainDescription = (roceGainDescriptionField?.value || '').trim();
@@ -5826,13 +5828,14 @@ function collectProjectData() {
 
   const normalizedRoceGain = Number.isFinite(roceGainValue) ? roceGainValue : 0;
   const normalizedRoceLoss = Number.isFinite(roceLossValue) ? roceLossValue : 0;
+
   const roceMetrics = computeRoceMetrics({
     gain: normalizedRoceGain,
     loss: normalizedRoceLoss,
     budget: budgetBrl
   });
-  const roceClassification = resolveRoceClassificationLabel(roceMetrics);
 
+  const roceClassification = resolveRoceClassificationLabel(roceMetrics);
   if (roceClassificationField) {
     roceClassificationField.value = roceClassification;
   }
@@ -5843,7 +5846,7 @@ function collectProjectData() {
     investmentType: document.getElementById('investmentType').value.trim(),
     assetType: document.getElementById('assetType').value.trim(),
     projectFunction: document.getElementById('projectFunction').value.trim(),
-    approvalYear: parseNumber(document.getElementById('approvalYear').value),
+    approvalYear: String(document.getElementById('approvalYear').value), // ← muda para string
     startDate: document.getElementById('startDate').value || null,
     endDate: document.getElementById('endDate').value || null,
     budgetBrl,
@@ -5863,12 +5866,15 @@ function collectProjectData() {
     kpiDescription: document.getElementById('kpiDescription').value.trim(),
     kpiCurrent: document.getElementById('kpiCurrent').value.trim(),
     kpiExpected: document.getElementById('kpiExpected').value.trim(),
-    roceGain: normalizedRoceGain,
+
+    // 🆕 Correções ROCE
+    roceGain: String(normalizedRoceGain ?? ''),
     roceGainDescription,
-    roceLoss: normalizedRoceLoss,
+    roceLoss: String(normalizedRoceLoss ?? ''),
     roceLossDescription,
-    roceClassification
+    roceClassification: String(roceClassification ?? '')
   };
+
   return data;
 }
 
