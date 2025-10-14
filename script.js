@@ -5681,6 +5681,7 @@ async function handleFormSubmit(event) {
 
   const payload = collectProjectData();
   payload.status = normalizedStatus;
+  const sharePointProjectPayload = buildProjectSharePointPayload(payload);
 
   const simplePeps = collectSimplePepDataForSummary();
   const milestones = collectMilestonesForSummary();
@@ -5706,10 +5707,10 @@ async function handleFormSubmit(event) {
   try {
     let savedProjectId = projectId;
     if (mode === 'create') {
-      const result = await sp.createItem('Projects', payload);
+      const result = await sp.createItem('Projects', sharePointProjectPayload);
       savedProjectId = result?.Id;
     } else {
-      await sp.updateItem('Projects', Number(projectId), payload);
+      await sp.updateItem('Projects', Number(projectId), sharePointProjectPayload);
     }
 
     resolvedId = Number(savedProjectId || projectId);
@@ -5861,6 +5862,33 @@ function collectProjectData() {
     roceLossDescription
   };
   return data;
+}
+
+/**
+ * Ajusta campos do payload do projeto para respeitar tipos esperados pelo SharePoint.
+ * @param {Project} projectData - Dados coletados do formulário.
+ * @returns {Object} Payload pronto para envio à lista Projects.
+ */
+function buildProjectSharePointPayload(projectData) {
+  if (!projectData || typeof projectData !== 'object') {
+    return {};
+  }
+
+  const payload = { ...projectData };
+
+  if ('approvalYear' in payload) {
+    const yearValue = payload.approvalYear;
+    if (Number.isFinite(yearValue)) {
+      payload.approvalYear = yearValue.toString();
+    } else if (typeof yearValue === 'string') {
+      const trimmed = yearValue.trim();
+      payload.approvalYear = trimmed || null;
+    } else {
+      payload.approvalYear = null;
+    }
+  }
+
+  return payload;
 }
 
 /**
