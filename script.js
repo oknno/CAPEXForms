@@ -4203,8 +4203,8 @@ function formatRocePercentage(value) {
   }
   return value.toLocaleString('pt-BR', {
     style: 'percent',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
   });
 }
 
@@ -4716,7 +4716,7 @@ function computeRoceMetrics({ gain, loss, budget } = {}) {
   }
 
   const value = (safeGain - safeLoss) / budgetValue;
-  const classification = value > 0.1 ? 'Estratégico' : 'Regular';
+  const classification = value >= 0.1 ? 'Estratégico' : 'Regular';
 
   return {
     gain: safeGain,
