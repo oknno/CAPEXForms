@@ -330,11 +330,58 @@
       </fieldset>
 
       <!-- ============================== -->
-      <!-- 7. Key Projects (a partir 1MM) -->
+      <!-- 7. ROCE                        -->
+      <!-- ============================== -->
+      <!-- Seção dedicada ao cálculo do ROCE com atualização em tempo real -->
+      <fieldset class="form-section">
+        <legend>7. ROCE</legend>
+        <div class="field-group">
+          <label for="roceClassification">Classificação do ROCE</label>
+          <input id="roceClassification" name="roceClassification" type="text" readonly aria-live="polite">
+          <p id="roceValueDisplay" class="roce-value" data-state="pending">ROCE: —</p>
+        </div>
+        <div class="field-grid">
+          <div class="field-group">
+            <label for="roceGain">Ganho (R$)</label>
+            <input
+              id="roceGain"
+              name="roceGain"
+              type="text"
+              inputmode="numeric"
+              pattern="^[0-9]+$"
+              value="0"
+            >
+          </div>
+          <div class="field-group">
+            <label for="roceLoss">Perda (R$)</label>
+            <input
+              id="roceLoss"
+              name="roceLoss"
+              type="text"
+              inputmode="numeric"
+              pattern="^[0-9]+$"
+              value="0"
+            >
+          </div>
+        </div>
+        <div class="field-grid">
+          <div class="field-group">
+            <label for="roceGainDescription">Descrição do ganho</label>
+            <textarea id="roceGainDescription" name="roceGainDescription" rows="3" maxlength="500"></textarea>
+          </div>
+          <div class="field-group">
+            <label for="roceLossDescription">Descrição da perda</label>
+            <textarea id="roceLossDescription" name="roceLossDescription" rows="3" maxlength="500"></textarea>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ============================== -->
+      <!-- 8. Key Projects (a partir 1MM) -->
       <!-- ============================== -->
       <!-- Seção exclusiva para orçamentos >= 1MM com marcos e atividades vinculadas ao Gantt -->
       <fieldset id="keyProjectSection" class="form-section hidden">
-        <legend>7. KEY Projects</legend>
+        <legend>8. KEY Projects</legend>
         <p class="hint">Disponível quando o orçamento é igual ou superior a R$ 1.000.000,00.</p>
         <div id="milestoneList" class="dynamic-list"></div>
         <!-- CTA para duplicar o template #milestoneTemplate criando novo marco -->
