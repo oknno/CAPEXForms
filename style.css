@@ -1013,6 +1013,13 @@ p {
   font-size: 13px;
 }
 
+.currency-preview {
+  margin-top: -2px;
+  font-size: 13px;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
 .form-feedback {
   display: flex;
   flex-direction: column;
