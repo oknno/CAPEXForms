@@ -513,6 +513,7 @@ async deleteAttachment(listName, itemId, fileName) {
  * reatribuição desses nós para preservar performance e consistência de estado.
  */
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const currencyPreviewRegistry = new WeakMap();
 const DATE_FMT = new Intl.DateTimeFormat('pt-BR');
 const BUDGET_THRESHOLD = 1_000_000;
 const EXCHANGE_RATE = 5.6; // 1 USD = 5.6 BRL
@@ -1644,6 +1645,19 @@ const roceClassificationField = document.getElementById('roceClassification');
 const roceGainDescriptionField = document.getElementById('roceGainDescription');
 const roceLossDescriptionField = document.getElementById('roceLossDescription');
 const roceValueDisplay = document.getElementById('roceValueDisplay');
+const projectBudgetPreview = document.getElementById('projectBudgetPreview');
+const roceGainPreview = document.getElementById('roceGainPreview');
+const roceLossPreview = document.getElementById('roceLossPreview');
+
+if (projectBudgetInput && projectBudgetPreview) {
+  attachCurrencyPreview(projectBudgetInput, projectBudgetPreview);
+}
+if (roceGainInput && roceGainPreview) {
+  attachCurrencyPreview(roceGainInput, roceGainPreview);
+}
+if (roceLossInput && roceLossPreview) {
+  attachCurrencyPreview(roceLossInput, roceLossPreview);
+}
 
 const businessNeedField = document.getElementById('businessNeed');
 const proposedSolutionField = document.getElementById('proposedSolution');
@@ -2351,6 +2365,7 @@ function bindEvents() {
     if (event.target.value !== sanitized) {
       event.target.value = sanitized;
     }
+    refreshCurrencyPreview(projectBudgetInput);
     debouncedBudgetRecalculation();
     updateRoceMetrics();
   });
@@ -2360,6 +2375,7 @@ function bindEvents() {
     if (event.target.value !== sanitized) {
       event.target.value = sanitized;
     }
+    refreshCurrencyPreview(event.target);
     updateRoceMetrics();
   };
 
@@ -2475,6 +2491,7 @@ function bindEvents() {
         event.target.value = sanitized;
       }
       schedulePepBudgetValidation(event.target);
+      refreshCurrencyPreview(event.target);
     }
     queueGanttRefresh();
   };
@@ -3390,6 +3407,9 @@ function applyStatusBehavior(status) {
  */
 function openProjectForm(mode, detail = null) {
   projectForm.reset();
+  refreshCurrencyPreview(projectBudgetInput);
+  refreshCurrencyPreview(roceGainInput);
+  refreshCurrencyPreview(roceLossInput);
   refreshCommentFeedback();
   resetFormStatus();
   resetValidationState();
@@ -3458,6 +3478,7 @@ function fillFormWithProject(detail) {
   document.getElementById('endDate').value = project.endDate ? project.endDate.substring(0, 10) : '';
 
   document.getElementById('projectBudget').value = sanitizeNumericInputValue(project.budgetBrl);
+  refreshCurrencyPreview(projectBudgetInput);
   updateInvestmentLevelField();
   document.getElementById('fundingSource').value = project.fundingSource || '';
   const selectedCompany = project.company || '';
@@ -3487,11 +3508,13 @@ function fillFormWithProject(detail) {
   if (roceGainInput) {
     const gainValue = sanitizeNumericInputValue(project.roceGain);
     roceGainInput.value = gainValue !== '' ? gainValue : '0';
+    refreshCurrencyPreview(roceGainInput);
   }
 
   if (roceLossInput) {
     const lossValue = sanitizeNumericInputValue(project.roceLoss);
     roceLossInput.value = lossValue !== '' ? lossValue : '0';
+    refreshCurrencyPreview(roceLossInput);
   }
 
   if (roceGainDescriptionField) {
@@ -4150,6 +4173,50 @@ function getSelectOptionText(selectElement) {
     return option.textContent?.trim() ?? '';
   }
   return selectElement.value ?? '';
+}
+
+/**
+ * Associa um elemento de visualização para exibir o valor de um campo como moeda BRL.
+ * @param {HTMLInputElement|null} input - Campo de origem.
+ * @param {HTMLElement|null} preview - Elemento que exibirá o valor formatado.
+ */
+function attachCurrencyPreview(input, preview) {
+  if (!input || !preview) return;
+
+  const updatePreview = () => {
+    if (!preview.isConnected) {
+      currencyPreviewRegistry.delete(input);
+      return;
+    }
+
+    const rawValue = input.value;
+    if (rawValue === null || rawValue === undefined || rawValue === '') {
+      preview.textContent = '—';
+      return;
+    }
+
+    const numericValue = parseNumericInputValue(input);
+    if (!Number.isFinite(numericValue)) {
+      preview.textContent = '—';
+      return;
+    }
+
+    preview.textContent = BRL.format(numericValue);
+  };
+
+  currencyPreviewRegistry.set(input, { preview, update: updatePreview });
+  updatePreview();
+}
+
+/**
+ * Atualiza o elemento de visualização associado a um campo numérico.
+ * @param {HTMLInputElement|null} input - Campo monitorado.
+ */
+function refreshCurrencyPreview(input) {
+  if (!input) return;
+  const entry = currencyPreviewRegistry.get(input);
+  if (!entry) return;
+  entry.update();
 }
 
 /**
@@ -5591,6 +5658,7 @@ function addActivityBlock(milestoneElement, data = {}) {
   const startInput = activity.querySelector('.activity-start');
   const endInput = activity.querySelector('.activity-end');
   const amountInput = activity.querySelector('.activity-pep-amount');
+  const amountPreview = activity.querySelector('[data-currency-preview]');
   const pepTitleInput = activity.querySelector('.activity-pep-title');
   const pepYearInput = activity.querySelector('.activity-pep-year');
 
@@ -5606,6 +5674,9 @@ function addActivityBlock(milestoneElement, data = {}) {
     amountInput.type = 'text';
     amountInput.setAttribute('inputmode', 'decimal');
     amountInput.value = sanitizeNumericInputValue(data.pepAmount);
+    if (amountPreview) {
+      attachCurrencyPreview(amountInput, amountPreview);
+    }
   }
   if (startInput) {
     startInput.value = data.start ? data.start.substring(0, 10) : '';
@@ -5652,6 +5723,7 @@ async function handleFormSubmit(event) {
 
   document.querySelectorAll('.activity-pep-amount').forEach((inp) => {
     inp.value = sanitizeNumericInputValue(inp.value);
+    refreshCurrencyPreview(inp);
   });
 
   const validation = runFormValidations({ scrollOnError: true, focusFirstError: true });
